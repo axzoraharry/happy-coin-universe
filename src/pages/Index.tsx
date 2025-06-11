@@ -108,10 +108,10 @@ const Index = () => {
     );
   }
 
-  // Show app with navbar for authenticated users - cast to any for now
+  // Show app with navbar for authenticated users
   return (
     <div className="min-h-screen bg-gray-50">
-      {(Navbar as any)({ currentPage, onPageChange: setCurrentPage })}
+      <Navbar />
       
       <main className="max-w-7xl mx-auto px-4 py-6">
         {renderPage()}

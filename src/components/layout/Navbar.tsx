@@ -19,12 +19,12 @@ export function Navbar() {
     };
 
     getUser();
-  }, []);
 
-  useEffect(() => {
-    supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleSignOut = async () => {
