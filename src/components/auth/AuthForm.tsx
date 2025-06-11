@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 
 export function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -12,42 +14,70 @@ export function AuthForm() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const { toast } = useToast();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setNeedsConfirmation(false);
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/`,
             data: {
               full_name: fullName,
             },
           },
         });
+
         if (error) throw error;
-        toast({
-          title: "Success!",
-          description: "Check your email to confirm your account.",
-        });
+
+        // Check if user needs email confirmation
+        if (data.user && !data.session) {
+          setNeedsConfirmation(true);
+          toast({
+            title: "Check your email!",
+            description: "We've sent you a confirmation link to complete your signup.",
+          });
+        } else {
+          toast({
+            title: "Account created!",
+            description: "Welcome to your digital wallet.",
+          });
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-        if (error) throw error;
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully signed in.",
-        });
+
+        if (error) {
+          // Handle specific error cases
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('Invalid email or password. Please check your credentials and try again.');
+          } else if (error.message.includes('Email not confirmed')) {
+            throw new Error('Please check your email and click the confirmation link before signing in.');
+          } else {
+            throw error;
+          }
+        }
+
+        if (data.user) {
+          toast({
+            title: "Welcome back!",
+            description: "You've successfully signed in.",
+          });
+        }
       }
     } catch (error: any) {
+      console.error('Auth error:', error);
       toast({
-        title: "Error",
+        title: "Authentication Error",
         description: error.message,
         variant: "destructive",
       });
@@ -55,6 +85,50 @@ export function AuthForm() {
       setLoading(false);
     }
   };
+
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setFullName('');
+    setNeedsConfirmation(false);
+  };
+
+  const switchMode = () => {
+    setIsSignUp(!isSignUp);
+    resetForm();
+  };
+
+  if (needsConfirmation) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader className="text-center">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+          <CardTitle>Check Your Email</CardTitle>
+          <CardDescription>
+            We've sent a confirmation link to {email}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Click the link in your email to activate your account, then return here to sign in.
+            </AlertDescription>
+          </Alert>
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={() => {
+              setNeedsConfirmation(false);
+              setIsSignUp(false);
+            }}
+          >
+            Return to Sign In
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -89,12 +163,23 @@ export function AuthForm() {
           <div>
             <Input
               type="password"
-              placeholder="Password"
+              placeholder="Password (minimum 6 characters)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
             />
           </div>
+          
+          {!isSignUp && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                If you just signed up, make sure to check your email and click the confirmation link first.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
           </Button>
@@ -102,7 +187,7 @@ export function AuthForm() {
         <div className="mt-4 text-center">
           <Button
             variant="link"
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={switchMode}
             className="text-sm"
           >
             {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
