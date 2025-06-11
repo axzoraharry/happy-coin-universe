@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { LandingPage } from '@/components/landing/LandingPage';
 import { WalletDashboard } from '@/components/wallet/WalletDashboard';
+import { WalletActions } from '@/components/wallet/WalletActions';
 import { TransactionsList } from '@/components/transactions/TransactionsList';
 import { NotificationsList } from '@/components/notifications/NotificationsList';
 import { OffersList } from '@/components/offers/OffersList';
@@ -86,7 +86,12 @@ const Index = () => {
         return (
           <div className="space-y-6">
             <WalletDashboard />
-            <TransactionsList />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <WalletActions />
+              <div>
+                <TransactionsList />
+              </div>
+            </div>
           </div>
         );
       case 'coins':
@@ -127,7 +132,12 @@ const Index = () => {
         return (
           <div className="space-y-6">
             <WalletDashboard />
-            <TransactionsList />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <WalletActions />
+              <div>
+                <TransactionsList />
+              </div>
+            </div>
           </div>
         );
     }

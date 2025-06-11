@@ -1,0 +1,330 @@
+
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Lock, Shield, Eye, EyeOff } from 'lucide-react';
+
+export function TransactionPinSetup() {
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [showConfirmPin, setShowConfirmPin] = useState(false);
+  const [showCurrentPin, setShowCurrentPin] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [hasExistingPin, setHasExistingPin] = useState(false);
+  const { toast } = useToast();
+
+  const validatePin = (pinValue: string) => {
+    if (pinValue.length !== 4) {
+      return 'PIN must be exactly 4 digits';
+    }
+    if (!/^\d+$/.test(pinValue)) {
+      return 'PIN must contain only numbers';
+    }
+    return null;
+  };
+
+  const handleSetPin = async () => {
+    const pinError = validatePin(pin);
+    if (pinError) {
+      toast({
+        title: "Invalid PIN",
+        description: pinError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      toast({
+        title: "PIN Mismatch",
+        description: "PIN and confirmation PIN do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Hash the PIN (in a real app, this should be done server-side)
+      const hashedPin = btoa(pin); // Simple base64 encoding for demo
+
+      const { error } = await supabase
+        .from('transaction_pins')
+        .upsert({
+          user_id: user.id,
+          pin_hash: hashedPin,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "PIN Set Successfully",
+        description: "Your transaction PIN has been set securely",
+      });
+
+      setPin('');
+      setConfirmPin('');
+      setCurrentPin('');
+      setHasExistingPin(true);
+    } catch (error: any) {
+      console.error('PIN setup error:', error);
+      toast({
+        title: "PIN Setup Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePin = async () => {
+    if (!currentPin) {
+      toast({
+        title: "Current PIN Required",
+        description: "Please enter your current PIN",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const pinError = validatePin(pin);
+    if (pinError) {
+      toast({
+        title: "Invalid New PIN",
+        description: pinError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (pin !== confirmPin) {
+      toast({
+        title: "PIN Mismatch",
+        description: "New PIN and confirmation PIN do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Verify current PIN first
+      const currentHashedPin = btoa(currentPin);
+      const { data: existingPin, error: fetchError } = await supabase
+        .from('transaction_pins')
+        .select('pin_hash')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (existingPin.pin_hash !== currentHashedPin) {
+        toast({
+          title: "Invalid Current PIN",
+          description: "The current PIN you entered is incorrect",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update with new PIN
+      const newHashedPin = btoa(pin);
+      const { error } = await supabase
+        .from('transaction_pins')
+        .update({
+          pin_hash: newHashedPin,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "PIN Updated Successfully",
+        description: "Your transaction PIN has been updated",
+      });
+
+      setPin('');
+      setConfirmPin('');
+      setCurrentPin('');
+    } catch (error: any) {
+      console.error('PIN update error:', error);
+      toast({
+        title: "PIN Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border-primary/20">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Shield className="h-5 w-5 text-primary" />
+          <span>Transaction PIN</span>
+        </CardTitle>
+        <CardDescription>
+          Set up a 4-digit PIN to secure your wallet transactions
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {hasExistingPin && (
+          <div className="space-y-2">
+            <Label htmlFor="current-pin" className="text-sm font-medium">
+              Current PIN
+            </Label>
+            <div className="relative">
+              <Input
+                id="current-pin"
+                type={showCurrentPin ? "text" : "password"}
+                placeholder="Enter current PIN"
+                value={currentPin}
+                onChange={(e) => setCurrentPin(e.target.value.slice(0, 4))}
+                maxLength={4}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3"
+                onClick={() => setShowCurrentPin(!showCurrentPin)}
+              >
+                {showCurrentPin ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="new-pin" className="text-sm font-medium">
+            {hasExistingPin ? 'New PIN' : 'PIN'}
+          </Label>
+          <div className="relative">
+            <Input
+              id="new-pin"
+              type={showPin ? "text" : "password"}
+              placeholder="Enter 4-digit PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.slice(0, 4))}
+              maxLength={4}
+              className="pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-full px-3"
+              onClick={() => setShowPin(!showPin)}
+            >
+              {showPin ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirm-pin" className="text-sm font-medium">
+            Confirm PIN
+          </Label>
+          <div className="relative">
+            <Input
+              id="confirm-pin"
+              type={showConfirmPin ? "text" : "password"}
+              placeholder="Confirm 4-digit PIN"
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value.slice(0, 4))}
+              maxLength={4}
+              className="pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-full px-3"
+              onClick={() => setShowConfirmPin(!showConfirmPin)}
+            >
+              {showConfirmPin ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-muted/50 p-4 rounded-lg">
+          <div className="flex items-start space-x-2">
+            <Lock className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium mb-1">Security Tips:</p>
+              <ul className="space-y-1 text-xs">
+                <li>• Use a unique 4-digit PIN</li>
+                <li>• Don't use obvious combinations like 1234 or 0000</li>
+                <li>• Keep your PIN confidential</li>
+                <li>• You'll need this PIN for all wallet transactions</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button 
+              className="w-full" 
+              disabled={loading || !pin || !confirmPin || (hasExistingPin && !currentPin)}
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              {loading ? 'Setting up...' : hasExistingPin ? 'Update PIN' : 'Set PIN'}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {hasExistingPin ? 'Update Transaction PIN?' : 'Set Transaction PIN?'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {hasExistingPin 
+                  ? 'This will update your existing transaction PIN. You will need to use the new PIN for all future transactions.'
+                  : 'This will set up a 4-digit PIN that you\'ll need to enter for all wallet transactions. Make sure you remember it!'
+                }
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={hasExistingPin ? handleUpdatePin : handleSetPin}>
+                {hasExistingPin ? 'Update PIN' : 'Set PIN'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
