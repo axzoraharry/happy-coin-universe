@@ -30,27 +30,8 @@ export function ReferralSystem() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get or create referral code
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('referral_code')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      let referralCode = profile?.referral_code;
-
-      // If no referral code exists, create one
-      if (!referralCode) {
-        referralCode = generateReferralCode();
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ referral_code: referralCode })
-          .eq('id', user.id);
-
-        if (updateError) throw updateError;
-      }
+      // For now, generate a referral code based on user ID
+      const referralCode = user.id.substring(0, 8).toUpperCase();
 
       // Get referral statistics (would need additional tables in real implementation)
       setReferralStats({
@@ -70,10 +51,6 @@ export function ReferralSystem() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const generateReferralCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
   const copyReferralCode = () => {

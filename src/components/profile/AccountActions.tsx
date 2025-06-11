@@ -11,66 +11,19 @@ export function AccountActions() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleDeactivateAccount = async () => {
+  const handleSignOut = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Update profile to mark as deactivated
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          is_active: false,
-          deactivated_at: new Date().toISOString() 
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      // Sign out the user
       await supabase.auth.signOut();
-
       toast({
-        title: "Account Deactivated",
-        description: "Your account has been deactivated successfully",
+        title: "Signed Out",
+        description: "You have been signed out successfully",
       });
     } catch (error: any) {
-      console.error('Error deactivating account:', error);
+      console.error('Error signing out:', error);
       toast({
         title: "Error",
-        description: "Failed to deactivate account",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Call the delete account function (will be created in database)
-      const { error } = await supabase.rpc('delete_user_account', {
-        user_id: user.id
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Account Deleted",
-        description: "Your account and all data have been permanently deleted",
-      });
-
-      // The user will be automatically signed out
-    } catch (error: any) {
-      console.error('Error deleting account:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete account",
+        description: "Failed to sign out",
         variant: "destructive",
       });
     } finally {
@@ -83,87 +36,53 @@ export function AccountActions() {
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-destructive">
           <AlertTriangle className="h-5 w-5" />
-          <span>Danger Zone</span>
+          <span>Account Actions</span>
         </CardTitle>
         <CardDescription>
-          Irreversible and destructive actions
+          Account management options
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg">
           <div>
-            <h4 className="font-medium">Deactivate Account</h4>
+            <h4 className="font-medium">Sign Out</h4>
             <p className="text-sm text-muted-foreground">
-              Temporarily disable your account. You can reactivate it later.
+              Sign out of your account on this device.
             </p>
           </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <UserX className="h-4 w-4 mr-2" />
-                Deactivate
+                Sign Out
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Deactivate Account</AlertDialogTitle>
+                <AlertDialogTitle>Sign Out</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to deactivate your account? You will be signed out and your account will be temporarily disabled. You can reactivate it by signing in again.
+                  Are you sure you want to sign out of your account?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction 
-                  onClick={handleDeactivateAccount}
+                  onClick={handleSignOut}
                   disabled={loading}
                   className="bg-orange-600 hover:bg-orange-700"
                 >
-                  {loading ? 'Deactivating...' : 'Deactivate Account'}
+                  {loading ? 'Signing out...' : 'Sign Out'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>
 
-        <div className="flex items-center justify-between p-4 border border-destructive rounded-lg">
-          <div>
-            <h4 className="font-medium">Delete Account</h4>
-            <p className="text-sm text-muted-foreground">
-              Permanently delete your account and all associated data. This action cannot be undone.
-            </p>
-          </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Account
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Account Permanently</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete your account and remove all your data from our servers, including:
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Profile information</li>
-                    <li>Wallet and transaction history</li>
-                    <li>Coins and rewards</li>
-                    <li>Notifications and preferences</li>
-                  </ul>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleDeleteAccount}
-                  disabled={loading}
-                  className="bg-destructive hover:bg-destructive/90"
-                >
-                  {loading ? 'Deleting...' : 'Delete Account Permanently'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+        <div className="p-4 border border-muted rounded-lg">
+          <h4 className="font-medium mb-2">Account Management</h4>
+          <p className="text-sm text-muted-foreground">
+            For account deactivation or deletion, please contact our support team. Advanced account management features will be available in future updates.
+          </p>
         </div>
       </CardContent>
     </Card>
