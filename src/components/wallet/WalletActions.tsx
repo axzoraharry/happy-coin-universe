@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, MinusCircle, Send } from 'lucide-react';
+import { PlusCircle, Send } from 'lucide-react';
 
 export function WalletActions() {
   const [amount, setAmount] = useState('');
@@ -44,7 +44,7 @@ export function WalletActions() {
       const { error: updateError } = await supabase
         .from('wallets')
         .update({ 
-          balance: newBalance.toString(),
+          balance: newBalance,
           updated_at: new Date().toISOString()
         })
         .eq('id', wallet.id);
@@ -84,95 +84,6 @@ export function WalletActions() {
       console.error('Deposit error:', error);
       toast({
         title: "Deposit Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleWithdraw = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      toast({
-        title: "Invalid Amount",
-        description: "Please enter a valid amount",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Get user's wallet
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (walletError) throw walletError;
-
-      const currentBalance = parseFloat(wallet.balance.toString());
-      const withdrawAmount = parseFloat(amount);
-
-      if (withdrawAmount > currentBalance) {
-        toast({
-          title: "Insufficient Funds",
-          description: "You don't have enough balance for this withdrawal",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Update wallet balance
-      const newBalance = currentBalance - withdrawAmount;
-      const { error: updateError } = await supabase
-        .from('wallets')
-        .update({ 
-          balance: newBalance.toString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', wallet.id);
-
-      if (updateError) throw updateError;
-
-      // Create transaction record
-      await supabase
-        .from('transactions')
-        .insert({
-          wallet_id: wallet.id,
-          user_id: user.id,
-          transaction_type: 'debit',
-          amount: withdrawAmount,
-          description: 'Wallet withdrawal',
-          status: 'completed'
-        });
-
-      // Create notification
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: user.id,
-          title: 'Withdrawal Successful',
-          message: `$${amount} has been withdrawn from your wallet`,
-          type: 'success'
-        });
-
-      toast({
-        title: "Withdrawal Successful",
-        description: `$${amount} has been withdrawn from your wallet`,
-      });
-
-      setAmount('');
-      window.location.reload(); // Refresh to show updated balance
-    } catch (error: any) {
-      console.error('Withdrawal error:', error);
-      toast({
-        title: "Withdrawal Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -246,7 +157,7 @@ export function WalletActions() {
       await supabase
         .from('wallets')
         .update({ 
-          balance: (senderBalance - transferAmount).toString(),
+          balance: senderBalance - transferAmount,
           updated_at: new Date().toISOString()
         })
         .eq('id', senderWallet.id);
@@ -256,7 +167,7 @@ export function WalletActions() {
       await supabase
         .from('wallets')
         .update({ 
-          balance: (recipientBalance + transferAmount).toString(),
+          balance: recipientBalance + transferAmount,
           updated_at: new Date().toISOString()
         })
         .eq('id', recipientWallet.id);
@@ -335,12 +246,9 @@ export function WalletActions() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="deposit" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 rounded-lg">
+          <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1 rounded-lg">
             <TabsTrigger value="deposit" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
               Deposit
-            </TabsTrigger>
-            <TabsTrigger value="withdraw" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              Withdraw
             </TabsTrigger>
             <TabsTrigger value="transfer" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
               Transfer
@@ -370,32 +278,6 @@ export function WalletActions() {
             >
               <PlusCircle className="h-4 w-4 mr-2" />
               {loading ? 'Processing...' : 'Deposit'}
-            </Button>
-          </TabsContent>
-
-          <TabsContent value="withdraw" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="withdraw-amount" className="text-sm font-medium">
-                Amount
-              </Label>
-              <Input
-                id="withdraw-amount"
-                type="number"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min="0"
-                step="0.01"
-                className="bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20"
-              />
-            </div>
-            <Button 
-              onClick={handleWithdraw} 
-              disabled={loading} 
-              className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-md transition-all duration-200"
-            >
-              <MinusCircle className="h-4 w-4 mr-2" />
-              {loading ? 'Processing...' : 'Withdraw'}
             </Button>
           </TabsContent>
 

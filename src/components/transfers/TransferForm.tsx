@@ -77,7 +77,7 @@ export function TransferForm() {
       if (recipientWalletError) throw recipientWalletError;
 
       const transferAmount = parseFloat(amount);
-      const senderBalance = parseFloat(senderWallet.balance);
+      const senderBalance = parseFloat(senderWallet.balance.toString());
 
       if (transferAmount > senderBalance) {
         toast({
@@ -98,7 +98,7 @@ export function TransferForm() {
         .eq('id', senderWallet.id);
 
       // Update recipient's balance
-      const recipientBalance = parseFloat(recipientWallet.balance);
+      const recipientBalance = parseFloat(recipientWallet.balance.toString());
       await supabase
         .from('wallets')
         .update({ 
