@@ -134,25 +134,31 @@ export function OffersList() {
     }
   };
 
-  const getOfferBadge = (type: string) => {
-    const badgeVariant = (() => {
-      switch (type) {
-        case 'daily':
-          return 'default' as const;
-        case 'weekly':
-          return 'secondary' as const;
-        case 'referral':
-          return 'outline' as const;
-        case 'task':
-          return 'default' as const;
-        case 'bonus':
-          return 'destructive' as const;
-        default:
-          return 'outline' as const;
-      }
-    })();
+  const getOfferBadge = (type: string): JSX.Element => {
+    let variant: "default" | "secondary" | "destructive" | "outline";
     
-    return <Badge variant={badgeVariant}>{type}</Badge>;
+    switch (type) {
+      case 'daily':
+        variant = 'default';
+        break;
+      case 'weekly':
+        variant = 'secondary';
+        break;
+      case 'referral':
+        variant = 'outline';
+        break;
+      case 'task':
+        variant = 'default';
+        break;
+      case 'bonus':
+        variant = 'destructive';
+        break;
+      default:
+        variant = 'outline';
+        break;
+    }
+    
+    return <Badge variant={variant}>{type}</Badge>;
   };
 
   if (loading) {
