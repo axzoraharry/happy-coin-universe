@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,30 +134,20 @@ export function OffersList() {
   };
 
   const getOfferBadge = (type: string): JSX.Element => {
-    let variant: "default" | "secondary" | "destructive" | "outline";
-    
     switch (type) {
       case 'daily':
-        variant = 'default';
-        break;
+        return <Badge variant="default">{type}</Badge>;
       case 'weekly':
-        variant = 'secondary';
-        break;
+        return <Badge variant="secondary">{type}</Badge>;
       case 'referral':
-        variant = 'outline';
-        break;
+        return <Badge variant="outline">{type}</Badge>;
       case 'task':
-        variant = 'default';
-        break;
+        return <Badge variant="default">{type}</Badge>;
       case 'bonus':
-        variant = 'destructive';
-        break;
+        return <Badge variant="destructive">{type}</Badge>;
       default:
-        variant = 'outline';
-        break;
+        return <Badge variant="outline">{type}</Badge>;
     }
-    
-    return <Badge variant={variant}>{type}</Badge>;
   };
 
   if (loading) {
