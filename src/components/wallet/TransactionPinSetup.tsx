@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,29 @@ export function TransactionPinSetup() {
   const [loading, setLoading] = useState(false);
   const [hasExistingPin, setHasExistingPin] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    checkExistingPin();
+  }, []);
+
+  const checkExistingPin = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .rpc('get_user_pin_exists', { p_user_id: user.id });
+
+      if (error) {
+        console.error('Error checking existing PIN:', error);
+        return;
+      }
+
+      setHasExistingPin(data || false);
+    } catch (error) {
+      console.error('Error checking existing PIN:', error);
+    }
+  };
 
   const validatePin = (pinValue: string) => {
     if (pinValue.length !== 4) {
@@ -59,12 +82,9 @@ export function TransactionPinSetup() {
       const hashedPin = btoa(pin); // Simple base64 encoding for demo
 
       const { error } = await supabase
-        .from('transaction_pins')
-        .upsert({
-          user_id: user.id,
-          pin_hash: hashedPin,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+        .rpc('set_transaction_pin', {
+          p_user_id: user.id,
+          p_pin_hash: hashedPin
         });
 
       if (error) throw error;
@@ -124,36 +144,27 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Verify current PIN first
+      // Verify current PIN and update with new PIN
       const currentHashedPin = btoa(currentPin);
-      const { data: existingPin, error: fetchError } = await supabase
-        .from('transaction_pins')
-        .select('pin_hash')
-        .eq('user_id', user.id)
-        .single();
+      const newHashedPin = btoa(pin);
 
-      if (fetchError) throw fetchError;
+      const { data, error } = await supabase
+        .rpc('update_transaction_pin', {
+          p_user_id: user.id,
+          p_current_pin_hash: currentHashedPin,
+          p_new_pin_hash: newHashedPin
+        });
 
-      if (existingPin.pin_hash !== currentHashedPin) {
+      if (error) throw error;
+
+      if (!data.success) {
         toast({
           title: "Invalid Current PIN",
-          description: "The current PIN you entered is incorrect",
+          description: data.error || "The current PIN you entered is incorrect",
           variant: "destructive",
         });
         return;
       }
-
-      // Update with new PIN
-      const newHashedPin = btoa(pin);
-      const { error } = await supabase
-        .from('transaction_pins')
-        .update({
-          pin_hash: newHashedPin,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
 
       toast({
         title: "PIN Updated Successfully",
