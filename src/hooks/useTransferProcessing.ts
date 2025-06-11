@@ -42,6 +42,8 @@ export function useTransferProcessing() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      console.log('Processing transfer from user:', user.id, 'to recipient:', recipient.id);
+
       if (recipient.id === user.id) {
         toast({
           title: "Invalid Transfer",
@@ -58,6 +60,8 @@ export function useTransferProcessing() {
         .eq('user_id', user.id)
         .single();
 
+      console.log('Sender wallet:', senderWallet, senderWalletError);
+
       if (senderWalletError) throw senderWalletError;
 
       // Get recipient's wallet
@@ -67,10 +71,22 @@ export function useTransferProcessing() {
         .eq('user_id', recipient.id)
         .single();
 
-      if (recipientWalletError) throw recipientWalletError;
+      console.log('Recipient wallet:', recipientWallet, recipientWalletError);
+
+      if (recipientWalletError) {
+        console.error('Recipient wallet error:', recipientWalletError);
+        toast({
+          title: "Recipient Wallet Not Found",
+          description: "The recipient doesn't have a wallet set up. They may need to log in first to initialize their account.",
+          variant: "destructive",
+        });
+        return false;
+      }
 
       const transferAmount = parseFloat(amount);
       const senderBalance = parseFloat(senderWallet.balance.toString());
+
+      console.log('Transfer amount:', transferAmount, 'Sender balance:', senderBalance);
 
       if (transferAmount > senderBalance) {
         toast({
@@ -82,7 +98,7 @@ export function useTransferProcessing() {
       }
 
       // Update sender's balance
-      await supabase
+      const { error: senderUpdateError } = await supabase
         .from('wallets')
         .update({ 
           balance: senderBalance - transferAmount,
@@ -90,9 +106,11 @@ export function useTransferProcessing() {
         })
         .eq('id', senderWallet.id);
 
+      if (senderUpdateError) throw senderUpdateError;
+
       // Update recipient's balance
       const recipientBalance = parseFloat(recipientWallet.balance.toString());
-      await supabase
+      const { error: recipientUpdateError } = await supabase
         .from('wallets')
         .update({ 
           balance: recipientBalance + transferAmount,
@@ -100,9 +118,11 @@ export function useTransferProcessing() {
         })
         .eq('id', recipientWallet.id);
 
+      if (recipientUpdateError) throw recipientUpdateError;
+
       // Create transaction records
       const referenceId = `TXN-${Date.now()}`;
-      await supabase
+      const { error: transactionError } = await supabase
         .from('transactions')
         .insert([
           {
@@ -127,8 +147,10 @@ export function useTransferProcessing() {
           }
         ]);
 
+      if (transactionError) throw transactionError;
+
       // Create notifications
-      await supabase
+      const { error: notificationError } = await supabase
         .from('notifications')
         .insert([
           {
@@ -144,6 +166,11 @@ export function useTransferProcessing() {
             type: 'transaction'
           }
         ]);
+
+      if (notificationError) {
+        console.warn('Failed to create notifications:', notificationError);
+        // Don't fail the transfer if notifications fail
+      }
 
       toast({
         title: "Transfer Successful",

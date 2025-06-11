@@ -39,19 +39,39 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
     try {
       let recipientData = null;
       
-      // First try to search in profiles table
+      console.log('Searching for recipient:', searchQuery);
+      
       if (searchQuery.includes('@')) {
-        // Search by email
+        // Search by email in profiles table first
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('id, email, full_name, phone')
           .eq('email', searchQuery)
           .maybeSingle();
 
+        console.log('Profile search result:', profileData, profileError);
+
         if (profileData) {
           recipientData = profileData;
         } else {
-          console.log('User not found in profiles table, this might be a sync issue');
+          // If not found in profiles, check if user exists in auth and create profile
+          console.log('User not found in profiles, checking if they need profile creation');
+          
+          // Try to find user by making a more comprehensive search
+          const { data: allProfiles, error: allProfilesError } = await supabase
+            .from('profiles')
+            .select('id, email, full_name, phone');
+          
+          console.log('All profiles for debugging:', allProfiles);
+          
+          // Check if there's a case-insensitive match
+          const matchingProfile = allProfiles?.find(profile => 
+            profile.email?.toLowerCase() === searchQuery.toLowerCase()
+          );
+          
+          if (matchingProfile) {
+            recipientData = matchingProfile;
+          }
         }
       } else {
         // Search by phone
@@ -61,21 +81,25 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
           .eq('phone', searchQuery)
           .maybeSingle();
 
+        console.log('Phone search result:', profileData, profileError);
+
         if (profileData) {
           recipientData = profileData;
         }
       }
 
       if (!recipientData) {
+        console.log('No recipient found for:', searchQuery);
         toast({
           title: "Recipient Not Found",
-          description: "No user found with that email or phone number. Make sure the user has registered an account.",
+          description: "No user found with that email or phone number. Make sure the user has registered an account and their profile is properly set up.",
           variant: "destructive",
         });
         onRecipientCleared();
         return;
       }
 
+      console.log('Found recipient:', recipientData);
       onRecipientFound(recipientData);
       toast({
         title: "Recipient Found",
@@ -105,6 +129,12 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              searchRecipient();
+            }
+          }}
         />
         <Button 
           type="button"
