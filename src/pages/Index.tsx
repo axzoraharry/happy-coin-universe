@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
@@ -131,7 +132,7 @@ const Index = () => {
   // Show app with navbar for authenticated users
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
       
       <main className="max-w-7xl mx-auto px-4 py-6">
         {renderPage()}

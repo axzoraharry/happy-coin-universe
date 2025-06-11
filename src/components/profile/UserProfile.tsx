@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { User, Mail, Phone, Calendar } from 'lucide-react';
+import { AccountActions } from './AccountActions';
+import { ContactSync } from './ContactSync';
+import { ReferralSystem } from './ReferralSystem';
 
 interface Profile {
   id: string;
@@ -14,6 +17,7 @@ interface Profile {
   full_name: string | null;
   phone: string | null;
   created_at: string;
+  is_active?: boolean;
 }
 
 export function UserProfile() {
@@ -103,6 +107,7 @@ export function UserProfile() {
 
   return (
     <div className="space-y-6">
+      {/* Basic Profile Information */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -165,6 +170,15 @@ export function UserProfile() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Contact Sync */}
+      <ContactSync />
+
+      {/* Referral System */}
+      <ReferralSystem />
+
+      {/* Account Actions */}
+      <AccountActions />
     </div>
   );
 }
