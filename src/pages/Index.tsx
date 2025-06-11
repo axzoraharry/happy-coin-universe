@@ -15,6 +15,12 @@ import { CoinExchange } from '@/components/coins/CoinExchange';
 import { PurchaseCoins } from '@/components/coins/PurchaseCoins';
 import { useToast } from '@/hooks/use-toast';
 
+interface ReferralResponse {
+  success?: boolean;
+  error?: string;
+  bonus_awarded?: number;
+}
+
 const Index = () => {
   const [user, setUser] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState('landing');
@@ -43,10 +49,12 @@ const Index = () => {
 
         console.log('Referral processing result:', data, error);
 
-        if (data?.success) {
+        const referralData = data as ReferralResponse;
+
+        if (referralData?.success) {
           toast({
             title: "Referral Bonus Awarded!",
-            description: `You and your referrer both earned ${data.bonus_awarded} coins!`,
+            description: `You and your referrer both earned ${referralData.bonus_awarded} coins!`,
           });
           // Clean up
           localStorage.removeItem('pendingReferralCode');
@@ -54,8 +62,8 @@ const Index = () => {
           if (urlParams.get('ref')) {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
-        } else if (data?.error && !data.error.includes('already been referred')) {
-          console.warn('Referral processing failed:', data.error);
+        } else if (referralData?.error && !referralData.error.includes('already been referred')) {
+          console.warn('Referral processing failed:', referralData.error);
         }
       }
     } catch (error: any) {
@@ -65,11 +73,31 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Store referral code if present in URL for later processing
+    // Process URL parameters once at the beginning
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // Store referral code if present in URL for later processing
     const referralCode = urlParams.get('ref');
     if (referralCode) {
       localStorage.setItem('pendingReferralCode', referralCode);
+    }
+
+    // Check for Stripe redirect params
+    if (urlParams.get('success') === 'true') {
+      toast({
+        title: "Purchase Successful!",
+        description: "Your Happy Coins have been added to your wallet",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.get('canceled') === 'true') {
+      toast({
+        title: "Purchase Canceled",
+        description: "Your purchase was canceled",
+        variant: "destructive",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     // Get initial user
@@ -98,25 +126,6 @@ const Index = () => {
         setCurrentPage('landing');
       }
     });
-
-    // Check for Stripe redirect params
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('success') === 'true') {
-      toast({
-        title: "Purchase Successful!",
-        description: "Your Happy Coins have been added to your wallet",
-      });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (urlParams.get('canceled') === 'true') {
-      toast({
-        title: "Purchase Canceled",
-        description: "Your purchase was canceled",
-        variant: "destructive",
-      });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
 
     return () => subscription.unsubscribe();
   }, [toast]);
