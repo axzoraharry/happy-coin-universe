@@ -23,29 +23,90 @@ export function ContactSync() {
   const { toast } = useToast();
 
   const searchUsers = async () => {
-    if (!searchEmail) return;
+    if (!searchEmail.trim()) {
+      toast({
+        title: "Search Required",
+        description: "Please enter an email address to search",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let contacts: Contact[] = [];
+      
+      console.log('Searching for users with email:', searchEmail);
+      
+      // First try exact match
+      const { data: exactMatch, error: exactError } = await supabase
         .from('profiles')
         .select('id, email, full_name')
-        .ilike('email', `%${searchEmail}%`)
-        .limit(10);
+        .eq('email', searchEmail)
+        .maybeSingle();
 
-      if (error) throw error;
+      console.log('Exact match result:', exactMatch, exactError);
 
-      const contacts = data?.map(user => ({
-        ...user,
-        is_user: true
-      })) || [];
+      if (exactMatch) {
+        contacts = [{
+          ...exactMatch,
+          is_user: true
+        }];
+      } else {
+        // If no exact match, try case-insensitive search
+        const { data: allProfiles, error: allProfilesError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name');
+        
+        console.log('All profiles for case-insensitive search:', allProfiles?.length, allProfilesError);
+        
+        if (allProfiles && !allProfilesError) {
+          const matchingProfiles = allProfiles.filter(profile => 
+            profile.email?.toLowerCase() === searchEmail.toLowerCase()
+          );
+          
+          console.log('Case-insensitive matches found:', matchingProfiles.length);
+          
+          contacts = matchingProfiles.map(profile => ({
+            ...profile,
+            is_user: true
+          }));
+        }
+        
+        // If still no results, try partial match for broader search
+        if (contacts.length === 0) {
+          const { data: partialMatches, error: partialError } = await supabase
+            .from('profiles')
+            .select('id, email, full_name')
+            .ilike('email', `%${searchEmail}%`)
+            .limit(10);
 
+          console.log('Partial match results:', partialMatches?.length, partialError);
+
+          if (partialMatches && !partialError) {
+            contacts = partialMatches.map(user => ({
+              ...user,
+              is_user: true
+            }));
+          }
+        }
+      }
+
+      console.log('Final search results:', contacts);
       setSearchResults(contacts);
+
+      if (contacts.length === 0) {
+        toast({
+          title: "No Users Found",
+          description: "No users found with that email address. Make sure the user has registered an account.",
+          variant: "destructive",
+        });
+      }
     } catch (error: any) {
       console.error('Error searching users:', error);
       toast({
-        title: "Error",
-        description: "Failed to search users",
+        title: "Search Error",
+        description: "Failed to search users. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -96,7 +157,7 @@ export function ContactSync() {
             />
           </div>
           <div className="flex items-end">
-            <Button onClick={searchUsers} disabled={loading || !searchEmail}>
+            <Button onClick={searchUsers} disabled={loading || !searchEmail.trim()}>
               <Search className="h-4 w-4 mr-2" />
               {loading ? 'Searching...' : 'Search'}
             </Button>
