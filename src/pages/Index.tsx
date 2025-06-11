@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
 import { AuthForm } from '@/components/auth/AuthForm';
+import { LandingPage } from '@/components/landing/LandingPage';
 import { WalletDashboard } from '@/components/wallet/WalletDashboard';
 import { TransactionsList } from '@/components/transactions/TransactionsList';
 import { NotificationsList } from '@/components/notifications/NotificationsList';
@@ -12,7 +13,7 @@ import { TransfersPage } from '@/components/transfers/TransfersPage';
 
 const Index = () => {
   const [user, setUser] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState('landing');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,8 +21,10 @@ const Index = () => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       setLoading(false);
-      if (!user) {
-        setCurrentPage('auth');
+      if (user) {
+        setCurrentPage('dashboard');
+      } else {
+        setCurrentPage('landing');
       }
     });
 
@@ -31,7 +34,7 @@ const Index = () => {
       if (session?.user) {
         setCurrentPage('dashboard');
       } else {
-        setCurrentPage('auth');
+        setCurrentPage('landing');
       }
     });
 
@@ -39,13 +42,22 @@ const Index = () => {
   }, []);
 
   const renderPage = () => {
-    if (!user && currentPage !== 'auth') {
-      return <AuthForm />;
+    if (!user && (currentPage === 'landing' || currentPage === 'auth')) {
+      switch (currentPage) {
+        case 'landing':
+          return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
+        case 'auth':
+          return <AuthForm />;
+        default:
+          return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
+      }
+    }
+
+    if (!user) {
+      return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
     }
 
     switch (currentPage) {
-      case 'auth':
-        return <AuthForm />;
       case 'dashboard':
         return (
           <div className="space-y-6">
@@ -62,7 +74,12 @@ const Index = () => {
       case 'profile':
         return <UserProfile />;
       default:
-        return <WalletDashboard />;
+        return (
+          <div className="space-y-6">
+            <WalletDashboard />
+            <TransactionsList />
+          </div>
+        );
     }
   };
 
@@ -77,6 +94,21 @@ const Index = () => {
     );
   }
 
+  // Show landing page without navbar for non-authenticated users
+  if (!user && currentPage === 'landing') {
+    return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
+  }
+
+  // Show auth form without navbar
+  if (!user && currentPage === 'auth') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <AuthForm />
+      </div>
+    );
+  }
+
+  // Show app with navbar for authenticated users
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
