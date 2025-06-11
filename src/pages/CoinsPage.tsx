@@ -10,7 +10,7 @@ export default function CoinsPage() {
       <div>
         <h1 className="text-3xl font-bold mb-2">Coins & Rewards</h1>
         <p className="text-muted-foreground">
-          Earn coins through daily bonuses, complete offers, and exchange them for real money.
+          Earn coins through daily bonuses, complete offers, and exchange them for Happy Coins.
         </p>
       </div>
 

@@ -84,7 +84,7 @@ export function WalletDashboard() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-16 translate-x-16"></div>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Wallet Balance
+            Happy Coins Balance
           </CardTitle>
           <div className="p-2 bg-primary/10 rounded-lg">
             <Wallet className="h-4 w-4 text-primary" />
@@ -92,11 +92,11 @@ export function WalletDashboard() {
         </CardHeader>
         <CardContent className="relative z-10">
           <div className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-            ${walletData?.balance?.toFixed(2) || '0.00'}
+            {walletData?.balance?.toFixed(2) || '0.00'} HC
           </div>
           <p className="text-xs text-muted-foreground flex items-center mt-1">
             <TrendingUp className="h-3 w-3 mr-1 text-green-600" />
-            {walletData?.currency || 'USD'}
+            Happy Coins
           </p>
         </CardContent>
       </Card>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,7 +32,7 @@ export function CoinExchange() {
   const [exchanging, setExchanging] = useState(false);
   const { toast } = useToast();
 
-  const EXCHANGE_RATE = 0.01; // 1 coin = $0.01
+  const EXCHANGE_RATE = 0.01; // 1 coin = 0.01 HC
 
   useEffect(() => {
     fetchUserData();
@@ -110,7 +109,7 @@ export function CoinExchange() {
 
       if (error) throw error;
 
-      const result = data as ExchangeResult;
+      const result = data as unknown as ExchangeResult;
       
       if (!result.success) {
         toast({
@@ -127,7 +126,7 @@ export function CoinExchange() {
       
       toast({
         title: "Exchange Successful!",
-        description: `Exchanged ${result.coins_exchanged} coins for $${result.amount_received}`,
+        description: `Exchanged ${result.coins_exchanged} coins for ${result.amount_received} HC`,
       });
 
       setCoinsToExchange('');
@@ -170,7 +169,7 @@ export function CoinExchange() {
           <span>Coin Exchange</span>
         </CardTitle>
         <CardDescription>
-          Convert your earned coins to wallet balance (1 coin = ${EXCHANGE_RATE})
+          Convert your earned coins to Happy Coins (1 coin = {EXCHANGE_RATE} HC)
         </CardDescription>
       </CardHeader>
       <CardContent className="relative z-10 space-y-6">
@@ -192,11 +191,11 @@ export function CoinExchange() {
             <div className="flex items-center justify-center mb-2">
               <DollarSign className="h-5 w-5 text-green-600 mr-2" />
               <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                Wallet Balance
+                Happy Coins Balance
               </span>
             </div>
             <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-              ${walletData?.balance?.toFixed(2) || '0.00'}
+              {walletData?.balance?.toFixed(2) || '0.00'} HC
             </div>
           </div>
         </div>
@@ -227,7 +226,7 @@ export function CoinExchange() {
                   </span>
                 </div>
                 <div className="text-lg font-bold text-blue-800 dark:text-blue-200">
-                  ${calculateAmount()}
+                  {calculateAmount()} HC
                 </div>
               </div>
             </div>
@@ -245,7 +244,7 @@ export function CoinExchange() {
 
         {/* Exchange Rate Info */}
         <div className="text-center text-sm text-muted-foreground">
-          <p>Exchange Rate: 1 coin = ${EXCHANGE_RATE}</p>
+          <p>Exchange Rate: 1 coin = {EXCHANGE_RATE} HC</p>
           <p>Minimum exchange: 1 coin</p>
         </div>
       </CardContent>

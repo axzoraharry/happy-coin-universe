@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,7 +53,7 @@ export function Navbar() {
               className="text-xl font-bold cursor-pointer" 
               onClick={() => navigate('/')}
             >
-              Digital Wallet
+              Happy Coins
             </h1>
             
             {user && (

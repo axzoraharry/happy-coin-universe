@@ -59,7 +59,7 @@ export function WalletActions() {
           user_id: user.id,
           transaction_type: 'credit',
           amount: parseFloat(amount),
-          description: 'Wallet deposit',
+          description: 'Happy Coins deposit',
           status: 'completed'
         });
 
@@ -69,13 +69,13 @@ export function WalletActions() {
         .insert({
           user_id: user.id,
           title: 'Deposit Successful',
-          message: `$${amount} has been added to your wallet`,
+          message: `${amount} HC has been added to your wallet`,
           type: 'success'
         });
 
       toast({
         title: "Deposit Successful",
-        description: `$${amount} has been added to your wallet`,
+        description: `${amount} HC has been added to your wallet`,
       });
 
       setAmount('');
@@ -203,20 +203,20 @@ export function WalletActions() {
           {
             user_id: user.id,
             title: 'Transfer Sent',
-            message: `$${amount} sent to ${recipientEmail}`,
+            message: `${amount} HC sent to ${recipientEmail}`,
             type: 'success'
           },
           {
             user_id: recipientProfile.id,
             title: 'Transfer Received',
-            message: `$${amount} received from ${user.email}`,
+            message: `${amount} HC received from ${user.email}`,
             type: 'success'
           }
         ]);
 
       toast({
         title: "Transfer Successful",
-        description: `$${amount} sent to ${recipientEmail}`,
+        description: `${amount} HC sent to ${recipientEmail}`,
       });
 
       setAmount('');
@@ -241,7 +241,7 @@ export function WalletActions() {
           Wallet Actions
         </CardTitle>
         <CardDescription className="text-muted-foreground">
-          Manage your wallet funds with ease
+          Manage your Happy Coins with ease
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -258,7 +258,7 @@ export function WalletActions() {
           <TabsContent value="deposit" className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="deposit-amount" className="text-sm font-medium">
-                Amount
+                Amount (HC)
               </Label>
               <Input
                 id="deposit-amount"
@@ -297,7 +297,7 @@ export function WalletActions() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="transfer-amount" className="text-sm font-medium">
-                Amount
+                Amount (HC)
               </Label>
               <Input
                 id="transfer-amount"
