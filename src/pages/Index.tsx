@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
@@ -10,11 +9,13 @@ import { NotificationsList } from '@/components/notifications/NotificationsList'
 import { OffersList } from '@/components/offers/OffersList';
 import { UserProfile } from '@/components/profile/UserProfile';
 import { TransfersPage } from '@/components/transfers/TransfersPage';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [user, setUser] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState('landing');
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Get initial user
@@ -38,8 +39,27 @@ const Index = () => {
       }
     });
 
+    // Check for Stripe redirect params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+      toast({
+        title: "Purchase Successful!",
+        description: "Your Happy Coins have been added to your wallet",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.get('canceled') === 'true') {
+      toast({
+        title: "Purchase Canceled",
+        description: "Your purchase was canceled",
+        variant: "destructive",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     return () => subscription.unsubscribe();
-  }, []);
+  }, [toast]);
 
   const renderPage = () => {
     if (!user && (currentPage === 'landing' || currentPage === 'auth')) {
