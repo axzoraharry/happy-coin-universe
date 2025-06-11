@@ -134,25 +134,21 @@ export function OffersList() {
     }
   };
 
-  const getOfferBadge = (type: string): JSX.Element => {
-    const knownTypes = ['daily', 'weekly', 'referral', 'task', 'bonus'] as const;
-    
-    if (knownTypes.includes(type as any)) {
-      switch (type) {
-        case 'daily':
-          return <Badge variant="default">daily</Badge>;
-        case 'weekly':
-          return <Badge variant="secondary">weekly</Badge>;
-        case 'referral':
-          return <Badge variant="outline">referral</Badge>;
-        case 'task':
-          return <Badge variant="default">task</Badge>;
-        case 'bonus':
-          return <Badge variant="destructive">bonus</Badge>;
-      }
+  const getOfferBadge = (type: string) => {
+    switch (type) {
+      case 'daily':
+        return <Badge variant="default">daily</Badge>;
+      case 'weekly':
+        return <Badge variant="secondary">weekly</Badge>;
+      case 'referral':
+        return <Badge variant="outline">referral</Badge>;
+      case 'task':
+        return <Badge variant="default">task</Badge>;
+      case 'bonus':
+        return <Badge variant="destructive">bonus</Badge>;
+      default:
+        return <Badge variant="outline">{type}</Badge>;
     }
-    
-    return <Badge variant="outline">{type}</Badge>;
   };
 
   if (loading) {

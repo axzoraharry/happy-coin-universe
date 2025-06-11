@@ -8,6 +8,7 @@ import { TransactionsList } from '@/components/transactions/TransactionsList';
 import { NotificationsList } from '@/components/notifications/NotificationsList';
 import { OffersList } from '@/components/offers/OffersList';
 import { UserProfile } from '@/components/profile/UserProfile';
+import { TransfersPage } from '@/components/transfers/TransfersPage';
 
 const Index = () => {
   const [user, setUser] = useState<any>(null);
@@ -52,6 +53,8 @@ const Index = () => {
             <TransactionsList />
           </div>
         );
+      case 'transfers':
+        return <TransfersPage />;
       case 'notifications':
         return <NotificationsList />;
       case 'offers':

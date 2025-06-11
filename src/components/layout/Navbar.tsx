@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { User as UserIcon, LogOut, Wallet, Bell, Gift, User } from 'lucide-react';
+import { User as UserIcon, LogOut, Wallet, Bell, Gift, User, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface NavbarProps {
@@ -76,6 +76,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Wallet },
+    { id: 'transfers', label: 'Transfers', icon: Send },
     { id: 'notifications', label: 'Notifications', icon: Bell, badge: notificationCount },
     { id: 'offers', label: 'Offers', icon: Gift },
     { id: 'profile', label: 'Profile', icon: User },
