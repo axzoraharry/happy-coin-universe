@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +6,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle } from 'lucide-react';
+
+interface ReferralResponse {
+  success?: boolean;
+  error?: string;
+  bonus_awarded?: number;
+}
 
 export function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -48,16 +53,18 @@ export function AuthForm() {
         throw error;
       }
 
-      if (data.success) {
+      const referralData = data as ReferralResponse;
+
+      if (referralData.success) {
         toast({
           title: "Referral Bonus!",
-          description: `You and your referrer both earned ${data.bonus_awarded} coins!`,
+          description: `You and your referrer both earned ${referralData.bonus_awarded} coins!`,
         });
       } else {
-        console.warn('Referral processing failed:', data.error);
+        console.warn('Referral processing failed:', referralData.error);
         toast({
           title: "Referral Notice",
-          description: data.error,
+          description: referralData.error,
           variant: "destructive",
         });
       }
