@@ -4,85 +4,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Minus } from 'lucide-react';
+import { PlusCircle, MinusCircle, Send } from 'lucide-react';
 
 export function WalletActions() {
   const [amount, setAmount] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleTransaction = async (type: 'deposit' | 'withdraw') => {
-    setLoading(true);
+  const handleDeposit = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "You must be logged in",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const transactionAmount = parseFloat(amount);
-      if (isNaN(transactionAmount) || transactionAmount <= 0) {
-        toast({
-          title: "Error",
-          description: "Please enter a valid amount",
-          variant: "destructive",
-        });
-        return;
-      }
+      if (!user) throw new Error('User not authenticated');
 
       // Get user's wallet
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
-        .select('id, balance')
+        .select('*')
         .eq('user_id', user.id)
-        .eq('is_active', true)
         .single();
 
-      if (walletError || !wallet) {
-        toast({
-          title: "Error",
-          description: "Could not find your wallet",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check balance for withdrawals
-      if (type === 'withdraw' && wallet.balance < transactionAmount) {
-        toast({
-          title: "Error",
-          description: "Insufficient balance",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Create transaction record
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          wallet_id: wallet.id,
-          user_id: user.id,
-          amount: transactionAmount,
-          transaction_type: type === 'deposit' ? 'credit' : 'debit',
-          description: type === 'deposit' ? 'Wallet deposit' : 'Wallet withdrawal',
-          status: 'completed'
-        });
-
-      if (transactionError) throw transactionError;
+      if (walletError) throw walletError;
 
       // Update wallet balance
-      const newBalance = type === 'deposit' 
-        ? wallet.balance + transactionAmount 
-        : wallet.balance - transactionAmount;
-
+      const newBalance = parseFloat(wallet.balance) + parseFloat(amount);
       const { error: updateError } = await supabase
         .from('wallets')
         .update({ 
@@ -93,27 +51,271 @@ export function WalletActions() {
 
       if (updateError) throw updateError;
 
-      // Send notification
+      // Create transaction record
+      await supabase
+        .from('transactions')
+        .insert({
+          wallet_id: wallet.id,
+          user_id: user.id,
+          transaction_type: 'credit',
+          amount: parseFloat(amount),
+          description: 'Wallet deposit',
+          status: 'completed'
+        });
+
+      // Create notification
       await supabase
         .from('notifications')
         .insert({
           user_id: user.id,
-          title: type === 'deposit' ? 'Deposit Successful' : 'Withdrawal Successful',
-          message: `$${transactionAmount.toFixed(2)} ${type === 'deposit' ? 'added to' : 'withdrawn from'} your wallet`,
-          type: 'transaction'
+          title: 'Deposit Successful',
+          message: `$${amount} has been added to your wallet`,
+          type: 'success'
         });
 
       toast({
-        title: "Success",
-        description: `Successfully ${type === 'deposit' ? 'deposited' : 'withdrew'} $${transactionAmount.toFixed(2)}`,
+        title: "Deposit Successful",
+        description: `$${amount} has been added to your wallet`,
       });
 
       setAmount('');
+      window.location.reload(); // Refresh to show updated balance
     } catch (error: any) {
-      console.error('Transaction error:', error);
+      console.error('Deposit error:', error);
       toast({
-        title: "Error",
-        description: `Failed to ${type} money`,
+        title: "Deposit Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get user's wallet
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (walletError) throw walletError;
+
+      const currentBalance = parseFloat(wallet.balance);
+      const withdrawAmount = parseFloat(amount);
+
+      if (withdrawAmount > currentBalance) {
+        toast({
+          title: "Insufficient Funds",
+          description: "You don't have enough balance for this withdrawal",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update wallet balance
+      const newBalance = currentBalance - withdrawAmount;
+      const { error: updateError } = await supabase
+        .from('wallets')
+        .update({ 
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', wallet.id);
+
+      if (updateError) throw updateError;
+
+      // Create transaction record
+      await supabase
+        .from('transactions')
+        .insert({
+          wallet_id: wallet.id,
+          user_id: user.id,
+          transaction_type: 'debit',
+          amount: withdrawAmount,
+          description: 'Wallet withdrawal',
+          status: 'completed'
+        });
+
+      // Create notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          title: 'Withdrawal Successful',
+          message: `$${amount} has been withdrawn from your wallet`,
+          type: 'success'
+        });
+
+      toast({
+        title: "Withdrawal Successful",
+        description: `$${amount} has been withdrawn from your wallet`,
+      });
+
+      setAmount('');
+      window.location.reload(); // Refresh to show updated balance
+    } catch (error: any) {
+      console.error('Withdrawal error:', error);
+      toast({
+        title: "Withdrawal Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!amount || parseFloat(amount) <= 0 || !recipientEmail) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter a valid amount and recipient email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Find recipient user
+      const { data: recipientProfile, error: recipientError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', recipientEmail)
+        .single();
+
+      if (recipientError || !recipientProfile) {
+        toast({
+          title: "Recipient Not Found",
+          description: "No user found with that email address",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get sender's wallet
+      const { data: senderWallet, error: senderWalletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (senderWalletError) throw senderWalletError;
+
+      // Get recipient's wallet
+      const { data: recipientWallet, error: recipientWalletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', recipientProfile.id)
+        .single();
+
+      if (recipientWalletError) throw recipientWalletError;
+
+      const transferAmount = parseFloat(amount);
+      const senderBalance = parseFloat(senderWallet.balance);
+
+      if (transferAmount > senderBalance) {
+        toast({
+          title: "Insufficient Funds",
+          description: "You don't have enough balance for this transfer",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update sender's balance
+      await supabase
+        .from('wallets')
+        .update({ 
+          balance: senderBalance - transferAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', senderWallet.id);
+
+      // Update recipient's balance
+      const recipientBalance = parseFloat(recipientWallet.balance);
+      await supabase
+        .from('wallets')
+        .update({ 
+          balance: recipientBalance + transferAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', recipientWallet.id);
+
+      // Create transaction records
+      await supabase
+        .from('transactions')
+        .insert([
+          {
+            wallet_id: senderWallet.id,
+            user_id: user.id,
+            transaction_type: 'transfer_out',
+            amount: transferAmount,
+            description: `Transfer to ${recipientEmail}`,
+            recipient_id: recipientProfile.id,
+            status: 'completed'
+          },
+          {
+            wallet_id: recipientWallet.id,
+            user_id: recipientProfile.id,
+            transaction_type: 'transfer_in',
+            amount: transferAmount,
+            description: `Transfer from ${user.email}`,
+            recipient_id: user.id,
+            status: 'completed'
+          }
+        ]);
+
+      // Create notifications
+      await supabase
+        .from('notifications')
+        .insert([
+          {
+            user_id: user.id,
+            title: 'Transfer Sent',
+            message: `$${amount} sent to ${recipientEmail}`,
+            type: 'success'
+          },
+          {
+            user_id: recipientProfile.id,
+            title: 'Transfer Received',
+            message: `$${amount} received from ${user.email}`,
+            type: 'success'
+          }
+        ]);
+
+      toast({
+        title: "Transfer Successful",
+        description: `$${amount} sent to ${recipientEmail}`,
+      });
+
+      setAmount('');
+      setRecipientEmail('');
+      window.location.reload(); // Refresh to show updated balance
+    } catch (error: any) {
+      console.error('Transfer error:', error);
+      toast({
+        title: "Transfer Failed",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -122,73 +324,87 @@ export function WalletActions() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Plus className="h-5 w-5 text-green-600" />
-            <span>Deposit</span>
-          </CardTitle>
-          <CardDescription>Add money to your wallet</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+    <Card>
+      <CardHeader>
+        <CardTitle>Wallet Actions</CardTitle>
+        <CardDescription>Manage your wallet funds</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="deposit" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="deposit">Deposit</TabsTrigger>
+            <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+            <TabsTrigger value="transfer">Transfer</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="deposit" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="deposit-amount">Amount ($)</Label>
+              <Label htmlFor="deposit-amount">Amount</Label>
               <Input
                 id="deposit-amount"
                 type="number"
-                step="0.01"
-                min="0.01"
+                placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
+                min="0"
+                step="0.01"
               />
             </div>
-            <Button 
-              onClick={() => handleTransaction('deposit')} 
-              className="w-full"
-              disabled={loading || !amount}
-            >
+            <Button onClick={handleDeposit} disabled={loading} className="w-full">
+              <PlusCircle className="h-4 w-4 mr-2" />
               {loading ? 'Processing...' : 'Deposit'}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Minus className="h-5 w-5 text-red-600" />
-            <span>Withdraw</span>
-          </CardTitle>
-          <CardDescription>Withdraw money from your wallet</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+          <TabsContent value="withdraw" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="withdraw-amount">Amount ($)</Label>
+              <Label htmlFor="withdraw-amount">Amount</Label>
               <Input
                 id="withdraw-amount"
                 type="number"
-                step="0.01"
-                min="0.01"
+                placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
+                min="0"
+                step="0.01"
               />
             </div>
-            <Button 
-              onClick={() => handleTransaction('withdraw')} 
-              className="w-full"
-              variant="outline"
-              disabled={loading || !amount}
-            >
+            <Button onClick={handleWithdraw} disabled={loading} className="w-full">
+              <MinusCircle className="h-4 w-4 mr-2" />
               {loading ? 'Processing...' : 'Withdraw'}
             </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </TabsContent>
+
+          <TabsContent value="transfer" className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="recipient-email">Recipient Email</Label>
+              <Input
+                id="recipient-email"
+                type="email"
+                placeholder="recipient@example.com"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="transfer-amount">Amount</Label>
+              <Input
+                id="transfer-amount"
+                type="number"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <Button onClick={handleTransfer} disabled={loading} className="w-full">
+              <Send className="h-4 w-4 mr-2" />
+              {loading ? 'Processing...' : 'Transfer'}
+            </Button>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }
