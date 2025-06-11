@@ -135,14 +135,24 @@ export function OffersList() {
   };
 
   const getOfferBadge = (type: string) => {
-    const colors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      daily: "default",
-      weekly: "secondary",
-      referral: "outline",
-      task: "default",
-      bonus: "destructive",
-    };
-    return <Badge variant={colors[type] || "outline"}>{type}</Badge>;
+    const badgeVariant = (() => {
+      switch (type) {
+        case 'daily':
+          return 'default' as const;
+        case 'weekly':
+          return 'secondary' as const;
+        case 'referral':
+          return 'outline' as const;
+        case 'task':
+          return 'default' as const;
+        case 'bonus':
+          return 'destructive' as const;
+        default:
+          return 'outline' as const;
+      }
+    })();
+    
+    return <Badge variant={badgeVariant}>{type}</Badge>;
   };
 
   if (loading) {
