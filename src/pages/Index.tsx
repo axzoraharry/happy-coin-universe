@@ -21,13 +21,65 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const processReferralAfterConfirmation = async (userId: string) => {
+    try {
+      console.log('Checking for pending referral processing for user:', userId);
+      
+      // Check if there's a referral code in URL or localStorage
+      const urlParams = new URLSearchParams(window.location.search);
+      let referralCode = urlParams.get('ref');
+      
+      if (!referralCode) {
+        referralCode = localStorage.getItem('pendingReferralCode');
+      }
+      
+      if (referralCode) {
+        console.log('Processing referral code:', referralCode);
+        
+        const { data, error } = await supabase.rpc('process_referral', {
+          p_referred_user_id: userId,
+          p_referral_code: referralCode
+        });
+
+        console.log('Referral processing result:', data, error);
+
+        if (data?.success) {
+          toast({
+            title: "Referral Bonus Awarded!",
+            description: `You and your referrer both earned ${data.bonus_awarded} coins!`,
+          });
+          // Clean up
+          localStorage.removeItem('pendingReferralCode');
+          // Clean up URL
+          if (urlParams.get('ref')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } else if (data?.error && !data.error.includes('already been referred')) {
+          console.warn('Referral processing failed:', data.error);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error processing referral after confirmation:', error);
+      // Silent fail - don't disrupt user experience
+    }
+  };
+
   useEffect(() => {
+    // Store referral code if present in URL for later processing
+    const urlParams = new URLSearchParams(window.location.search);
+    const referralCode = urlParams.get('ref');
+    if (referralCode) {
+      localStorage.setItem('pendingReferralCode', referralCode);
+    }
+
     // Get initial user
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       setLoading(false);
       if (user) {
         setCurrentPage('dashboard');
+        // Process referral if user just confirmed email
+        processReferralAfterConfirmation(user.id);
       } else {
         setCurrentPage('landing');
       }
@@ -38,6 +90,10 @@ const Index = () => {
       setUser(session?.user || null);
       if (session?.user) {
         setCurrentPage('dashboard');
+        // Process referral for new users after email confirmation
+        if (event === 'SIGNED_IN') {
+          processReferralAfterConfirmation(session.user.id);
+        }
       } else {
         setCurrentPage('landing');
       }

@@ -30,15 +30,44 @@ export function ReferralSystem() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // For now, generate a referral code based on user ID
-      const referralCode = user.id.substring(0, 8).toUpperCase();
+      console.log('Fetching referral stats for user:', user.id);
 
-      // Get referral statistics (would need additional tables in real implementation)
+      // Get user profile with referral code
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('referral_code')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        throw profileError;
+      }
+
+      console.log('User profile:', profile);
+
+      // Get referral statistics
+      const { data: referrals, error: referralsError } = await supabase
+        .from('referrals')
+        .select('*')
+        .eq('referrer_id', user.id);
+
+      if (referralsError) {
+        console.error('Error fetching referrals:', referralsError);
+        throw referralsError;
+      }
+
+      console.log('Referrals data:', referrals);
+
+      const totalReferrals = referrals?.length || 0;
+      const pendingRewards = referrals?.filter(r => !r.bonus_awarded).length || 0;
+      const totalRewardsEarned = referrals?.filter(r => r.bonus_awarded).length * 100 || 0;
+
       setReferralStats({
-        referral_code: referralCode,
-        total_referrals: 0,
-        pending_rewards: 0,
-        total_rewards_earned: 0
+        referral_code: profile.referral_code || '',
+        total_referrals: totalReferrals,
+        pending_rewards: pendingRewards * 100, // 100 coins per referral
+        total_rewards_earned: totalRewardsEarned
       });
 
     } catch (error: any) {
@@ -75,7 +104,15 @@ export function ReferralSystem() {
   };
 
   if (loading) {
-    return <div>Loading referral information...</div>;
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="text-lg font-medium">Loading referral information...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -148,7 +185,7 @@ export function ReferralSystem() {
             </div>
             <div className="flex items-center space-x-2">
               <Badge variant="outline">3</Badge>
-              <span>You both earn 100 bonus coins when they make their first transaction</span>
+              <span>You both earn 100 bonus coins when they sign up</span>
             </div>
           </div>
         </div>

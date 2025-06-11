@@ -111,6 +111,7 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string | null
+          referral_code: string | null
           updated_at: string
         }
         Insert: {
@@ -121,6 +122,7 @@ export type Database = {
           id: string
           is_active?: boolean
           phone?: string | null
+          referral_code?: string | null
           updated_at?: string
         }
         Update: {
@@ -131,7 +133,35 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
+          referral_code?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          bonus_awarded: boolean
+          created_at: string
+          id: string
+          referral_code: string
+          referred_id: string
+          referrer_id: string
+        }
+        Insert: {
+          bonus_awarded?: boolean
+          created_at?: string
+          id?: string
+          referral_code: string
+          referred_id: string
+          referrer_id: string
+        }
+        Update: {
+          bonus_awarded?: boolean
+          created_at?: string
+          id?: string
+          referral_code?: string
+          referred_id?: string
+          referrer_id?: string
         }
         Relationships: []
       }
@@ -346,6 +376,10 @@ export type Database = {
           p_coins_to_exchange: number
           p_exchange_rate?: number
         }
+        Returns: Json
+      }
+      process_referral: {
+        Args: { p_referred_user_id: string; p_referral_code: string }
         Returns: Json
       }
       reset_daily_coins: {

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +13,59 @@ export function AuthForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Check for referral code in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      setReferralCode(refCode);
+      setIsSignUp(true); // Switch to signup mode if there's a referral code
+      toast({
+        title: "Referral Code Detected",
+        description: `You'll earn bonus coins when you sign up with code: ${refCode}`,
+      });
+    }
+  }, [toast]);
+
+  const processReferral = async (userId: string, refCode: string) => {
+    try {
+      console.log('Processing referral for user:', userId, 'with code:', refCode);
+      
+      const { data, error } = await supabase.rpc('process_referral', {
+        p_referred_user_id: userId,
+        p_referral_code: refCode
+      });
+
+      console.log('Referral processing result:', data, error);
+
+      if (error) {
+        console.error('Error processing referral:', error);
+        throw error;
+      }
+
+      if (data.success) {
+        toast({
+          title: "Referral Bonus!",
+          description: `You and your referrer both earned ${data.bonus_awarded} coins!`,
+        });
+      } else {
+        console.warn('Referral processing failed:', data.error);
+        toast({
+          title: "Referral Notice",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error in referral processing:', error);
+      // Don't show error to user as signup was successful
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +94,12 @@ export function AuthForm() {
             title: "Check your email!",
             description: "We've sent you a confirmation link to complete your signup.",
           });
-        } else {
+        } else if (data.user) {
+          // Process referral if code was provided and user is immediately signed in
+          if (referralCode.trim()) {
+            await processReferral(data.user.id, referralCode.trim());
+          }
+          
           toast({
             title: "Account created!",
             description: "Welcome to your digital wallet.",
@@ -90,6 +145,9 @@ export function AuthForm() {
     setEmail('');
     setPassword('');
     setFullName('');
+    if (!new URLSearchParams(window.location.search).get('ref')) {
+      setReferralCode(''); // Don't clear if it came from URL
+    }
     setNeedsConfirmation(false);
   };
 
@@ -113,6 +171,11 @@ export function AuthForm() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               Click the link in your email to activate your account, then return here to sign in.
+              {referralCode && (
+                <div className="mt-2">
+                  <strong>Your referral bonus will be processed after email confirmation.</strong>
+                </div>
+              )}
             </AlertDescription>
           </Alert>
           <Button 
@@ -170,6 +233,23 @@ export function AuthForm() {
               minLength={6}
             />
           </div>
+          
+          {isSignUp && (
+            <div>
+              <Input
+                type="text"
+                placeholder="Referral Code (optional)"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                maxLength={8}
+              />
+              {referralCode && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  You'll earn 100 bonus coins when you sign up!
+                </p>
+              )}
+            </div>
+          )}
           
           {!isSignUp && (
             <Alert>
