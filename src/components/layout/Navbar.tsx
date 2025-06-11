@@ -72,9 +72,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   Dashboard
                 </Button>
                 <Button
-                  variant={location.pathname === '/coins' ? "default" : "ghost"}
+                  variant={currentPage === 'coins' ? "default" : "ghost"}
                   size="sm"
-                  onClick={() => navigate('/coins')}
+                  onClick={() => onPageChange('coins')}
                 >
                   <Coins className="h-4 w-4 mr-2" />
                   Coins & Rewards
