@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,7 +106,8 @@ export function AccountActions() {
 
       if (error) throw error;
 
-      const response = data as DeleteUserDataResponse;
+      // Properly type the response
+      const response = data as unknown as DeleteUserDataResponse;
       if (!response.success) {
         throw new Error(response.error || 'Failed to delete account data');
       }

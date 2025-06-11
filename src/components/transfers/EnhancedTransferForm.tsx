@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,34 +36,66 @@ export function EnhancedTransferForm() {
 
     setSearching(true);
     try {
-      // Search by email first
-      let query = supabase
-        .from('profiles')
-        .select('id, email, full_name, phone');
-
-      // Check if it's an email or phone
+      let recipientData = null;
+      
+      // First try to search in profiles table
       if (searchQuery.includes('@')) {
-        query = query.eq('email', searchQuery);
+        // Search by email
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, phone')
+          .eq('email', searchQuery)
+          .maybeSingle();
+
+        if (profileData) {
+          recipientData = profileData;
+        } else {
+          // If not found in profiles, search in auth.users via a more comprehensive approach
+          console.log('User not found in profiles table, this might be a sync issue');
+          
+          // For now, let's check if there's a wallet with a user that has this email
+          // We'll use the RPC function approach or direct query
+          const { data: userCheck, error: userError } = await supabase
+            .rpc('get_user_by_email', { p_email: searchQuery });
+          
+          if (userError) {
+            console.error('Error checking user by email:', userError);
+          } else if (userCheck) {
+            recipientData = {
+              id: userCheck.id,
+              email: searchQuery,
+              full_name: userCheck.full_name || null,
+              phone: userCheck.phone || null
+            };
+          }
+        }
       } else {
-        query = query.eq('phone', searchQuery);
+        // Search by phone
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, phone')
+          .eq('phone', searchQuery)
+          .maybeSingle();
+
+        if (profileData) {
+          recipientData = profileData;
+        }
       }
 
-      const { data, error } = await query.single();
-
-      if (error || !data) {
+      if (!recipientData) {
         toast({
           title: "Recipient Not Found",
-          description: "No user found with that email or phone number",
+          description: "No user found with that email or phone number. Make sure the user has registered an account.",
           variant: "destructive",
         });
         setRecipient(null);
         return;
       }
 
-      setRecipient(data);
+      setRecipient(recipientData);
       toast({
         title: "Recipient Found",
-        description: `Found user: ${data.full_name || data.email}`,
+        description: `Found user: ${recipientData.full_name || recipientData.email}`,
       });
     } catch (error: any) {
       console.error('Search error:', error);
