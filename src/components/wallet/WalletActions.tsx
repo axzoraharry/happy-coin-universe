@@ -40,11 +40,11 @@ export function WalletActions() {
       if (walletError) throw walletError;
 
       // Update wallet balance
-      const newBalance = parseFloat(wallet.balance) + parseFloat(amount);
+      const newBalance = parseFloat(wallet.balance.toString()) + parseFloat(amount);
       const { error: updateError } = await supabase
         .from('wallets')
         .update({ 
-          balance: newBalance,
+          balance: newBalance.toString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', wallet.id);
@@ -116,7 +116,7 @@ export function WalletActions() {
 
       if (walletError) throw walletError;
 
-      const currentBalance = parseFloat(wallet.balance);
+      const currentBalance = parseFloat(wallet.balance.toString());
       const withdrawAmount = parseFloat(amount);
 
       if (withdrawAmount > currentBalance) {
@@ -133,7 +133,7 @@ export function WalletActions() {
       const { error: updateError } = await supabase
         .from('wallets')
         .update({ 
-          balance: newBalance,
+          balance: newBalance.toString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', wallet.id);
@@ -231,7 +231,7 @@ export function WalletActions() {
       if (recipientWalletError) throw recipientWalletError;
 
       const transferAmount = parseFloat(amount);
-      const senderBalance = parseFloat(senderWallet.balance);
+      const senderBalance = parseFloat(senderWallet.balance.toString());
 
       if (transferAmount > senderBalance) {
         toast({
@@ -246,17 +246,17 @@ export function WalletActions() {
       await supabase
         .from('wallets')
         .update({ 
-          balance: senderBalance - transferAmount,
+          balance: (senderBalance - transferAmount).toString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', senderWallet.id);
 
       // Update recipient's balance
-      const recipientBalance = parseFloat(recipientWallet.balance);
+      const recipientBalance = parseFloat(recipientWallet.balance.toString());
       await supabase
         .from('wallets')
         .update({ 
-          balance: recipientBalance + transferAmount,
+          balance: (recipientBalance + transferAmount).toString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', recipientWallet.id);
@@ -324,22 +324,34 @@ export function WalletActions() {
   };
 
   return (
-    <Card>
+    <Card className="backdrop-blur-sm bg-gradient-to-r from-card/80 to-card/60 border-border/50 shadow-lg">
       <CardHeader>
-        <CardTitle>Wallet Actions</CardTitle>
-        <CardDescription>Manage your wallet funds</CardDescription>
+        <CardTitle className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+          Wallet Actions
+        </CardTitle>
+        <CardDescription className="text-muted-foreground">
+          Manage your wallet funds with ease
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="deposit" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="deposit">Deposit</TabsTrigger>
-            <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
-            <TabsTrigger value="transfer">Transfer</TabsTrigger>
+        <Tabs defaultValue="deposit" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 rounded-lg">
+            <TabsTrigger value="deposit" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              Deposit
+            </TabsTrigger>
+            <TabsTrigger value="withdraw" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              Withdraw
+            </TabsTrigger>
+            <TabsTrigger value="transfer" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              Transfer
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="deposit" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="deposit-amount">Amount</Label>
+              <Label htmlFor="deposit-amount" className="text-sm font-medium">
+                Amount
+              </Label>
               <Input
                 id="deposit-amount"
                 type="number"
@@ -348,9 +360,14 @@ export function WalletActions() {
                 onChange={(e) => setAmount(e.target.value)}
                 min="0"
                 step="0.01"
+                className="bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20"
               />
             </div>
-            <Button onClick={handleDeposit} disabled={loading} className="w-full">
+            <Button 
+              onClick={handleDeposit} 
+              disabled={loading} 
+              className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-md transition-all duration-200"
+            >
               <PlusCircle className="h-4 w-4 mr-2" />
               {loading ? 'Processing...' : 'Deposit'}
             </Button>
@@ -358,7 +375,9 @@ export function WalletActions() {
 
           <TabsContent value="withdraw" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="withdraw-amount">Amount</Label>
+              <Label htmlFor="withdraw-amount" className="text-sm font-medium">
+                Amount
+              </Label>
               <Input
                 id="withdraw-amount"
                 type="number"
@@ -367,9 +386,14 @@ export function WalletActions() {
                 onChange={(e) => setAmount(e.target.value)}
                 min="0"
                 step="0.01"
+                className="bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20"
               />
             </div>
-            <Button onClick={handleWithdraw} disabled={loading} className="w-full">
+            <Button 
+              onClick={handleWithdraw} 
+              disabled={loading} 
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-md transition-all duration-200"
+            >
               <MinusCircle className="h-4 w-4 mr-2" />
               {loading ? 'Processing...' : 'Withdraw'}
             </Button>
@@ -377,17 +401,22 @@ export function WalletActions() {
 
           <TabsContent value="transfer" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="recipient-email">Recipient Email</Label>
+              <Label htmlFor="recipient-email" className="text-sm font-medium">
+                Recipient Email
+              </Label>
               <Input
                 id="recipient-email"
                 type="email"
                 placeholder="recipient@example.com"
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
+                className="bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="transfer-amount">Amount</Label>
+              <Label htmlFor="transfer-amount" className="text-sm font-medium">
+                Amount
+              </Label>
               <Input
                 id="transfer-amount"
                 type="number"
@@ -396,9 +425,14 @@ export function WalletActions() {
                 onChange={(e) => setAmount(e.target.value)}
                 min="0"
                 step="0.01"
+                className="bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20"
               />
             </div>
-            <Button onClick={handleTransfer} disabled={loading} className="w-full">
+            <Button 
+              onClick={handleTransfer} 
+              disabled={loading} 
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md transition-all duration-200"
+            >
               <Send className="h-4 w-4 mr-2" />
               {loading ? 'Processing...' : 'Transfer'}
             </Button>
