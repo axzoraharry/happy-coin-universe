@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      coin_exchanges: {
+        Row: {
+          amount_received: number
+          coins_spent: number
+          created_at: string
+          exchange_rate: number
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount_received: number
+          coins_spent: number
+          created_at?: string
+          exchange_rate: number
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount_received?: number
+          coins_spent?: number
+          created_at?: string
+          exchange_rate?: number
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -407,6 +437,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      exchange_coins_to_balance: {
+        Args: {
+          p_user_id: string
+          p_coins_to_exchange: number
+          p_exchange_rate?: number
+        }
+        Returns: Json
+      }
       reset_daily_coins: {
         Args: Record<PropertyKey, never>
         Returns: undefined

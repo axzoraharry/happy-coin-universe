@@ -2,6 +2,7 @@
 import { WalletDashboard } from '@/components/wallet/WalletDashboard';
 import { DailyLoginBonus } from '@/components/offers/DailyLoginBonus';
 import { OffersList } from '@/components/offers/OffersList';
+import { CoinExchange } from '@/components/coins/CoinExchange';
 
 export default function CoinsPage() {
   return (
@@ -9,7 +10,7 @@ export default function CoinsPage() {
       <div>
         <h1 className="text-3xl font-bold mb-2">Coins & Rewards</h1>
         <p className="text-muted-foreground">
-          Earn coins through daily bonuses, complete offers, and grow your wallet balance.
+          Earn coins through daily bonuses, complete offers, and exchange them for real money.
         </p>
       </div>
 
@@ -17,9 +18,11 @@ export default function CoinsPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DailyLoginBonus />
-        <div>
-          <OffersList />
-        </div>
+        <CoinExchange />
+      </div>
+
+      <div>
+        <OffersList />
       </div>
     </div>
   );
