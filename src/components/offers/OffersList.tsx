@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -136,15 +137,15 @@ export function OffersList() {
   const getOfferBadge = (type: string): JSX.Element => {
     switch (type) {
       case 'daily':
-        return <Badge variant="default">{type}</Badge>;
+        return <Badge variant="default">daily</Badge>;
       case 'weekly':
-        return <Badge variant="secondary">{type}</Badge>;
+        return <Badge variant="secondary">weekly</Badge>;
       case 'referral':
-        return <Badge variant="outline">{type}</Badge>;
+        return <Badge variant="outline">referral</Badge>;
       case 'task':
-        return <Badge variant="default">{type}</Badge>;
+        return <Badge variant="default">task</Badge>;
       case 'bonus':
-        return <Badge variant="destructive">{type}</Badge>;
+        return <Badge variant="destructive">bonus</Badge>;
       default:
         return <Badge variant="outline">{type}</Badge>;
     }
