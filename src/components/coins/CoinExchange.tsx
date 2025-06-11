@@ -16,6 +16,15 @@ interface WalletData {
   balance: number;
 }
 
+interface ExchangeResult {
+  success: boolean;
+  error?: string;
+  coins_exchanged?: number;
+  amount_received?: number;
+  new_coin_balance?: number;
+  new_wallet_balance?: number;
+}
+
 export function CoinExchange() {
   const [coinsToExchange, setCoinsToExchange] = useState<string>('');
   const [coinData, setCoinData] = useState<CoinData | null>(null);
@@ -101,7 +110,7 @@ export function CoinExchange() {
 
       if (error) throw error;
 
-      const result = data;
+      const result = data as ExchangeResult;
       
       if (!result.success) {
         toast({
@@ -113,8 +122,8 @@ export function CoinExchange() {
       }
 
       // Update local state
-      setCoinData(prev => prev ? { total_coins: result.new_coin_balance } : null);
-      setWalletData(prev => prev ? { balance: result.new_wallet_balance } : null);
+      setCoinData(prev => prev ? { total_coins: result.new_coin_balance || 0 } : null);
+      setWalletData(prev => prev ? { balance: result.new_wallet_balance || 0 } : null);
       
       toast({
         title: "Exchange Successful!",
