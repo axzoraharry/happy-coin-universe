@@ -82,30 +82,31 @@ export function OffersList() {
 
       if (offerError) throw offerError;
 
-      // Update user coins
-      const { error: coinsError } = await supabase.rpc('update_user_coins', {
-        user_id: user.id,
-        coins_to_add: coinReward
-      });
+      // Update user coins directly since RPC doesn't exist
+      const { data: currentCoins } = await supabase
+        .from('user_coins')
+        .select('total_coins, earned_today')
+        .eq('user_id', user.id)
+        .single();
 
-      if (coinsError) {
-        // If RPC doesn't exist, update directly
-        const { data: currentCoins } = await supabase
+      if (currentCoins) {
+        await supabase
           .from('user_coins')
-          .select('total_coins, earned_today')
-          .eq('user_id', user.id)
-          .single();
-
-        if (currentCoins) {
-          await supabase
-            .from('user_coins')
-            .update({
-              total_coins: currentCoins.total_coins + coinReward,
-              earned_today: currentCoins.earned_today + coinReward,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', user.id);
-        }
+          .update({
+            total_coins: currentCoins.total_coins + coinReward,
+            earned_today: currentCoins.earned_today + coinReward,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+      } else {
+        // Create user_coins record if it doesn't exist
+        await supabase
+          .from('user_coins')
+          .insert({
+            user_id: user.id,
+            total_coins: coinReward,
+            earned_today: coinReward
+          });
       }
 
       setCompletedOffers([...completedOffers, offerId]);
