@@ -1,9 +1,9 @@
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { SignUpFields } from './SignUpFields';
+import { SignInAlert } from './SignInAlert';
+import { AuthFormActions } from './AuthFormActions';
 
 interface AuthFormFieldsProps {
   isSignUp: boolean;
@@ -45,15 +45,12 @@ export function AuthFormFields({
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
           {isSignUp && (
-            <div>
-              <Input
-                type="text"
-                placeholder="Full Name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
-            </div>
+            <SignUpFields
+              fullName={fullName}
+              setFullName={setFullName}
+              referralCode={referralCode}
+              setReferralCode={setReferralCode}
+            />
           )}
           <div>
             <Input
@@ -75,45 +72,14 @@ export function AuthFormFields({
             />
           </div>
           
-          {isSignUp && (
-            <div>
-              <Input
-                type="text"
-                placeholder="Referral Code (optional)"
-                value={referralCode}
-                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                maxLength={8}
-              />
-              {referralCode && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  You'll earn 100 bonus coins when you sign up!
-                </p>
-              )}
-            </div>
-          )}
-          
-          {!isSignUp && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                If you just signed up, make sure to check your email and click the confirmation link first.
-              </AlertDescription>
-            </Alert>
-          )}
+          {!isSignUp && <SignInAlert />}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
-          </Button>
+          <AuthFormActions
+            isSignUp={isSignUp}
+            loading={loading}
+            onSwitchMode={onSwitchMode}
+          />
         </form>
-        <div className="mt-4 text-center">
-          <Button
-            variant="link"
-            onClick={onSwitchMode}
-            className="text-sm"
-          >
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );
