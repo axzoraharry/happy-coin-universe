@@ -9,6 +9,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, UserX, AlertTriangle, UserMinus } from 'lucide-react';
 
+interface DeleteUserDataResponse {
+  success: boolean;
+  error?: string;
+  message?: string;
+  deleted_at?: string;
+}
+
 export function AccountActions() {
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -100,8 +107,9 @@ export function AccountActions() {
 
       if (error) throw error;
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to delete account data');
+      const response = data as DeleteUserDataResponse;
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to delete account data');
       }
 
       toast({
