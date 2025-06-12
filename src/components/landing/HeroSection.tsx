@@ -8,6 +8,15 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ onGetStarted }: HeroSectionProps) {
+  const handleLearnMore = () => {
+    console.log('Learn More clicked');
+    // Scroll to features section or handle learn more action
+    const featuresSection = document.querySelector('[data-section="features"]');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
@@ -37,6 +46,7 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
             <Button 
               variant="outline" 
               size="lg"
+              onClick={handleLearnMore}
               className="text-lg px-8 py-3"
             >
               Learn More

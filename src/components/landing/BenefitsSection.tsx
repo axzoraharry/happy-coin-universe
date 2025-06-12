@@ -16,6 +16,11 @@ export function BenefitsSection({ onGetStarted }: BenefitsSectionProps) {
     "Reward points on every transaction"
   ];
 
+  const handleGetStarted = () => {
+    console.log('Benefits section - Get Started clicked');
+    onGetStarted();
+  };
+
   return (
     <div className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,7 +45,7 @@ export function BenefitsSection({ onGetStarted }: BenefitsSectionProps) {
 
             <Button 
               size="lg" 
-              onClick={onGetStarted}
+              onClick={handleGetStarted}
               className="mt-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
               Start Your Journey

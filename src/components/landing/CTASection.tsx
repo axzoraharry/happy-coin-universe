@@ -7,6 +7,11 @@ interface CTASectionProps {
 }
 
 export function CTASection({ onGetStarted }: CTASectionProps) {
+  const handleCreateAccount = () => {
+    console.log('CTA section - Create Account clicked');
+    onGetStarted();
+  };
+
   return (
     <div className="py-20 bg-gradient-to-r from-blue-600 to-purple-600">
       <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
@@ -18,7 +23,7 @@ export function CTASection({ onGetStarted }: CTASectionProps) {
         </p>
         <Button 
           size="lg" 
-          onClick={onGetStarted}
+          onClick={handleCreateAccount}
           variant="secondary"
           className="text-lg px-8 py-3"
         >
