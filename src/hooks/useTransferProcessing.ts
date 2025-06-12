@@ -53,103 +53,31 @@ export function useTransferProcessing() {
         return false;
       }
 
-      // Get sender's wallet
-      const { data: senderWallet, error: senderWalletError } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      console.log('Sender wallet:', senderWallet, senderWalletError);
-
-      if (senderWalletError) throw senderWalletError;
-
-      // Get recipient's wallet
-      const { data: recipientWallet, error: recipientWalletError } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', recipient.id)
-        .single();
-
-      console.log('Recipient wallet:', recipientWallet, recipientWalletError);
-
-      if (recipientWalletError) {
-        console.error('Recipient wallet error:', recipientWalletError);
-        toast({
-          title: "Recipient Wallet Not Found",
-          description: "The recipient doesn't have a wallet set up. They may need to log in first to initialize their account.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
       const transferAmount = parseFloat(amount);
-      const senderBalance = parseFloat(senderWallet.balance.toString());
 
-      console.log('Transfer amount:', transferAmount, 'Sender balance:', senderBalance);
+      // Start a database transaction by using rpc function
+      const { data: result, error: transferError } = await supabase.rpc('process_wallet_transfer', {
+        sender_id: user.id,
+        recipient_id: recipient.id,
+        transfer_amount: transferAmount,
+        transfer_description: description || `Transfer to ${recipient.email}`
+      });
 
-      if (transferAmount > senderBalance) {
+      if (transferError) {
+        console.error('Transfer error:', transferError);
+        throw transferError;
+      }
+
+      if (!result?.success) {
         toast({
-          title: "Insufficient Funds",
-          description: "You don't have enough balance for this transfer",
+          title: "Transfer Failed",
+          description: result?.error || "An error occurred during the transfer",
           variant: "destructive",
         });
         return false;
       }
 
-      // Update sender's balance
-      const { error: senderUpdateError } = await supabase
-        .from('wallets')
-        .update({ 
-          balance: senderBalance - transferAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', senderWallet.id);
-
-      if (senderUpdateError) throw senderUpdateError;
-
-      // Update recipient's balance
-      const recipientBalance = parseFloat(recipientWallet.balance.toString());
-      const { error: recipientUpdateError } = await supabase
-        .from('wallets')
-        .update({ 
-          balance: recipientBalance + transferAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', recipientWallet.id);
-
-      if (recipientUpdateError) throw recipientUpdateError;
-
-      // Create transaction records
-      const referenceId = `TXN-${Date.now()}`;
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert([
-          {
-            wallet_id: senderWallet.id,
-            user_id: user.id,
-            transaction_type: 'transfer_out',
-            amount: transferAmount,
-            description: description || `Transfer to ${recipient.email}`,
-            recipient_id: recipient.id,
-            reference_id: referenceId,
-            status: 'completed'
-          },
-          {
-            wallet_id: recipientWallet.id,
-            user_id: recipient.id,
-            transaction_type: 'transfer_in',
-            amount: transferAmount,
-            description: description || `Transfer from ${user.email}`,
-            recipient_id: user.id,
-            reference_id: referenceId,
-            status: 'completed'
-          }
-        ]);
-
-      if (transactionError) throw transactionError;
-
-      // Create notifications
+      // Create notifications after successful transfer
       const { error: notificationError } = await supabase
         .from('notifications')
         .insert([
