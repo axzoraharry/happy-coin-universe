@@ -25,6 +25,50 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
   const [searching, setSearching] = useState(false);
   const { toast } = useToast();
 
+  const createMissingProfile = async (email: string) => {
+    try {
+      console.log('Attempting to create missing profile for:', email);
+      
+      // First check if user exists in auth system by checking the users table
+      const { data: authUser, error: authError } = await supabase
+        .from('users')
+        .select('user_id, email, full_name')
+        .eq('email', email)
+        .maybeSingle();
+
+      console.log('Auth user check result:', authUser, authError);
+
+      if (!authUser) {
+        console.log('User not found in auth system');
+        return null;
+      }
+
+      // Create profile record for this user
+      const { data: newProfile, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authUser.user_id,
+          email: authUser.email,
+          full_name: authUser.full_name || authUser.email,
+          referral_code: authUser.user_id.substring(0, 8).toUpperCase()
+        })
+        .select()
+        .single();
+
+      console.log('Profile creation result:', newProfile, profileError);
+
+      if (profileError) {
+        console.error('Failed to create profile:', profileError);
+        return null;
+      }
+
+      return newProfile;
+    } catch (error) {
+      console.error('Error in createMissingProfile:', error);
+      return null;
+    }
+  };
+
   const searchRecipient = async () => {
     if (!searchQuery.trim()) {
       toast({
@@ -54,10 +98,7 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
         if (profileData) {
           recipientData = profileData;
         } else {
-          // If not found in profiles, check if user exists in auth and create profile
-          console.log('User not found in profiles, checking if they need profile creation');
-          
-          // Try to find user by making a more comprehensive search
+          // If not found in profiles, try case-insensitive search
           const { data: allProfiles, error: allProfilesError } = await supabase
             .from('profiles')
             .select('id, email, full_name, phone');
@@ -71,6 +112,17 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
           
           if (matchingProfile) {
             recipientData = matchingProfile;
+          } else {
+            // Try to create missing profile if user exists in auth
+            console.log('Attempting to create missing profile...');
+            const createdProfile = await createMissingProfile(searchQuery);
+            if (createdProfile) {
+              recipientData = createdProfile;
+              toast({
+                title: "Profile Created",
+                description: "Created missing profile for existing user",
+              });
+            }
           }
         }
       } else {
@@ -92,7 +144,7 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
         console.log('No recipient found for:', searchQuery);
         toast({
           title: "Recipient Not Found",
-          description: "No user found with that email or phone number. Make sure the user has registered an account and their profile is properly set up.",
+          description: "No user found with that email or phone number. Make sure the user has registered an account.",
           variant: "destructive",
         });
         onRecipientCleared();
