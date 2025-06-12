@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,17 +108,59 @@ export function WalletActions() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Find recipient user
-      const { data: recipientProfile, error: recipientError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', recipientEmail)
-        .single();
+      console.log('Searching for recipient with email:', recipientEmail);
 
-      if (recipientError || !recipientProfile) {
+      // Enhanced recipient search with better error handling
+      let recipientProfile = null;
+      
+      // First try exact match
+      const { data: exactMatch, error: exactError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('email', recipientEmail)
+        .maybeSingle();
+
+      console.log('Exact match result:', exactMatch, exactError);
+
+      if (exactMatch) {
+        recipientProfile = exactMatch;
+      } else {
+        // If no exact match, try case-insensitive search
+        const { data: allProfiles, error: allProfilesError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name');
+        
+        console.log('All profiles for case-insensitive search:', allProfiles?.length, allProfilesError);
+        
+        if (allProfiles && !allProfilesError) {
+          const matchingProfile = allProfiles.find(profile => 
+            profile.email?.toLowerCase() === recipientEmail.toLowerCase()
+          );
+          
+          console.log('Case-insensitive match found:', matchingProfile);
+          
+          if (matchingProfile) {
+            recipientProfile = matchingProfile;
+          }
+        }
+      }
+
+      if (!recipientProfile) {
+        console.log('No recipient found for email:', recipientEmail);
         toast({
           title: "Recipient Not Found",
-          description: "No user found with that email address",
+          description: "No user found with that email address. Make sure the email is correct and the user has registered an account.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Found recipient:', recipientProfile);
+
+      if (recipientProfile.id === user.id) {
+        toast({
+          title: "Invalid Transfer",
+          description: "You cannot transfer money to yourself",
           variant: "destructive",
         });
         return;
@@ -139,10 +182,20 @@ export function WalletActions() {
         .eq('user_id', recipientProfile.id)
         .single();
 
-      if (recipientWalletError) throw recipientWalletError;
+      if (recipientWalletError) {
+        console.error('Recipient wallet error:', recipientWalletError);
+        toast({
+          title: "Recipient Wallet Not Found",
+          description: "The recipient doesn't have a wallet set up. They may need to log in first to initialize their account.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const transferAmount = parseFloat(amount);
       const senderBalance = parseFloat(senderWallet.balance.toString());
+
+      console.log('Transfer amount:', transferAmount, 'Sender balance:', senderBalance);
 
       if (transferAmount > senderBalance) {
         toast({
@@ -173,6 +226,7 @@ export function WalletActions() {
         .eq('id', recipientWallet.id);
 
       // Create transaction records
+      const referenceId = `TXN-${Date.now()}`;
       await supabase
         .from('transactions')
         .insert([
@@ -183,6 +237,7 @@ export function WalletActions() {
             amount: transferAmount,
             description: `Transfer to ${recipientEmail}`,
             recipient_id: recipientProfile.id,
+            reference_id: referenceId,
             status: 'completed'
           },
           {
@@ -192,6 +247,7 @@ export function WalletActions() {
             amount: transferAmount,
             description: `Transfer from ${user.email}`,
             recipient_id: user.id,
+            reference_id: referenceId,
             status: 'completed'
           }
         ]);
