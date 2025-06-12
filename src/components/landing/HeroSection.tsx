@@ -8,7 +8,14 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ onGetStarted }: HeroSectionProps) {
-  const handleLearnMore = () => {
+  const handleGetStarted = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log('Hero section - Get Started clicked');
+    onGetStarted();
+  };
+
+  const handleLearnMore = (e: React.MouseEvent) => {
+    e.preventDefault();
     console.log('Learn More clicked');
     // Scroll to features section or handle learn more action
     const featuresSection = document.querySelector('[data-section="features"]');
@@ -37,7 +44,7 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
               size="lg" 
-              onClick={onGetStarted}
+              onClick={handleGetStarted}
               className="text-lg px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
               Get Started Free

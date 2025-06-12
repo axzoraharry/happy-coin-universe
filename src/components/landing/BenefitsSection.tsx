@@ -16,7 +16,8 @@ export function BenefitsSection({ onGetStarted }: BenefitsSectionProps) {
     "Reward points on every transaction"
   ];
 
-  const handleGetStarted = () => {
+  const handleGetStarted = (e: React.MouseEvent) => {
+    e.preventDefault();
     console.log('Benefits section - Get Started clicked');
     onGetStarted();
   };

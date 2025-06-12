@@ -7,7 +7,8 @@ interface CTASectionProps {
 }
 
 export function CTASection({ onGetStarted }: CTASectionProps) {
-  const handleCreateAccount = () => {
+  const handleCreateAccount = (e: React.MouseEvent) => {
+    e.preventDefault();
     console.log('CTA section - Create Account clicked');
     onGetStarted();
   };
