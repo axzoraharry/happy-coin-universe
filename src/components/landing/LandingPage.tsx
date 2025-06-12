@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,8 +32,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
     },
     {
       icon: CreditCard,
-      title: "Easy Deposits & Withdrawals",
-      description: "Add money to your wallet or withdraw to your bank account seamlessly."
+      title: "Easy Deposits & Happy Coins",
+      description: "Add money to your wallet seamlessly and earn Happy Coins with every transaction."
     },
     {
       icon: TrendingUp,
