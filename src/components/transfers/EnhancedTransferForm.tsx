@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Send, ArrowLeftRight } from 'lucide-react';
 import { RecipientSearch } from './RecipientSearch';
 import { TransferAmountInput } from './TransferAmountInput';
-import { useTransferProcessing } from '@/hooks/useTransferProcessing';
+import { SecurePinInput } from '../wallet/SecurePinInput';
+import { useSecureTransfer } from '@/hooks/useSecureTransfer';
 
 interface RecipientInfo {
   id: string;
@@ -18,22 +19,74 @@ export function EnhancedTransferForm() {
   const [recipient, setRecipient] = useState<RecipientInfo | null>(null);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-  const { processTransfer, loading } = useTransferProcessing();
+  
+  const {
+    loading,
+    showPinInput,
+    pendingTransfer,
+    initiateTransfer,
+    executeTransfer,
+    cancelTransfer
+  } = useSecureTransfer();
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!recipient) return;
+    
+    if (!amount || parseFloat(amount) <= 0) {
+      return;
+    }
 
-    const success = await processTransfer(recipient, amount, description);
+    // Initiate secure transfer (this will show PIN input)
+    initiateTransfer({
+      recipientId: recipient.id,
+      amount,
+      description: description || `Transfer to ${recipient.email}`
+    });
+  };
+
+  const handlePinSubmit = async (pin: string) => {
+    const success = await executeTransfer(pin);
     
     if (success) {
       // Reset form
       setRecipient(null);
       setAmount('');
       setDescription('');
+      
+      // Refresh page to show updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     }
   };
+
+  // Show PIN input overlay when needed
+  if (showPinInput && pendingTransfer) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <ArrowLeftRight className="h-5 w-5" />
+            <span>Confirm Transfer</span>
+          </CardTitle>
+          <CardDescription>
+            Transferring {pendingTransfer.amount} HC to {recipient?.full_name || recipient?.email}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SecurePinInput
+            onPinEntered={handlePinSubmit}
+            onCancel={cancelTransfer}
+            isVerifying={loading}
+            title="Confirm Transfer"
+            description="Enter your PIN to securely complete this transfer"
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -42,7 +95,7 @@ export function EnhancedTransferForm() {
           <ArrowLeftRight className="h-5 w-5" />
           <span>Send Happy Coins</span>
         </CardTitle>
-        <CardDescription>Transfer Happy Coins to another user by email or phone</CardDescription>
+        <CardDescription>Transfer Happy Coins securely with PIN verification</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleTransfer} className="space-y-6">
@@ -65,7 +118,7 @@ export function EnhancedTransferForm() {
             className="w-full"
           >
             <Send className="h-4 w-4 mr-2" />
-            {loading ? 'Processing Transfer...' : 'Send Happy Coins'}
+            {loading ? 'Processing Transfer...' : 'Send Happy Coins Securely'}
           </Button>
         </form>
       </CardContent>

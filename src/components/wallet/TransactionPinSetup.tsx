@@ -35,7 +35,6 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if user has existing PIN by querying the table directly
       const { data, error } = await supabase
         .from('transaction_pins')
         .select('id')
@@ -59,6 +58,10 @@ export function TransactionPinSetup() {
     }
     if (!/^\d+$/.test(pinValue)) {
       return 'PIN must contain only numbers';
+    }
+    // Add security checks for weak PINs
+    if (pinValue === '0000' || pinValue === '1234' || pinValue === '1111') {
+      return 'Please choose a more secure PIN';
     }
     return null;
   };
@@ -88,22 +91,23 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Hash the PIN (in a real app, this should be done server-side)
-      const hashedPin = btoa(pin); // Simple base64 encoding for demo
-
-      // Insert PIN directly into the table
-      const { error } = await supabase
-        .from('transaction_pins')
-        .upsert({
-          user_id: user.id,
-          pin_hash: hashedPin
-        });
+      // Use the new secure PIN function
+      const { data: result, error } = await supabase.rpc('set_secure_transaction_pin', {
+        p_user_id: user.id,
+        p_pin: pin
+      });
 
       if (error) throw error;
 
+      const pinResult = result as PinResponse;
+      
+      if (!pinResult.success) {
+        throw new Error(pinResult.error);
+      }
+
       toast({
         title: "PIN Set Successfully",
-        description: "Your transaction PIN has been set securely",
+        description: "Your transaction PIN has been set securely using advanced encryption",
       });
 
       setPin('');
@@ -157,16 +161,14 @@ export function TransactionPinSetup() {
       if (!user) throw new Error('User not authenticated');
 
       // Verify current PIN first
-      const currentHashedPin = btoa(currentPin);
-      const { data: existingPin, error: verifyError } = await supabase
-        .from('transaction_pins')
-        .select('pin_hash')
-        .eq('user_id', user.id)
-        .single();
+      const { data: verifyResult, error: verifyError } = await supabase.rpc('verify_transaction_pin', {
+        p_user_id: user.id,
+        p_pin: currentPin
+      });
 
       if (verifyError) throw verifyError;
 
-      if (existingPin.pin_hash !== currentHashedPin) {
+      if (!verifyResult) {
         toast({
           title: "Invalid Current PIN",
           description: "The current PIN you entered is incorrect",
@@ -175,18 +177,23 @@ export function TransactionPinSetup() {
         return;
       }
 
-      // Update with new PIN
-      const newHashedPin = btoa(pin);
-      const { error } = await supabase
-        .from('transaction_pins')
-        .update({ pin_hash: newHashedPin })
-        .eq('user_id', user.id);
+      // Set new PIN
+      const { data: result, error } = await supabase.rpc('set_secure_transaction_pin', {
+        p_user_id: user.id,
+        p_pin: pin
+      });
 
       if (error) throw error;
 
+      const pinResult = result as PinResponse;
+      
+      if (!pinResult.success) {
+        throw new Error(pinResult.error);
+      }
+
       toast({
         title: "PIN Updated Successfully",
-        description: "Your transaction PIN has been updated",
+        description: "Your transaction PIN has been updated with enhanced security",
       });
 
       setPin('');
@@ -209,10 +216,10 @@ export function TransactionPinSetup() {
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Shield className="h-5 w-5 text-primary" />
-          <span>Transaction PIN</span>
+          <span>Secure Transaction PIN</span>
         </CardTitle>
         <CardDescription>
-          Set up a 4-digit PIN to secure your wallet transactions
+          Set up a 4-digit PIN with advanced encryption to secure your wallet transactions
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -227,7 +234,7 @@ export function TransactionPinSetup() {
                 type={showCurrentPin ? "text" : "password"}
                 placeholder="Enter current PIN"
                 value={currentPin}
-                onChange={(e) => setCurrentPin(e.target.value.slice(0, 4))}
+                onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 maxLength={4}
                 className="pr-10"
               />
@@ -258,7 +265,7 @@ export function TransactionPinSetup() {
               type={showPin ? "text" : "password"}
               placeholder="Enter 4-digit PIN"
               value={pin}
-              onChange={(e) => setPin(e.target.value.slice(0, 4))}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               maxLength={4}
               className="pr-10"
             />
@@ -288,7 +295,7 @@ export function TransactionPinSetup() {
               type={showConfirmPin ? "text" : "password"}
               placeholder="Confirm 4-digit PIN"
               value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.slice(0, 4))}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               maxLength={4}
               className="pr-10"
             />
@@ -312,12 +319,13 @@ export function TransactionPinSetup() {
           <div className="flex items-start space-x-2">
             <Lock className="h-4 w-4 text-muted-foreground mt-0.5" />
             <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-1">Security Tips:</p>
+              <p className="font-medium mb-1">Enhanced Security Features:</p>
               <ul className="space-y-1 text-xs">
-                <li>• Use a unique 4-digit PIN</li>
-                <li>• Don't use obvious combinations like 1234 or 0000</li>
-                <li>• Keep your PIN confidential</li>
-                <li>• You'll need this PIN for all wallet transactions</li>
+                <li>• Advanced bcrypt encryption (cost factor 12)</li>
+                <li>• Secure PIN validation and verification</li>
+                <li>• Protection against common PIN patterns</li>
+                <li>• Server-side security with rate limiting</li>
+                <li>• Required for all sensitive transactions</li>
               </ul>
             </div>
           </div>
@@ -330,25 +338,25 @@ export function TransactionPinSetup() {
               disabled={loading || !pin || !confirmPin || (hasExistingPin && !currentPin)}
             >
               <Shield className="h-4 w-4 mr-2" />
-              {loading ? 'Setting up...' : hasExistingPin ? 'Update PIN' : 'Set PIN'}
+              {loading ? 'Setting up...' : hasExistingPin ? 'Update Secure PIN' : 'Set Secure PIN'}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {hasExistingPin ? 'Update Transaction PIN?' : 'Set Transaction PIN?'}
+                {hasExistingPin ? 'Update Secure Transaction PIN?' : 'Set Secure Transaction PIN?'}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {hasExistingPin 
-                  ? 'This will update your existing transaction PIN. You will need to use the new PIN for all future transactions.'
-                  : 'This will set up a 4-digit PIN that you\'ll need to enter for all wallet transactions. Make sure you remember it!'
+                  ? 'This will update your existing transaction PIN using advanced encryption. You will need to use the new PIN for all future transactions.'
+                  : 'This will set up a 4-digit PIN with advanced bcrypt encryption that you\'ll need to enter for all wallet transactions. The PIN will be securely stored and cannot be recovered if forgotten.'
                 }
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={hasExistingPin ? handleUpdatePin : handleSetPin}>
-                {hasExistingPin ? 'Update PIN' : 'Set PIN'}
+                {hasExistingPin ? 'Update Secure PIN' : 'Set Secure PIN'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

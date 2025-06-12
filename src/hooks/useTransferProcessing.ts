@@ -13,8 +13,7 @@ interface RecipientInfo {
 interface TransferResult {
   success: boolean;
   error?: string;
-  sender_new_balance?: number;
-  recipient_new_balance?: number;
+  pin_verified?: boolean;
   reference_id?: string;
 }
 
@@ -25,7 +24,8 @@ export function useTransferProcessing() {
   const processTransfer = async (
     recipient: RecipientInfo,
     amount: string,
-    description: string
+    description: string,
+    pin?: string
   ) => {
     if (!recipient) {
       toast({
@@ -50,7 +50,7 @@ export function useTransferProcessing() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      console.log('Processing transfer from user:', user.id, 'to recipient:', recipient.id);
+      console.log('Processing secure transfer from user:', user.id, 'to recipient:', recipient.id);
 
       if (recipient.id === user.id) {
         toast({
@@ -63,12 +63,13 @@ export function useTransferProcessing() {
 
       const transferAmount = parseFloat(amount);
 
-      // Call the database function to process the transfer atomically
-      const { data: rawResult, error: transferError } = await supabase.rpc('process_wallet_transfer', {
+      // Use the new secure transfer function
+      const { data: rawResult, error: transferError } = await supabase.rpc('process_secure_wallet_transfer', {
         sender_id: user.id,
         recipient_id: recipient.id,
         transfer_amount: transferAmount,
-        transfer_description: description || `Transfer to ${recipient.email}`
+        transfer_description: description || `Transfer to ${recipient.email}`,
+        sender_pin: pin || null
       });
 
       if (transferError) {
@@ -76,7 +77,6 @@ export function useTransferProcessing() {
         throw transferError;
       }
 
-      // Type-safe handling of the result - handle the case where rawResult might be various JSON types
       const result = rawResult as unknown as TransferResult;
 
       if (!result?.success) {
@@ -94,8 +94,8 @@ export function useTransferProcessing() {
         .insert([
           {
             user_id: user.id,
-            title: 'Transfer Sent',
-            message: `${amount} HC sent to ${recipient.full_name || recipient.email}`,
+            title: 'Secure Transfer Sent',
+            message: `${amount} HC securely sent to ${recipient.full_name || recipient.email}${result.pin_verified ? ' (PIN verified)' : ''}`,
             type: 'transaction'
           },
           {
@@ -108,18 +108,12 @@ export function useTransferProcessing() {
 
       if (notificationError) {
         console.warn('Failed to create notifications:', notificationError);
-        // Don't fail the transfer if notifications fail
       }
 
       toast({
         title: "Transfer Successful",
-        description: `${amount} HC sent to ${recipient.full_name || recipient.email}`,
+        description: `${amount} HC securely sent to ${recipient.full_name || recipient.email}`,
       });
-
-      // Refresh page to show updated data
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
 
       return true;
     } catch (error: any) {
