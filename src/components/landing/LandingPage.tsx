@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,8 +32,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
     },
     {
       icon: CreditCard,
-      title: "Easy Deposits & Withdrawals",
-      description: "Add money to your wallet or withdraw to your bank account seamlessly."
+      title: "Easy Deposits",
+      description: "Add money to your wallet seamlessly and earn Happy Coins with every deposit."
     },
     {
       icon: TrendingUp,
@@ -89,7 +88,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
               Experience the future of digital payments with our secure, fast, and user-friendly 
-              digital wallet. Send money, manage transactions, and earn rewards all in one place.
+              digital wallet. Send money, manage transactions, earn Happy Coins, and redeem rewards all in one place.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
