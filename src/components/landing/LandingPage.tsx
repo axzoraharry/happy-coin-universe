@@ -90,7 +90,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               Experience the future of digital payments with our secure, fast, and user-friendly 
               digital wallet. Send money, manage transactions, earn Happy Coins, and redeem rewards all in one place.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex justify-center">
               <Button 
                 size="lg" 
                 onClick={onGetStarted}
@@ -98,13 +98,6 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               >
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="text-lg px-8 py-3"
-              >
-                Learn More
               </Button>
             </div>
           </div>
