@@ -82,46 +82,67 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
     setSearching(true);
     try {
       let recipientData = null;
+      const normalizedQuery = searchQuery.trim().toLowerCase();
       
       console.log('Searching for recipient:', searchQuery);
+      console.log('Normalized query:', normalizedQuery);
       
       if (searchQuery.includes('@')) {
-        // Search by email in profiles table first
-        const { data: profileData, error: profileError } = await supabase
+        // First try exact case-sensitive match
+        const { data: exactMatch, error: exactError } = await supabase
           .from('profiles')
           .select('id, email, full_name, phone')
           .eq('email', searchQuery)
           .maybeSingle();
 
-        console.log('Profile search result:', profileData, profileError);
+        console.log('Exact match result:', exactMatch, exactError);
 
-        if (profileData) {
-          recipientData = profileData;
+        if (exactMatch) {
+          recipientData = exactMatch;
         } else {
-          // If not found in profiles, try case-insensitive search
-          const { data: allProfiles, error: allProfilesError } = await supabase
+          // Try case-insensitive search using ilike
+          const { data: caseInsensitiveMatch, error: caseError } = await supabase
             .from('profiles')
-            .select('id, email, full_name, phone');
-          
-          console.log('All profiles for debugging:', allProfiles);
-          
-          // Check if there's a case-insensitive match
-          const matchingProfile = allProfiles?.find(profile => 
-            profile.email?.toLowerCase() === searchQuery.toLowerCase()
-          );
-          
-          if (matchingProfile) {
-            recipientData = matchingProfile;
+            .select('id, email, full_name, phone')
+            .ilike('email', searchQuery)
+            .maybeSingle();
+
+          console.log('Case-insensitive match result:', caseInsensitiveMatch, caseError);
+
+          if (caseInsensitiveMatch) {
+            recipientData = caseInsensitiveMatch;
           } else {
-            // Try to create missing profile if user exists in auth
-            console.log('Attempting to create missing profile...');
-            const createdProfile = await createMissingProfile(searchQuery);
-            if (createdProfile) {
-              recipientData = createdProfile;
-              toast({
-                title: "Profile Created",
-                description: "Created missing profile for existing user",
-              });
+            // Get all profiles to check what exists in the database
+            const { data: allProfiles, error: allProfilesError } = await supabase
+              .from('profiles')
+              .select('id, email, full_name, phone');
+            
+            console.log('All profiles in database:', allProfiles);
+            console.log('Total profiles count:', allProfiles?.length || 0);
+            
+            // Check auth.users table directly to see if user exists there
+            const { data: authUsers, error: authError } = await supabase
+              .from('users')
+              .select('user_id, email, full_name');
+            
+            console.log('All users in auth system:', authUsers);
+            console.log('Total users count:', authUsers?.length || 0);
+            
+            // Check if email exists in auth but not in profiles
+            const authUser = authUsers?.find(user => 
+              user.email?.toLowerCase() === normalizedQuery
+            );
+            
+            if (authUser) {
+              console.log('Found user in auth system but not in profiles. Attempting to create profile...');
+              const createdProfile = await createMissingProfile(authUser.email);
+              if (createdProfile) {
+                recipientData = createdProfile;
+                toast({
+                  title: "Profile Created",
+                  description: "Created missing profile for existing user",
+                });
+              }
             }
           }
         }
@@ -144,7 +165,7 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
         console.log('No recipient found for:', searchQuery);
         toast({
           title: "User Not Found",
-          description: "This email address is not registered. The user needs to create an account first before you can send them Happy Coins.",
+          description: "This email address is not registered or there may be a data synchronization issue. Please verify the email address or ask the user to log in once to sync their profile.",
           variant: "destructive",
         });
         onRecipientCleared();
