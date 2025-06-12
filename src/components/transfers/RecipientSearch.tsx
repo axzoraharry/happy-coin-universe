@@ -84,70 +84,112 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
       let recipientData = null;
       const normalizedQuery = searchQuery.trim().toLowerCase();
       
-      console.log('Searching for recipient:', searchQuery);
+      console.log('=== SEARCH DEBUG START ===');
+      console.log('Original search query:', searchQuery);
       console.log('Normalized query:', normalizedQuery);
+      console.log('Query includes @:', searchQuery.includes('@'));
       
       if (searchQuery.includes('@')) {
         // First try exact case-sensitive match
+        console.log('Attempting exact match...');
         const { data: exactMatch, error: exactError } = await supabase
           .from('profiles')
           .select('id, email, full_name, phone')
           .eq('email', searchQuery)
           .maybeSingle();
 
-        console.log('Exact match result:', exactMatch, exactError);
+        console.log('Exact match result:', exactMatch);
+        console.log('Exact match error:', exactError);
 
         if (exactMatch) {
           recipientData = exactMatch;
+          console.log('Found exact match!');
         } else {
           // Try case-insensitive search using ilike
+          console.log('Attempting case-insensitive match...');
           const { data: caseInsensitiveMatch, error: caseError } = await supabase
             .from('profiles')
             .select('id, email, full_name, phone')
             .ilike('email', searchQuery)
             .maybeSingle();
 
-          console.log('Case-insensitive match result:', caseInsensitiveMatch, caseError);
+          console.log('Case-insensitive match result:', caseInsensitiveMatch);
+          console.log('Case-insensitive match error:', caseError);
 
           if (caseInsensitiveMatch) {
             recipientData = caseInsensitiveMatch;
+            console.log('Found case-insensitive match!');
           } else {
-            // Get all profiles to check what exists in the database
-            const { data: allProfiles, error: allProfilesError } = await supabase
+            // Try with wildcard pattern
+            console.log('Attempting wildcard search...');
+            const { data: wildcardMatch, error: wildcardError } = await supabase
               .from('profiles')
-              .select('id, email, full_name, phone');
-            
-            console.log('All profiles in database:', allProfiles);
-            console.log('Total profiles count:', allProfiles?.length || 0);
-            
-            // Check auth.users table directly to see if user exists there
-            const { data: authUsers, error: authError } = await supabase
-              .from('users')
-              .select('user_id, email, full_name');
-            
-            console.log('All users in auth system:', authUsers);
-            console.log('Total users count:', authUsers?.length || 0);
-            
-            // Check if email exists in auth but not in profiles
-            const authUser = authUsers?.find(user => 
-              user.email?.toLowerCase() === normalizedQuery
-            );
-            
-            if (authUser) {
-              console.log('Found user in auth system but not in profiles. Attempting to create profile...');
-              const createdProfile = await createMissingProfile(authUser.email);
-              if (createdProfile) {
-                recipientData = createdProfile;
-                toast({
-                  title: "Profile Created",
-                  description: "Created missing profile for existing user",
-                });
+              .select('id, email, full_name, phone')
+              .ilike('email', `%${searchQuery}%`)
+              .maybeSingle();
+
+            console.log('Wildcard match result:', wildcardMatch);
+            console.log('Wildcard match error:', wildcardError);
+
+            if (wildcardMatch) {
+              recipientData = wildcardMatch;
+              console.log('Found wildcard match!');
+            } else {
+              // Get all profiles to debug what's actually in the database
+              console.log('Getting all profiles for debugging...');
+              const { data: allProfiles, error: allProfilesError } = await supabase
+                .from('profiles')
+                .select('id, email, full_name, phone');
+              
+              console.log('All profiles in database:', allProfiles);
+              console.log('Total profiles count:', allProfiles?.length || 0);
+              console.log('Profile emails:', allProfiles?.map(p => p.email));
+              
+              // Check if any profile email matches when both are normalized
+              const matchingProfile = allProfiles?.find(profile => 
+                profile.email?.toLowerCase().trim() === normalizedQuery
+              );
+              
+              console.log('Manual matching profile:', matchingProfile);
+              
+              if (matchingProfile) {
+                recipientData = matchingProfile;
+                console.log('Found manual match!');
+              } else {
+                // Check auth.users table directly
+                console.log('Checking auth.users table...');
+                const { data: authUsers, error: authError } = await supabase
+                  .from('users')
+                  .select('user_id, email, full_name');
+                
+                console.log('All users in auth system:', authUsers);
+                console.log('Auth user emails:', authUsers?.map(u => u.email));
+                
+                // Check if email exists in auth but not in profiles
+                const authUser = authUsers?.find(user => 
+                  user.email?.toLowerCase().trim() === normalizedQuery
+                );
+                
+                console.log('Matching auth user:', authUser);
+                
+                if (authUser) {
+                  console.log('Found user in auth system but not in profiles. Attempting to create profile...');
+                  const createdProfile = await createMissingProfile(authUser.email);
+                  if (createdProfile) {
+                    recipientData = createdProfile;
+                    toast({
+                      title: "Profile Created",
+                      description: "Created missing profile for existing user",
+                    });
+                  }
+                }
               }
             }
           }
         }
       } else {
         // Search by phone
+        console.log('Searching by phone...');
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('id, email, full_name, phone')
@@ -160,6 +202,10 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
           recipientData = profileData;
         }
       }
+
+      console.log('=== FINAL RESULT ===');
+      console.log('Final recipient data:', recipientData);
+      console.log('=== SEARCH DEBUG END ===');
 
       if (!recipientData) {
         console.log('No recipient found for:', searchQuery);
