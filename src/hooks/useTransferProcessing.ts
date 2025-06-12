@@ -76,8 +76,8 @@ export function useTransferProcessing() {
         throw transferError;
       }
 
-      // Type-safe handling of the result
-      const result = rawResult as TransferResult;
+      // Type-safe handling of the result - handle the case where rawResult might be various JSON types
+      const result = rawResult as unknown as TransferResult;
 
       if (!result?.success) {
         toast({
