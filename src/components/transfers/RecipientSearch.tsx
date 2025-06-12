@@ -39,7 +39,7 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
       console.log('Auth user check result:', authUser, authError);
 
       if (!authUser) {
-        console.log('User not found in auth system');
+        console.log('User not found in auth system - they need to register first');
         return null;
       }
 
@@ -143,8 +143,8 @@ export function RecipientSearch({ onRecipientFound, onRecipientCleared, recipien
       if (!recipientData) {
         console.log('No recipient found for:', searchQuery);
         toast({
-          title: "Recipient Not Found",
-          description: "No user found with that email or phone number. Make sure the user has registered an account.",
+          title: "User Not Found",
+          description: "This email address is not registered. The user needs to create an account first before you can send them Happy Coins.",
           variant: "destructive",
         });
         onRecipientCleared();
