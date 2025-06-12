@@ -10,6 +10,14 @@ interface RecipientInfo {
   phone?: string;
 }
 
+interface TransferResult {
+  success: boolean;
+  error?: string;
+  sender_new_balance?: number;
+  recipient_new_balance?: number;
+  reference_id?: string;
+}
+
 export function useTransferProcessing() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -55,8 +63,8 @@ export function useTransferProcessing() {
 
       const transferAmount = parseFloat(amount);
 
-      // Start a database transaction by using rpc function
-      const { data: result, error: transferError } = await supabase.rpc('process_wallet_transfer', {
+      // Call the database function to process the transfer atomically
+      const { data: rawResult, error: transferError } = await supabase.rpc('process_wallet_transfer', {
         sender_id: user.id,
         recipient_id: recipient.id,
         transfer_amount: transferAmount,
@@ -67,6 +75,9 @@ export function useTransferProcessing() {
         console.error('Transfer error:', transferError);
         throw transferError;
       }
+
+      // Type-safe handling of the result
+      const result = rawResult as TransferResult;
 
       if (!result?.success) {
         toast({

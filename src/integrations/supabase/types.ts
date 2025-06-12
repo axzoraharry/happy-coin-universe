@@ -382,6 +382,15 @@ export type Database = {
         Args: { p_referred_user_id: string; p_referral_code: string }
         Returns: Json
       }
+      process_wallet_transfer: {
+        Args: {
+          sender_id: string
+          recipient_id: string
+          transfer_amount: number
+          transfer_description?: string
+        }
+        Returns: Json
+      }
       reset_daily_coins: {
         Args: Record<PropertyKey, never>
         Returns: undefined
