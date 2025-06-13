@@ -284,6 +284,18 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
           </Button>
+        </form>
+        
+        <div className="mt-4 space-y-2">
+          <div className="text-center">
+            <Button
+              variant="link"
+              onClick={switchMode}
+              className="text-sm"
+            >
+              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+            </Button>
+          </div>
           
           {onBackToLanding && (
             <Button 
@@ -295,15 +307,6 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
               Back to Home
             </Button>
           )}
-        </form>
-        <div className="mt-4 text-center">
-          <Button
-            variant="link"
-            onClick={switchMode}
-            className="text-sm"
-          >
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-          </Button>
         </div>
       </CardContent>
     </Card>
