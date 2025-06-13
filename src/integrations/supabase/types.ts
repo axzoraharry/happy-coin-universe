@@ -366,6 +366,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_user_completely: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       delete_user_data: {
         Args: { p_user_id: string }
         Returns: Json
