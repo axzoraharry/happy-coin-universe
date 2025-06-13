@@ -7,6 +7,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { UserCheck, Info } from 'lucide-react';
 
+interface DatabaseFunctionResponse {
+  success?: boolean;
+  error?: string;
+  message?: string;
+}
+
 export function AccountReactivation() {
   const [reactivating, setReactivating] = useState(false);
   const { toast } = useToast();
@@ -17,13 +23,15 @@ export function AccountReactivation() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase.rpc('reactivate_user_account', {
+      const { data, error } = await supabase.rpc('reactivate_user_account' as any, {
         p_user_id: user.id
       });
 
       if (error) throw error;
 
-      if (data?.success) {
+      const result = data as DatabaseFunctionResponse;
+
+      if (result?.success) {
         toast({
           title: "Account Reactivated",
           description: "Your account has been successfully reactivated. Welcome back!",
@@ -34,7 +42,7 @@ export function AccountReactivation() {
           window.location.reload();
         }, 1500);
       } else {
-        throw new Error(data?.error || 'Failed to reactivate account');
+        throw new Error(result?.error || 'Failed to reactivate account');
       }
     } catch (error: any) {
       console.error('Error reactivating account:', error);

@@ -11,6 +11,12 @@ import { UserX, Trash2, LogOut, Shield, AlertTriangle } from 'lucide-react';
 import { AccountStatusGuard } from '../common/AccountStatusGuard';
 import { useAccountStatus } from '@/hooks/useAccountStatus';
 
+interface DatabaseFunctionResponse {
+  success?: boolean;
+  error?: string;
+  message?: string;
+}
+
 export function AccountActions() {
   const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -96,14 +102,16 @@ export function AccountActions() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Call the enhanced deletion function
-      const { data, error } = await supabase.rpc('delete_user_completely', {
+      // Call the enhanced deletion function using rpc with proper typing
+      const { data, error } = await supabase.rpc('delete_user_completely' as any, {
         p_user_id: user.id
       });
 
       if (error) throw error;
 
-      if (data?.success) {
+      const result = data as DatabaseFunctionResponse;
+
+      if (result?.success) {
         toast({
           title: "Account Deleted",
           description: "Your account and all associated data have been permanently deleted.",
@@ -116,7 +124,7 @@ export function AccountActions() {
         // The user will be automatically signed out since the auth record is deleted
         window.location.href = '/';
       } else {
-        throw new Error(data?.error || 'Failed to delete account');
+        throw new Error(result?.error || 'Failed to delete account');
       }
     } catch (error: any) {
       console.error('Error deleting account:', error);

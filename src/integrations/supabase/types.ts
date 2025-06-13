@@ -401,6 +401,10 @@ export type Database = {
         }
         Returns: Json
       }
+      reactivate_user_account: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       reset_daily_coins: {
         Args: Record<PropertyKey, never>
         Returns: undefined
