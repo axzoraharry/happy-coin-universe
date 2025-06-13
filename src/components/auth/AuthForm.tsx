@@ -28,6 +28,7 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('AuthForm onBackToLanding prop:', onBackToLanding);
     // Check for referral code in URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
@@ -286,7 +287,7 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
           </Button>
         </form>
         
-        <div className="mt-4 space-y-2">
+        <div className="mt-6 space-y-3">
           <div className="text-center">
             <Button
               variant="link"
@@ -297,15 +298,24 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
             </Button>
           </div>
           
-          {onBackToLanding && (
-            <Button 
-              variant="ghost" 
-              className="w-full" 
-              onClick={onBackToLanding}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Home
-            </Button>
+          {onBackToLanding ? (
+            <div className="w-full">
+              <Button 
+                variant="outline" 
+                className="w-full border-2 border-primary/20 hover:border-primary/40" 
+                onClick={() => {
+                  console.log('Back button clicked');
+                  onBackToLanding();
+                }}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Home
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center text-sm text-muted-foreground">
+              No back button (onBackToLanding not provided)
+            </div>
           )}
         </div>
       </CardContent>
