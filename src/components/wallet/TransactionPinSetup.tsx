@@ -77,8 +77,8 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Use the secure PIN setting function from the security fixes migration
-      const { data, error } = await supabase.rpc('set_secure_transaction_pin' as any, {
+      // Use the correct function signature from the security fixes migration
+      const { data, error } = await supabase.rpc('set_secure_transaction_pin', {
         p_user_id: user.id,
         p_pin: pin
       });
