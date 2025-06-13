@@ -6,25 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
-
-interface PinResponse {
-  success?: boolean;
-  error?: string;
-  message?: string;
-  pin_verified?: boolean;
-}
+import { Lock, CheckCircle, AlertCircle } from 'lucide-react';
 
 export function TransactionPinSetup() {
-  const [currentPin, setCurrentPin] = useState('');
-  const [newPin, setNewPin] = useState('');
+  const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [showCurrentPin, setShowCurrentPin] = useState(false);
-  const [showNewPin, setShowNewPin] = useState(false);
-  const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [hasPin, setHasPin] = useState(false);
   const [checkingPin, setCheckingPin] = useState(true);
+  const [hasPin, setHasPin] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -36,14 +25,17 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if user has a PIN set
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('has_transaction_pin')
-        .eq('id', user.id)
-        .single();
+      // Check if user has a transaction PIN by calling the database function
+      const { data, error } = await supabase.rpc('check_user_transaction_pin', {
+        user_id: user.id
+      });
 
-      setHasPin(profile?.has_transaction_pin || false);
+      if (error) {
+        console.error('Error checking PIN:', error);
+        return;
+      }
+
+      setHasPin(data === true);
     } catch (error) {
       console.error('Error checking existing PIN:', error);
     } finally {
@@ -51,8 +43,10 @@ export function TransactionPinSetup() {
     }
   };
 
-  const handleSetPin = async () => {
-    if (!newPin || newPin.length !== 4) {
+  const handleSetupPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (pin.length !== 4) {
       toast({
         title: "Invalid PIN",
         description: "PIN must be exactly 4 digits",
@@ -61,19 +55,10 @@ export function TransactionPinSetup() {
       return;
     }
 
-    if (newPin !== confirmPin) {
+    if (pin !== confirmPin) {
       toast({
-        title: "PIN Mismatch",
-        description: "New PIN and confirmation don't match",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (hasPin && !currentPin) {
-      toast({
-        title: "Current PIN Required",
-        description: "Please enter your current PIN to change it",
+        title: "PINs don't match",
+        description: "Please make sure both PINs are the same",
         variant: "destructive",
       });
       return;
@@ -84,156 +69,29 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data: rawResult, error } = await supabase.rpc('set_secure_transaction_pin' as any, {
+      const { data, error } = await supabase.rpc('set_transaction_pin', {
         user_id: user.id,
-        new_pin: newPin,
-        current_pin: hasPin ? currentPin : null
+        new_pin: pin
       });
 
       if (error) throw error;
 
-      const result = rawResult as unknown as PinResponse;
-
-      if (result?.success) {
+      if (data?.success) {
         toast({
-          title: "PIN Updated",
-          description: result.message || "Transaction PIN has been set successfully",
+          title: "PIN Set Successfully",
+          description: "Your transaction PIN has been set up securely",
         });
         setHasPin(true);
-        setCurrentPin('');
-        setNewPin('');
+        setPin('');
         setConfirmPin('');
       } else {
-        toast({
-          title: "Failed to Set PIN",
-          description: result?.error || "Failed to set transaction PIN",
-          variant: "destructive",
-        });
+        throw new Error(data?.error || 'Failed to set PIN');
       }
     } catch (error: any) {
       console.error('Error setting PIN:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to set transaction PIN",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyPin = async () => {
-    if (!currentPin || currentPin.length !== 4) {
-      toast({
-        title: "Invalid PIN",
-        description: "Please enter your 4-digit PIN",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { data: rawResult, error } = await supabase.rpc('verify_transaction_pin' as any, {
-        user_id: user.id,
-        pin_to_verify: currentPin
-      });
-
-      if (error) throw error;
-
-      const result = rawResult as unknown as PinResponse;
-
-      if (result?.pin_verified) {
-        toast({
-          title: "PIN Verified",
-          description: "Your transaction PIN is correct",
-        });
-      } else {
-        toast({
-          title: "Invalid PIN",
-          description: "The PIN you entered is incorrect",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error('Error verifying PIN:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to verify PIN",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-      setCurrentPin('');
-    }
-  };
-
-  const handleChangePin = async () => {
-    if (!currentPin || currentPin.length !== 4) {
-      toast({
-        title: "Invalid Current PIN",
-        description: "Please enter your current 4-digit PIN",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!newPin || newPin.length !== 4) {
-      toast({
-        title: "Invalid New PIN",
-        description: "New PIN must be exactly 4 digits",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPin !== confirmPin) {
-      toast({
-        title: "PIN Mismatch",
-        description: "New PIN and confirmation don't match",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { data: rawResult, error } = await supabase.rpc('set_secure_transaction_pin' as any, {
-        user_id: user.id,
-        new_pin: newPin,
-        current_pin: currentPin
-      });
-
-      if (error) throw error;
-
-      const result = rawResult as unknown as PinResponse;
-
-      if (result?.success) {
-        toast({
-          title: "PIN Changed",
-          description: "Your transaction PIN has been changed successfully",
-        });
-        setCurrentPin('');
-        setNewPin('');
-        setConfirmPin('');
-      } else {
-        toast({
-          title: "Failed to Change PIN",
-          description: result?.error || "Failed to change transaction PIN",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error('Error changing PIN:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to change transaction PIN",
+        title: "Setup Failed",
+        description: error.message || "Failed to set up transaction PIN",
         variant: "destructive",
       });
     } finally {
@@ -244,10 +102,30 @@ export function TransactionPinSetup() {
   if (checkingPin) {
     return (
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="flex items-center justify-center py-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-sm text-muted-foreground mt-2">Checking PIN status...</p>
+            <div className="text-lg font-medium">Checking PIN status...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (hasPin) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <span>Transaction PIN Active</span>
+          </CardTitle>
+          <CardDescription>
+            Your transaction PIN is set up and securing your transfers
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground">
+            Your transfers are protected with a secure 4-digit PIN. You'll be prompted to enter it when making transfers.
           </div>
         </CardContent>
       </Card>
@@ -255,248 +133,57 @@ export function TransactionPinSetup() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Shield className="h-5 w-5 text-primary" />
-            <CardTitle>Transaction PIN Security</CardTitle>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Lock className="h-5 w-5" />
+          <span>Set Up Transaction PIN</span>
+        </CardTitle>
+        <CardDescription>
+          Secure your transfers with a 4-digit PIN
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSetupPin} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="pin">Create 4-Digit PIN</Label>
+            <Input
+              id="pin"
+              type="password"
+              placeholder="••••"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              maxLength={4}
+              required
+            />
           </div>
-          <CardDescription>
-            {hasPin 
-              ? "Manage your transaction PIN for secure transfers" 
-              : "Set up a 4-digit PIN for secure transactions"
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {hasPin ? (
-            <>
-              {/* Verify PIN Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span>Verify Current PIN</span>
-                </h3>
-                <div className="space-y-2">
-                  <Label htmlFor="verify-pin">Enter your current PIN</Label>
-                  <div className="relative">
-                    <Input
-                      id="verify-pin"
-                      type={showCurrentPin ? "text" : "password"}
-                      placeholder="••••"
-                      value={currentPin}
-                      onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      maxLength={4}
-                      className="text-center text-lg tracking-widest pr-10"
-                      disabled={loading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowCurrentPin(!showCurrentPin)}
-                      disabled={loading}
-                    >
-                      {showCurrentPin ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <Button 
-                    onClick={handleVerifyPin} 
-                    disabled={loading || currentPin.length !== 4}
-                    className="w-full"
-                  >
-                    {loading ? 'Verifying...' : 'Verify PIN'}
-                  </Button>
-                </div>
-              </div>
 
-              {/* Change PIN Section */}
-              <div className="space-y-4 border-t pt-6">
-                <h3 className="text-lg font-semibold flex items-center space-x-2">
-                  <AlertCircle className="h-4 w-4 text-orange-600" />
-                  <span>Change PIN</span>
-                </h3>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="current-pin-change">Current PIN</Label>
-                  <div className="relative">
-                    <Input
-                      id="current-pin-change"
-                      type={showCurrentPin ? "text" : "password"}
-                      placeholder="••••"
-                      value={currentPin}
-                      onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      maxLength={4}
-                      className="text-center text-lg tracking-widest pr-10"
-                      disabled={loading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowCurrentPin(!showCurrentPin)}
-                      disabled={loading}
-                    >
-                      {showCurrentPin ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPin">Confirm PIN</Label>
+            <Input
+              id="confirmPin"
+              type="password"
+              placeholder="••••"
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              maxLength={4}
+              required
+            />
+          </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="new-pin-change">New PIN</Label>
-                  <div className="relative">
-                    <Input
-                      id="new-pin-change"
-                      type={showNewPin ? "text" : "password"}
-                      placeholder="••••"
-                      value={newPin}
-                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      maxLength={4}
-                      className="text-center text-lg tracking-widest pr-10"
-                      disabled={loading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowNewPin(!showNewPin)}
-                      disabled={loading}
-                    >
-                      {showNewPin ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-pin-change">Confirm New PIN</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirm-pin-change"
-                      type={showConfirmPin ? "text" : "password"}
-                      placeholder="••••"
-                      value={confirmPin}
-                      onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      maxLength={4}
-                      className="text-center text-lg tracking-widest pr-10"
-                      disabled={loading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowConfirmPin(!showConfirmPin)}
-                      disabled={loading}
-                    >
-                      {showConfirmPin ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <Button 
-                  onClick={handleChangePin} 
-                  disabled={loading || currentPin.length !== 4 || newPin.length !== 4 || confirmPin.length !== 4}
-                  className="w-full"
-                  variant="outline"
-                >
-                  {loading ? 'Changing...' : 'Change PIN'}
-                </Button>
-              </div>
-            </>
-          ) : (
-            /* Set PIN Section */
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-pin">New PIN (4 digits)</Label>
-                <div className="relative">
-                  <Input
-                    id="new-pin"
-                    type={showNewPin ? "text" : "password"}
-                    placeholder="••••"
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    maxLength={4}
-                    className="text-center text-lg tracking-widest pr-10"
-                    disabled={loading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowNewPin(!showNewPin)}
-                    disabled={loading}
-                  >
-                    {showNewPin ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirm-pin">Confirm PIN</Label>
-                <div className="relative">
-                  <Input
-                    id="confirm-pin"
-                    type={showConfirmPin ? "text" : "password"}
-                    placeholder="••••"
-                    value={confirmPin}
-                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    maxLength={4}
-                    className="text-center text-lg tracking-widest pr-10"
-                    disabled={loading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowConfirmPin(!showConfirmPin)}
-                    disabled={loading}
-                  >
-                    {showConfirmPin ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <Button 
-                onClick={handleSetPin} 
-                disabled={loading || newPin.length !== 4 || confirmPin.length !== 4}
-                className="w-full"
-              >
-                {loading ? 'Setting...' : 'Set PIN'}
-              </Button>
+          <div className="flex items-start space-x-2 text-sm text-muted-foreground">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <div>
+              Your PIN will be securely encrypted and used to verify transfers. 
+              Make sure to remember it as it cannot be recovered.
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? 'Setting up PIN...' : 'Set Up PIN'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

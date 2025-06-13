@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -218,24 +217,10 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
-            <CardDescription>
-              {isSignUp ? 'Create your digital wallet account' : 'Welcome back to your digital wallet'}
-            </CardDescription>
-          </div>
-          {onBackToLanding && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={onBackToLanding}
-              className="ml-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        <CardTitle>{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
+        <CardDescription>
+          {isSignUp ? 'Create your digital wallet account' : 'Welcome back to your digital wallet'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleAuth} className="space-y-4">
@@ -299,6 +284,17 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
           </Button>
+          
+          {onBackToLanding && (
+            <Button 
+              variant="ghost" 
+              className="w-full" 
+              onClick={onBackToLanding}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          )}
         </form>
         <div className="mt-4 text-center">
           <Button
