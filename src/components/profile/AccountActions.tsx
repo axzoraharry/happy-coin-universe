@@ -1,48 +1,41 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, UserX, AlertTriangle, UserMinus } from 'lucide-react';
-
-interface DeleteUserDataResponse {
-  success: boolean;
-  error?: string;
-  message?: string;
-  deleted_at?: string;
-}
+import { UserX, Trash2, LogOut, Shield } from 'lucide-react';
+import { AccountStatusGuard } from '../common/AccountStatusGuard';
+import { useAccountStatus } from '@/hooks/useAccountStatus';
 
 export function AccountActions() {
-  const [loading, setLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [confirmationText, setConfirmationText] = useState('');
+  const [deactivating, setDeactivating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const { toast } = useToast();
+  const { isActive } = useAccountStatus();
 
   const handleSignOut = async () => {
-    setLoading(true);
+    setSigningOut(true);
     try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Signed Out",
-        description: "You have been signed out successfully",
-      });
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Redirect will happen automatically through auth state change
     } catch (error: any) {
-      console.error('Error signing out:', error);
       toast({
-        title: "Error",
-        description: "Failed to sign out",
+        title: "Sign Out Failed",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setSigningOut(false);
     }
   };
 
   const handleDeactivateAccount = async () => {
-    setLoading(true);
+    setDeactivating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -60,16 +53,16 @@ export function AccountActions() {
         .insert({
           user_id: user.id,
           title: 'Account Deactivated',
-          message: 'Your account has been deactivated. Contact support to reactivate.',
+          message: 'Your account has been deactivated. You can reactivate it anytime by logging in.',
           type: 'warning'
         });
 
       toast({
         title: "Account Deactivated",
-        description: "Your account has been deactivated. You will be signed out.",
+        description: "Your account has been deactivated. You will be signed out shortly.",
       });
 
-      // Sign out after deactivation
+      // Sign out user after deactivation
       setTimeout(() => {
         supabase.auth.signOut();
       }, 2000);
@@ -81,196 +74,144 @@ export function AccountActions() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setDeactivating(false);
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (confirmationText !== 'DELETE MY ACCOUNT') {
-      toast({
-        title: "Confirmation Required",
-        description: "Please type 'DELETE MY ACCOUNT' to confirm",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setDeleteLoading(true);
+    setDeleting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Call the GDPR compliant deletion function
-      const { data, error } = await supabase
-        .rpc('delete_user_data', { p_user_id: user.id });
+      // Call the GDPR deletion function
+      const { data, error } = await supabase.rpc('delete_user_data', {
+        p_user_id: user.id
+      });
 
       if (error) throw error;
 
-      // Properly type the response
-      const response = data as unknown as DeleteUserDataResponse;
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to delete account data');
-      }
-
       toast({
         title: "Account Deleted",
-        description: "Your account and all data have been permanently deleted.",
+        description: "Your account and all associated data have been permanently deleted.",
       });
 
-      // Sign out after deletion
-      setTimeout(() => {
-        supabase.auth.signOut();
-      }, 2000);
+      // Sign out user after deletion
+      await supabase.auth.signOut();
     } catch (error: any) {
       console.error('Error deleting account:', error);
       toast({
         title: "Deletion Failed",
-        description: error.message,
+        description: error.message || "Failed to delete account",
         variant: "destructive",
       });
     } finally {
-      setDeleteLoading(false);
-      setConfirmationText('');
+      setDeleting(false);
     }
   };
 
   return (
-    <Card className="border-destructive/20">
+    <Card className="border-red-200 bg-red-50/50">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-destructive">
-          <AlertTriangle className="h-5 w-5" />
+        <CardTitle className="flex items-center space-x-2 text-red-700">
+          <Shield className="h-5 w-5" />
           <span>Account Actions</span>
         </CardTitle>
         <CardDescription>
-          Account management options
+          Manage your account security and data
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg">
-          <div>
-            <h4 className="font-medium">Sign Out</h4>
-            <p className="text-sm text-muted-foreground">
-              Sign out of your account on this device.
-            </p>
-          </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <UserX className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Sign Out</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to sign out of your account?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleSignOut}
-                  disabled={loading}
-                  className="bg-orange-600 hover:bg-orange-700"
-                >
-                  {loading ? 'Signing out...' : 'Sign Out'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+        {/* Sign Out */}
+        <Button
+          variant="outline"
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="w-full justify-start"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          {signingOut ? 'Signing Out...' : 'Sign Out'}
+        </Button>
 
-        <div className="flex items-center justify-between p-4 border border-yellow-200 rounded-lg">
-          <div>
-            <h4 className="font-medium">Deactivate Account</h4>
-            <p className="text-sm text-muted-foreground">
-              Temporarily deactivate your account. You can contact support to reactivate it.
-            </p>
-          </div>
+        {/* Deactivate Account - Only show if account is active */}
+        {isActive && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="border-yellow-500 text-yellow-700 hover:bg-yellow-50">
-                <UserMinus className="h-4 w-4 mr-2" />
-                Deactivate
+              <Button
+                variant="outline"
+                disabled={deactivating}
+                className="w-full justify-start border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+              >
+                <UserX className="h-4 w-4 mr-2" />
+                {deactivating ? 'Deactivating...' : 'Deactivate Account'}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Deactivate Account</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will deactivate your account temporarily. Your data will be preserved, but you won't be able to access your account until it's reactivated by contacting support.
+                  Are you sure you want to deactivate your account? This will:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Prevent you from making transfers or exchanges</li>
+                    <li>Restrict access to certain features</li>
+                    <li>Sign you out of your account</li>
+                    <li>Allow you to reactivate anytime by signing back in</li>
+                  </ul>
+                  Your data will be preserved and you can reactivate anytime.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogAction
                   onClick={handleDeactivateAccount}
-                  disabled={loading}
                   className="bg-yellow-600 hover:bg-yellow-700"
                 >
-                  {loading ? 'Deactivating...' : 'Deactivate Account'}
+                  Deactivate Account
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </div>
+        )}
 
-        <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg">
-          <div>
-            <h4 className="font-medium text-red-700">Delete Account & Data</h4>
-            <p className="text-sm text-muted-foreground">
-              Permanently delete your account and all associated data. This action cannot be undone.
-            </p>
-          </div>
+        {/* Delete Account */}
+        <AccountStatusGuard showError={false}>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="border-red-500 text-red-700 hover:bg-red-50">
+              <Button
+                variant="outline"
+                disabled={deleting}
+                className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50"
+              >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+                {deleting ? 'Deleting...' : 'Delete Account'}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Account & All Data</AlertDialogTitle>
+                <AlertDialogTitle>Delete Account Permanently</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently delete your account and all associated data including:
-                  <ul className="list-disc list-inside mt-2 text-sm">
-                    <li>Profile information</li>
-                    <li>Wallet and transaction history</li>
-                    <li>Coins and rewards</li>
-                    <li>Notifications</li>
-                    <li>All other personal data</li>
+                  Are you sure you want to permanently delete your account? This action cannot be undone and will:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Permanently delete all your data</li>
+                    <li>Remove all transaction history</li>
+                    <li>Delete your wallet and coins</li>
+                    <li>Cancel all pending transactions</li>
                   </ul>
-                  <strong className="text-red-600 block mt-2">This action cannot be undone.</strong>
+                  This action is irreversible and complies with GDPR data deletion requirements.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="px-6 pb-4">
-                <Label htmlFor="confirmation" className="text-sm font-medium text-red-700">
-                  Type "DELETE MY ACCOUNT" to confirm:
-                </Label>
-                <Input
-                  id="confirmation"
-                  type="text"
-                  value={confirmationText}
-                  onChange={(e) => setConfirmationText(e.target.value)}
-                  placeholder="DELETE MY ACCOUNT"
-                  className="mt-2"
-                />
-              </div>
               <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setConfirmationText('')}>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
                   onClick={handleDeleteAccount}
-                  disabled={deleteLoading || confirmationText !== 'DELETE MY ACCOUNT'}
                   className="bg-red-600 hover:bg-red-700"
                 >
-                  {deleteLoading ? 'Deleting...' : 'Delete Account & Data'}
+                  Delete Forever
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </div>
+        </AccountStatusGuard>
       </CardContent>
     </Card>
   );

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAccountStatus } from '@/hooks/useAccountStatus';
 
 interface SecureTransferResult {
   success: boolean;
@@ -15,17 +16,28 @@ export function useSecureTransfer() {
   const [showPinInput, setShowPinInput] = useState(false);
   const [pendingTransfer, setPendingTransfer] = useState<any>(null);
   const { toast } = useToast();
+  const { isActive, showDeactivatedAccountError } = useAccountStatus();
 
   const initiateTransfer = (transferData: {
     recipientId: string;
     amount: string;
     description: string;
   }) => {
+    if (!isActive) {
+      showDeactivatedAccountError();
+      return;
+    }
+
     setPendingTransfer(transferData);
     setShowPinInput(true);
   };
 
   const executeTransfer = async (pin: string) => {
+    if (!isActive) {
+      showDeactivatedAccountError();
+      return false;
+    }
+
     if (!pendingTransfer) return false;
 
     setLoading(true);

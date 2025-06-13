@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { AccountStatusGuard } from '../common/AccountStatusGuard';
+import { useAccountStatus } from '@/hooks/useAccountStatus';
 
 interface PinResponse {
   success?: boolean;
@@ -21,6 +23,7 @@ export function TransactionPinSetup() {
   const [checkingPin, setCheckingPin] = useState(true);
   const [hasPin, setHasPin] = useState(false);
   const { toast } = useToast();
+  const { isActive, showDeactivatedAccountError } = useAccountStatus();
 
   useEffect(() => {
     checkExistingPin();
@@ -53,6 +56,11 @@ export function TransactionPinSetup() {
 
   const handleSetupPin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isActive) {
+      showDeactivatedAccountError();
+      return;
+    }
     
     if (pin.length !== 4) {
       toast({
@@ -144,57 +152,59 @@ export function TransactionPinSetup() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Lock className="h-5 w-5" />
-          <span>Set Up Transaction PIN</span>
-        </CardTitle>
-        <CardDescription>
-          Secure your transfers with a 4-digit PIN
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSetupPin} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="pin">Create 4-Digit PIN</Label>
-            <Input
-              id="pin"
-              type="password"
-              placeholder="••••"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              maxLength={4}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirmPin">Confirm PIN</Label>
-            <Input
-              id="confirmPin"
-              type="password"
-              placeholder="••••"
-              value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              maxLength={4}
-              required
-            />
-          </div>
-
-          <div className="flex items-start space-x-2 text-sm text-muted-foreground">
-            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <div>
-              Your PIN will be securely encrypted and used to verify transfers. 
-              Make sure to remember it as it cannot be recovered.
+    <AccountStatusGuard>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Lock className="h-5 w-5" />
+            <span>Set Up Transaction PIN</span>
+          </CardTitle>
+          <CardDescription>
+            Secure your transfers with a 4-digit PIN
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSetupPin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="pin">Create 4-Digit PIN</Label>
+              <Input
+                id="pin"
+                type="password"
+                placeholder="••••"
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                maxLength={4}
+                required
+              />
             </div>
-          </div>
 
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Setting up PIN...' : 'Set Up PIN'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPin">Confirm PIN</Label>
+              <Input
+                id="confirmPin"
+                type="password"
+                placeholder="••••"
+                value={confirmPin}
+                onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                maxLength={4}
+                required
+              />
+            </div>
+
+            <div className="flex items-start space-x-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                Your PIN will be securely encrypted and used to verify transfers. 
+                Make sure to remember it as it cannot be recovered.
+              </div>
+            </div>
+
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Setting up PIN...' : 'Set Up PIN'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </AccountStatusGuard>
   );
 }

@@ -5,42 +5,12 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AlertTriangle, CheckCircle, Mail } from 'lucide-react';
+import { useAccountStatus } from '@/hooks/useAccountStatus';
 
 export function AccountDeactivationStatus() {
-  const [isActive, setIsActive] = useState(true);
-  const [loading, setLoading] = useState(true);
   const [reactivating, setReactivating] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    checkAccountStatus();
-  }, []);
-
-  const checkAccountStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('is_active')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-
-      setIsActive(data.is_active);
-    } catch (error: any) {
-      console.error('Error checking account status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to check account status",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { isActive, loading, checkAccountStatus } = useAccountStatus();
 
   const handleReactivate = async () => {
     setReactivating(true);
@@ -65,7 +35,9 @@ export function AccountDeactivationStatus() {
           type: 'success'
         });
 
-      setIsActive(true);
+      // Refresh account status
+      await checkAccountStatus();
+
       toast({
         title: "Account Reactivated",
         description: "Your account has been successfully reactivated.",
@@ -110,7 +82,7 @@ export function AccountDeactivationStatus() {
           <div className="flex items-start space-x-2 text-sm text-yellow-700">
             <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <div>
-              While deactivated, you can still access your account but some features may be limited.
+              While deactivated, you cannot make transfers, exchanges, or purchase coins.
               To fully restore all functionality, please reactivate your account.
             </div>
           </div>

@@ -6,6 +6,7 @@ import { Send, ArrowLeftRight } from 'lucide-react';
 import { RecipientSearch } from './RecipientSearch';
 import { TransferAmountInput } from './TransferAmountInput';
 import { SecurePinInput } from '../wallet/SecurePinInput';
+import { AccountStatusGuard } from '../common/AccountStatusGuard';
 import { useSecureTransfer } from '@/hooks/useSecureTransfer';
 
 interface RecipientInfo {
@@ -65,63 +66,67 @@ export function EnhancedTransferForm() {
   // Show PIN input overlay when needed
   if (showPinInput && pendingTransfer) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <ArrowLeftRight className="h-5 w-5" />
-            <span>Confirm Transfer</span>
-          </CardTitle>
-          <CardDescription>
-            Transferring {pendingTransfer.amount} HC to {recipient?.full_name || recipient?.email}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SecurePinInput
-            onPinEntered={handlePinSubmit}
-            onCancel={cancelTransfer}
-            isVerifying={loading}
-            title="Confirm Transfer"
-            description="Enter your PIN to securely complete this transfer"
-          />
-        </CardContent>
-      </Card>
+      <AccountStatusGuard>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <ArrowLeftRight className="h-5 w-5" />
+              <span>Confirm Transfer</span>
+            </CardTitle>
+            <CardDescription>
+              Transferring {pendingTransfer.amount} HC to {recipient?.full_name || recipient?.email}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SecurePinInput
+              onPinEntered={handlePinSubmit}
+              onCancel={cancelTransfer}
+              isVerifying={loading}
+              title="Confirm Transfer"
+              description="Enter your PIN to securely complete this transfer"
+            />
+          </CardContent>
+        </Card>
+      </AccountStatusGuard>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <ArrowLeftRight className="h-5 w-5" />
-          <span>Send Happy Coins</span>
-        </CardTitle>
-        <CardDescription>Transfer Happy Coins securely with PIN verification</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleTransfer} className="space-y-6">
-          <RecipientSearch
-            onRecipientFound={setRecipient}
-            onRecipientCleared={() => setRecipient(null)}
-            recipient={recipient}
-          />
+    <AccountStatusGuard>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <ArrowLeftRight className="h-5 w-5" />
+            <span>Send Happy Coins</span>
+          </CardTitle>
+          <CardDescription>Transfer Happy Coins securely with PIN verification</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleTransfer} className="space-y-6">
+            <RecipientSearch
+              onRecipientFound={setRecipient}
+              onRecipientCleared={() => setRecipient(null)}
+              recipient={recipient}
+            />
 
-          <TransferAmountInput
-            amount={amount}
-            description={description}
-            onAmountChange={setAmount}
-            onDescriptionChange={setDescription}
-          />
+            <TransferAmountInput
+              amount={amount}
+              description={description}
+              onAmountChange={setAmount}
+              onDescriptionChange={setDescription}
+            />
 
-          <Button 
-            type="submit" 
-            disabled={loading || !recipient} 
-            className="w-full"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            {loading ? 'Processing Transfer...' : 'Send Happy Coins Securely'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+            <Button 
+              type="submit" 
+              disabled={loading || !recipient} 
+              className="w-full"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {loading ? 'Processing Transfer...' : 'Send Happy Coins Securely'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </AccountStatusGuard>
   );
 }
