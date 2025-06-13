@@ -136,7 +136,7 @@ const Index = () => {
         case 'landing':
           return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
         case 'auth':
-          return <AuthForm />;
+          return <AuthForm onBackToLanding={() => setCurrentPage('landing')} />;
         default:
           return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
       }

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 
 interface ReferralResponse {
   success?: boolean;
@@ -13,7 +14,11 @@ interface ReferralResponse {
   bonus_awarded?: number;
 }
 
-export function AuthForm() {
+interface AuthFormProps {
+  onBackToLanding?: () => void;
+}
+
+export function AuthForm({ onBackToLanding }: AuthFormProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -195,6 +200,16 @@ export function AuthForm() {
           >
             Return to Sign In
           </Button>
+          {onBackToLanding && (
+            <Button 
+              variant="ghost" 
+              className="w-full" 
+              onClick={onBackToLanding}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -203,10 +218,24 @@ export function AuthForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
-        <CardDescription>
-          {isSignUp ? 'Create your digital wallet account' : 'Welcome back to your digital wallet'}
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
+            <CardDescription>
+              {isSignUp ? 'Create your digital wallet account' : 'Welcome back to your digital wallet'}
+            </CardDescription>
+          </div>
+          {onBackToLanding && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={onBackToLanding}
+              className="ml-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleAuth} className="space-y-4">
