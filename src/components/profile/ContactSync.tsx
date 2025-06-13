@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -240,24 +239,16 @@ export function ContactSync() {
             <div className="space-y-2">
               <h4 className="font-medium">Search Results</h4>
               {searchResults.map((contact) => (
-                <div key={contact.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Avatar>
-                      <AvatarFallback>
-                        {contact.full_name?.charAt(0) || contact.email.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{contact.full_name || 'No name'}</p>
-                      <p className="text-sm text-muted-foreground">{contact.email}</p>
-                    </div>
+                <div key={contact.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                  <Avatar>
+                    <AvatarFallback>
+                      {contact.full_name?.charAt(0) || contact.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{contact.full_name || 'No name'}</p>
+                    <p className="text-sm text-muted-foreground">{contact.email}</p>
                   </div>
-                  {contact.is_user && (
-                    <Button size="sm" variant="outline">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Connect
-                    </Button>
-                  )}
                 </div>
               ))}
             </div>
