@@ -9,8 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 import { User, Mail, Phone, Calendar } from 'lucide-react';
 import { AccountActions } from './AccountActions';
 import { AccountDeactivationStatus } from './AccountDeactivationStatus';
+import { AccountReactivation } from './AccountReactivation';
 import { ContactSync } from './ContactSync';
 import { ReferralSystem } from './ReferralSystem';
+import { useAccountStatus } from '@/hooks/useAccountStatus';
 
 interface Profile {
   id: string;
@@ -28,6 +30,7 @@ export function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { isActive } = useAccountStatus();
 
   useEffect(() => {
     fetchProfile();
@@ -108,8 +111,8 @@ export function UserProfile() {
 
   return (
     <div className="space-y-6">
-      {/* Account Status */}
-      <AccountDeactivationStatus />
+      {/* Show appropriate status component based on account state */}
+      {!isActive ? <AccountReactivation /> : <AccountDeactivationStatus />}
 
       {/* Basic Profile Information */}
       <Card>
@@ -142,6 +145,7 @@ export function UserProfile() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Enter your full name"
+                disabled={!isActive}
               />
             </div>
 
@@ -154,6 +158,7 @@ export function UserProfile() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="Enter your phone number"
+                  disabled={!isActive}
                 />
               </div>
             </div>
@@ -168,18 +173,20 @@ export function UserProfile() {
               </div>
             </div>
 
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving...' : 'Update Profile'}
-            </Button>
+            {isActive && (
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving...' : 'Update Profile'}
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>
 
-      {/* Contact Sync */}
-      <ContactSync />
+      {/* Contact Sync - Only show for active accounts */}
+      {isActive && <ContactSync />}
 
-      {/* Referral System */}
-      <ReferralSystem />
+      {/* Referral System - Only show for active accounts */}
+      {isActive && <ReferralSystem />}
 
       {/* Account Actions */}
       <AccountActions />

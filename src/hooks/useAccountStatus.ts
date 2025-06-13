@@ -19,6 +19,15 @@ export function useAccountStatus() {
 
   useEffect(() => {
     checkAccountStatus();
+    
+    // Listen for auth state changes to recheck status
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        checkAccountStatus();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const checkAccountStatus = async () => {
@@ -35,7 +44,22 @@ export function useAccountStatus() {
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If profile doesn't exist, the account might have been deleted
+        if (error.code === 'PGRST116') {
+          console.error('Profile not found - account may have been deleted');
+          setStatus({
+            isActive: false,
+            loading: false,
+            error: 'Account not found'
+          });
+          
+          // Sign out the user since their account no longer exists
+          await supabase.auth.signOut();
+          return;
+        }
+        throw error;
+      }
 
       setStatus({
         isActive: data.is_active,
@@ -60,9 +84,15 @@ export function useAccountStatus() {
     });
   };
 
+  const refreshAccountStatus = () => {
+    setStatus(prev => ({ ...prev, loading: true }));
+    checkAccountStatus();
+  };
+
   return {
     ...status,
     checkAccountStatus,
+    refreshAccountStatus,
     showDeactivatedAccountError
   };
 }

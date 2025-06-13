@@ -3,9 +3,11 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { UserX, Trash2, LogOut, Shield } from 'lucide-react';
+import { UserX, Trash2, LogOut, Shield, AlertTriangle } from 'lucide-react';
 import { AccountStatusGuard } from '../common/AccountStatusGuard';
 import { useAccountStatus } from '@/hooks/useAccountStatus';
 
@@ -13,6 +15,7 @@ export function AccountActions() {
   const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const { toast } = useToast();
   const { isActive } = useAccountStatus();
 
@@ -79,34 +82,52 @@ export function AccountActions() {
   };
 
   const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      toast({
+        title: "Confirmation Required",
+        description: "Please type 'DELETE' to confirm account deletion.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setDeleting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Call the GDPR deletion function
-      const { data, error } = await supabase.rpc('delete_user_data', {
+      // Call the enhanced deletion function
+      const { data, error } = await supabase.rpc('delete_user_completely', {
         p_user_id: user.id
       });
 
       if (error) throw error;
 
-      toast({
-        title: "Account Deleted",
-        description: "Your account and all associated data have been permanently deleted.",
-      });
+      if (data?.success) {
+        toast({
+          title: "Account Deleted",
+          description: "Your account and all associated data have been permanently deleted.",
+        });
 
-      // Sign out user after deletion
-      await supabase.auth.signOut();
+        // Clear any local storage and redirect
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // The user will be automatically signed out since the auth record is deleted
+        window.location.href = '/';
+      } else {
+        throw new Error(data?.error || 'Failed to delete account');
+      }
     } catch (error: any) {
       console.error('Error deleting account:', error);
       toast({
         title: "Deletion Failed",
-        description: error.message || "Failed to delete account",
+        description: error.message || "Failed to delete account. Please try again or contact support.",
         variant: "destructive",
       });
     } finally {
       setDeleting(false);
+      setDeleteConfirmation('');
     }
   };
 
@@ -118,7 +139,7 @@ export function AccountActions() {
           <span>Account Actions</span>
         </CardTitle>
         <CardDescription>
-          Manage your account security and data
+          Manage your account security and data. These actions are permanent and cannot be undone.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -173,7 +194,7 @@ export function AccountActions() {
           </AlertDialog>
         )}
 
-        {/* Delete Account */}
+        {/* Delete Account - Only available for active accounts */}
         <AccountStatusGuard showError={false}>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -183,30 +204,57 @@ export function AccountActions() {
                 className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                {deleting ? 'Deleting...' : 'Delete Account'}
+                {deleting ? 'Deleting...' : 'Delete Account Permanently'}
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
+            <AlertDialogContent className="max-w-md">
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Account Permanently</AlertDialogTitle>
+                <AlertDialogTitle className="flex items-center space-x-2 text-red-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span>Delete Account Permanently</span>
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to permanently delete your account? This action cannot be undone and will:
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Permanently delete all your data</li>
-                    <li>Remove all transaction history</li>
-                    <li>Delete your wallet and coins</li>
-                    <li>Cancel all pending transactions</li>
-                  </ul>
-                  This action is irreversible and complies with GDPR data deletion requirements.
+                  <div className="space-y-3">
+                    <p className="font-medium text-red-800">
+                      This action cannot be undone and will permanently delete:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      <li>Your entire account and profile</li>
+                      <li>All transaction history</li>
+                      <li>Your wallet and coin balance</li>
+                      <li>All notifications and settings</li>
+                      <li>Your authentication credentials</li>
+                    </ul>
+                    <div className="bg-red-100 p-3 rounded-lg border border-red-200">
+                      <p className="text-sm font-medium text-red-800">
+                        To confirm, type "DELETE" in the box below:
+                      </p>
+                    </div>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="py-4">
+                <Label htmlFor="deleteConfirmation" className="text-sm font-medium">
+                  Type DELETE to confirm
+                </Label>
+                <Input
+                  id="deleteConfirmation"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="Type DELETE here"
+                  className="mt-2"
+                />
+              </div>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel onClick={() => setDeleteConfirmation('')}>
+                  Cancel
+                </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDeleteAccount}
+                  disabled={deleteConfirmation !== 'DELETE' || deleting}
                   className="bg-red-600 hover:bg-red-700"
                 >
-                  Delete Forever
+                  {deleting ? 'Deleting...' : 'Delete Forever'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
