@@ -64,7 +64,7 @@ export function useTransferProcessing() {
       const transferAmount = parseFloat(amount);
 
       // Use the new secure transfer function
-      const { data: rawResult, error: transferError } = await supabase.rpc('process_secure_wallet_transfer', {
+      const { data: rawResult, error: transferError } = await supabase.rpc('process_secure_wallet_transfer' as any, {
         sender_id: user.id,
         recipient_id: recipient.id,
         transfer_amount: transferAmount,

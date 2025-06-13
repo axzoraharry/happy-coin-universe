@@ -33,7 +33,7 @@ export function useSecureTransfer() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data: rawResult, error } = await supabase.rpc('process_secure_wallet_transfer', {
+      const { data: rawResult, error } = await supabase.rpc('process_secure_wallet_transfer' as any, {
         sender_id: user.id,
         recipient_id: pendingTransfer.recipientId,
         transfer_amount: parseFloat(pendingTransfer.amount),
@@ -43,7 +43,7 @@ export function useSecureTransfer() {
 
       if (error) throw error;
 
-      const result = rawResult as SecureTransferResult;
+      const result = rawResult as unknown as SecureTransferResult;
 
       if (!result.success) {
         toast({
