@@ -8,6 +8,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, CheckCircle, AlertCircle } from 'lucide-react';
 
+interface PinResponse {
+  success?: boolean;
+  error?: string;
+  message?: string;
+}
+
 export function TransactionPinSetup() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -25,17 +31,19 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if user has a transaction PIN by calling the database function
-      const { data, error } = await supabase.rpc('check_user_transaction_pin', {
-        user_id: user.id
-      });
+      // Check if user has a transaction PIN by querying the transaction_pins table directly
+      const { data, error } = await supabase
+        .from('transaction_pins')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (error) {
         console.error('Error checking PIN:', error);
         return;
       }
 
-      setHasPin(data === true);
+      setHasPin(!!data);
     } catch (error) {
       console.error('Error checking existing PIN:', error);
     } finally {
@@ -69,14 +77,17 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase.rpc('set_transaction_pin', {
-        user_id: user.id,
-        new_pin: pin
+      // Use the secure PIN setting function from the security fixes migration
+      const { data, error } = await supabase.rpc('set_secure_transaction_pin' as any, {
+        p_user_id: user.id,
+        p_pin: pin
       });
 
       if (error) throw error;
 
-      if (data?.success) {
+      const result = data as PinResponse;
+
+      if (result?.success) {
         toast({
           title: "PIN Set Successfully",
           description: "Your transaction PIN has been set up securely",
@@ -85,7 +96,7 @@ export function TransactionPinSetup() {
         setPin('');
         setConfirmPin('');
       } else {
-        throw new Error(data?.error || 'Failed to set PIN');
+        throw new Error(result?.error || 'Failed to set PIN');
       }
     } catch (error: any) {
       console.error('Error setting PIN:', error);
