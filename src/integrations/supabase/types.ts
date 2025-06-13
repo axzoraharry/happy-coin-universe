@@ -382,6 +382,16 @@ export type Database = {
         Args: { p_referred_user_id: string; p_referral_code: string }
         Returns: Json
       }
+      process_secure_wallet_transfer: {
+        Args: {
+          sender_id: string
+          recipient_id: string
+          transfer_amount: number
+          transfer_description?: string
+          sender_pin?: string
+        }
+        Returns: Json
+      }
       process_wallet_transfer: {
         Args: {
           sender_id: string
@@ -394,6 +404,14 @@ export type Database = {
       reset_daily_coins: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      set_secure_transaction_pin: {
+        Args: { p_user_id: string; p_pin: string }
+        Returns: Json
+      }
+      verify_transaction_pin: {
+        Args: { p_user_id: string; p_pin: string }
+        Returns: boolean
       }
     }
     Enums: {

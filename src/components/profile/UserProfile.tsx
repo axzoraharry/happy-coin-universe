@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { User, Mail, Phone, Calendar } from 'lucide-react';
 import { AccountActions } from './AccountActions';
+import { AccountDeactivationStatus } from './AccountDeactivationStatus';
 import { ContactSync } from './ContactSync';
 import { ReferralSystem } from './ReferralSystem';
 
@@ -107,6 +108,9 @@ export function UserProfile() {
 
   return (
     <div className="space-y-6">
+      {/* Account Status */}
+      <AccountDeactivationStatus />
+
       {/* Basic Profile Information */}
       <Card>
         <CardHeader>
