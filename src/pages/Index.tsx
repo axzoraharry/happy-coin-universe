@@ -13,6 +13,7 @@ import { TransfersPage } from '@/components/transfers/TransfersPage';
 import { DailyLoginBonus } from '@/components/offers/DailyLoginBonus';
 import { CoinExchange } from '@/components/coins/CoinExchange';
 import { PurchaseCoins } from '@/components/coins/PurchaseCoins';
+import { SSOGenerator } from '@/components/embed/SSOGenerator';
 import { useToast } from '@/hooks/use-toast';
 
 interface ReferralResponse {
@@ -186,7 +187,6 @@ const Index = () => {
           </div>
         );
       case 'sso':
-        const { SSOGenerator } = await import('@/components/embed/SSOGenerator');
         return (
           <div className="space-y-8">
             <div>
