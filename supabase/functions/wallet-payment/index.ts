@@ -14,6 +14,7 @@ interface PaymentRequest {
   description?: string;
   callback_url?: string;
   metadata?: any;
+  user_pin?: string; // Added PIN support
 }
 
 serve(async (req) => {
@@ -77,17 +78,18 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log(`Processing payment request for order: ${paymentData.external_order_id}`);
+    console.log(`Processing secure payment request for order: ${paymentData.external_order_id}`);
 
-    // Process the payment using the database function
-    const { data: result, error } = await supabase.rpc('process_external_payment', {
+    // Process the payment using the secure database function
+    const { data: result, error } = await supabase.rpc('process_external_payment_secure', {
       p_api_key: apiKey,
       p_external_order_id: paymentData.external_order_id,
       p_user_email: paymentData.user_email,
       p_amount: paymentData.amount,
       p_description: paymentData.description || 'External payment',
       p_callback_url: paymentData.callback_url || null,
-      p_metadata: paymentData.metadata || null
+      p_metadata: paymentData.metadata || null,
+      p_user_pin: paymentData.user_pin || null
     });
 
     if (error) {
@@ -103,6 +105,21 @@ serve(async (req) => {
 
     if (!result?.success) {
       console.log('Payment failed:', result?.error);
+      
+      // Check if PIN is required
+      if (result?.pin_required) {
+        return new Response(
+          JSON.stringify({ 
+            error: result?.error || 'PIN verification required',
+            pin_required: true
+          }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ 
           error: result?.error || 'Payment processing failed' 
@@ -127,7 +144,8 @@ serve(async (req) => {
         amount: paymentData.amount,
         status: 'completed',
         timestamp: new Date().toISOString(),
-        metadata: paymentData.metadata
+        metadata: paymentData.metadata,
+        pin_verified: result.pin_verified || false
       };
 
       // Fire webhook without waiting
@@ -160,6 +178,7 @@ serve(async (req) => {
         transaction_id: result.transaction_id,
         reference_id: result.reference_id,
         new_balance: result.new_balance,
+        pin_verified: result.pin_verified || false,
         message: 'Payment processed successfully'
       }),
       { 

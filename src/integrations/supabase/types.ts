@@ -559,6 +559,19 @@ export type Database = {
         }
         Returns: Json
       }
+      process_external_payment_secure: {
+        Args: {
+          p_api_key: string
+          p_external_order_id: string
+          p_user_email: string
+          p_amount: number
+          p_description?: string
+          p_callback_url?: string
+          p_metadata?: Json
+          p_user_pin?: string
+        }
+        Returns: Json
+      }
       process_referral: {
         Args: { p_referred_user_id: string; p_referral_code: string }
         Returns: Json

@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle, XCircle, Lock } from 'lucide-react';
+import { SecurePinInput } from '../wallet/SecurePinInput';
 
 interface PaymentWidgetProps {
   apiKey: string;
@@ -24,6 +25,8 @@ interface PaymentResult {
   payment_request_id?: string;
   transaction_id?: string;
   reference_id?: string;
+  pin_verified?: boolean;
+  pin_required?: boolean;
   error?: string;
 }
 
@@ -40,10 +43,11 @@ export function PaymentWidget({
 }: PaymentWidgetProps) {
   const [email, setEmail] = useState(userEmail);
   const [processing, setProcessing] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error' | 'pin_required'>('idle');
   const [message, setMessage] = useState('');
+  const [showPinInput, setShowPinInput] = useState(false);
 
-  const processPayment = async () => {
+  const processPayment = async (pin?: string) => {
     if (!email.trim()) {
       setStatus('error');
       setMessage('Email is required');
@@ -56,18 +60,25 @@ export function PaymentWidget({
     setMessage('Processing payment...');
 
     try {
+      const requestBody: any = {
+        external_order_id: orderId,
+        user_email: email,
+        amount: amount,
+        description: description,
+      };
+
+      // Include PIN if provided
+      if (pin) {
+        requestBody.user_pin = pin;
+      }
+
       const response = await fetch('/api/wallet-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
         },
-        body: JSON.stringify({
-          external_order_id: orderId,
-          user_email: email,
-          amount: amount,
-          description: description,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result: PaymentResult = await response.json();
@@ -75,19 +86,41 @@ export function PaymentWidget({
       if (result.success) {
         setStatus('success');
         setMessage('Payment completed successfully!');
+        setShowPinInput(false);
         onSuccess?.(result);
+      } else if (result.pin_required) {
+        setStatus('pin_required');
+        setMessage('PIN verification required');
+        setShowPinInput(true);
+        setProcessing(false);
+        return;
       } else {
         setStatus('error');
         setMessage(result.error || 'Payment failed');
+        setShowPinInput(false);
         onError?.(result.error || 'Payment failed');
       }
     } catch (error) {
       setStatus('error');
       setMessage('Network error occurred');
+      setShowPinInput(false);
       onError?.('Network error occurred');
     } finally {
-      setProcessing(false);
+      if (status !== 'pin_required') {
+        setProcessing(false);
+      }
     }
+  };
+
+  const handlePinSubmit = async (pin: string) => {
+    await processPayment(pin);
+  };
+
+  const handlePinCancel = () => {
+    setShowPinInput(false);
+    setStatus('idle');
+    setMessage('');
+    setProcessing(false);
   };
 
   const getStatusIcon = () => {
@@ -98,6 +131,8 @@ export function PaymentWidget({
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'error':
         return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'pin_required':
+        return <Lock className="h-4 w-4 text-blue-600" />;
       default:
         return <CreditCard className="h-4 w-4" />;
     }
@@ -106,6 +141,21 @@ export function PaymentWidget({
   const themeClasses = theme === 'dark' 
     ? 'bg-gray-900 text-white border-gray-700' 
     : 'bg-white text-gray-900 border-gray-200';
+
+  // Show PIN input when required
+  if (showPinInput) {
+    return (
+      <div className={`p-4 rounded-lg border ${themeClasses} max-w-sm`}>
+        <SecurePinInput
+          onPinEntered={handlePinSubmit}
+          onCancel={handlePinCancel}
+          isVerifying={processing}
+          title="Verify Payment"
+          description="Enter your 4-digit PIN to complete the payment"
+        />
+      </div>
+    );
+  }
 
   if (compact) {
     return (
@@ -127,7 +177,7 @@ export function PaymentWidget({
           )}
           
           <Button
-            onClick={processPayment}
+            onClick={() => processPayment()}
             disabled={processing || status === 'success'}
             className="w-full"
           >
@@ -186,7 +236,7 @@ export function PaymentWidget({
         )}
 
         <Button
-          onClick={processPayment}
+          onClick={() => processPayment()}
           disabled={processing || status === 'success'}
           className="w-full"
         >
@@ -200,6 +250,7 @@ export function PaymentWidget({
           <div className={`p-3 rounded text-sm ${
             status === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
             status === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
+            status === 'pin_required' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
             'bg-blue-50 text-blue-700 border border-blue-200'
           }`}>
             {message}
