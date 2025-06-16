@@ -141,16 +141,14 @@ async function handleAuthorize(req: Request, supabase: any) {
     // Create HappyCoins login URL that will redirect back to our callback
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/sso-auth/callback?code=${authCode}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state || ''}`;
     
-    // For now, redirect to a simple login page - in production, this would be the HappyCoins login
-    const loginUrl = `${Deno.env.get('SUPABASE_URL')}/auth/v1/authorize?provider=email&redirect_to=${encodeURIComponent(callbackUrl)}`;
-
-    console.log('Redirecting to login URL:', loginUrl);
+    // For demo purposes, simulate login and redirect directly to callback
+    console.log('Redirecting to callback URL:', callbackUrl);
 
     return new Response(null, {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': loginUrl
+        'Location': callbackUrl
       }
     });
   } catch (error) {
