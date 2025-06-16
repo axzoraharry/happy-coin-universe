@@ -95,8 +95,8 @@ export function APIManagement() {
 
       if (error) throw error;
 
-      // Type assertion for the response data
-      const response = data as GenerateApiKeysResponse;
+      // Proper type conversion: Json -> unknown -> GenerateApiKeysResponse
+      const response = data as unknown as GenerateApiKeysResponse;
 
       if (response?.success) {
         toast({
