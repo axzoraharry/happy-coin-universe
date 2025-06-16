@@ -51,12 +51,12 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               </Button>
 
               <Button
-                variant={currentPage === 'sso' ? 'default' : 'ghost'}
-                onClick={() => onPageChange('sso')}
+                variant={currentPage === 'notifications' ? 'default' : 'ghost'}
+                onClick={() => onPageChange('notifications')}
                 className="flex items-center space-x-2"
               >
-                <Shield className="h-4 w-4" />
-                <span>SSO</span>
+                <Bell className="h-4 w-4" />
+                <span>Notifications</span>
               </Button>
               
               <DropdownMenu>
@@ -67,9 +67,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => onPageChange('notifications')}>
-                    <Bell className="h-4 w-4 mr-2" />
-                    Notifications
+                  <DropdownMenuItem onClick={() => onPageChange('sso')}>
+                    <Shield className="h-4 w-4 mr-2" />
+                    SSO
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onPageChange('offers')}>
                     <Gift className="h-4 w-4 mr-2" />
@@ -146,18 +146,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               </Button>
 
               <Button
-                variant={currentPage === 'sso' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('sso');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                SSO
-              </Button>
-
-              <Button
                 variant={currentPage === 'notifications' ? 'default' : 'ghost'}
                 onClick={() => {
                   onPageChange('notifications');
@@ -167,6 +155,18 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               >
                 <Bell className="h-4 w-4 mr-2" />
                 Notifications
+              </Button>
+
+              <Button
+                variant={currentPage === 'sso' ? 'default' : 'ghost'}
+                onClick={() => {
+                  onPageChange('sso');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full justify-start"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                SSO
               </Button>
 
               <Button
