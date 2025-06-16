@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Wallet, Home, Coins, Send, Bell, Gift, Code, Shield, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -47,15 +48,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               >
                 <Coins className="h-4 w-4" />
                 <span>Coins</span>
-              </Button>
-              
-              <Button
-                variant={currentPage === 'transfers' ? 'default' : 'ghost'}
-                onClick={() => onPageChange('transfers')}
-                className="flex items-center space-x-2"
-              >
-                <Send className="h-4 w-4" />
-                <span>Transfers</span>
               </Button>
 
               <Button
@@ -151,18 +143,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               >
                 <Coins className="h-4 w-4 mr-2" />
                 Coins
-              </Button>
-              
-              <Button
-                variant={currentPage === 'transfers' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('transfers');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Transfers
               </Button>
 
               <Button
