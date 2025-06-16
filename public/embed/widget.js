@@ -1,4 +1,5 @@
 
+
 (function() {
   'use strict';
 
@@ -293,6 +294,19 @@
           }),
         });
 
+        // Handle non-2xx responses properly
+        if (!response.ok) {
+          let errorMessage = 'Payment failed';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            // If we can't parse the error response, use a generic message
+            errorMessage = `Payment failed (${response.status})`;
+          }
+          throw new Error(errorMessage);
+        }
+
         const result = await response.json();
 
         if (result.success) {
@@ -312,9 +326,9 @@
         }
       } catch (error) {
         console.error('HappyCoins Widget: API call failed:', error);
-        this.showMessage(messageDiv, 'Network error occurred', 'error');
+        this.showMessage(messageDiv, error.message || 'Network error occurred', 'error');
         this.resetButton(button, config);
-        config.onError('Network error occurred');
+        config.onError(error.message || 'Network error occurred');
       }
     },
 

@@ -85,7 +85,18 @@ export function PaymentWidget({
 
       if (error) {
         console.error('Supabase function error:', error);
-        throw new Error(error.message || 'Payment processing failed');
+        
+        // Handle specific error cases
+        let errorMessage = 'Payment processing failed';
+        
+        if (error.message && error.message.includes('non-2xx')) {
+          // Try to get the actual error from the response
+          errorMessage = 'Payment failed - please check your balance or try again';
+        } else {
+          errorMessage = error.message || 'Payment processing failed';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result: PaymentResult = data;
