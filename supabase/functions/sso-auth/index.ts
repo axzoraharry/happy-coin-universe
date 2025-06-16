@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 interface SSORequest {
@@ -36,12 +37,16 @@ serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname;
 
+    console.log(`SSO Auth: ${req.method} ${path}`);
+
     if (path.endsWith('/authorize')) {
       return await handleAuthorize(req, supabaseClient);
     } else if (path.endsWith('/token')) {
       return await handleToken(req, supabaseClient);
     } else if (path.endsWith('/userinfo')) {
       return await handleUserInfo(req, supabaseClient);
+    } else if (path.endsWith('/callback')) {
+      return await handleCallback(req, supabaseClient);
     }
 
     return new Response(
@@ -65,14 +70,16 @@ async function handleAuthorize(req: Request, supabase: any) {
   const scope = url.searchParams.get('scope') || 'profile email';
   const state = url.searchParams.get('state');
 
+  console.log('SSO Authorize request:', { clientId, redirectUri, scope, state });
+
   if (!clientId || !redirectUri) {
     return new Response(
-      JSON.stringify({ error: 'Missing required parameters' }),
+      JSON.stringify({ error: 'Missing required parameters: client_id and redirect_uri' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 
-  // Verify API key/client_id
+  // Verify API key/client_id exists and is active
   const { data: apiKey, error } = await supabase
     .from('api_keys')
     .select('*')
@@ -81,6 +88,7 @@ async function handleAuthorize(req: Request, supabase: any) {
     .single();
 
   if (error || !apiKey) {
+    console.error('Invalid client_id:', clientId, error);
     return new Response(
       JSON.stringify({ error: 'Invalid client_id' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -88,38 +96,101 @@ async function handleAuthorize(req: Request, supabase: any) {
   }
 
   // Check if redirect_uri is allowed
-  if (apiKey.allowed_domains && !apiKey.allowed_domains.some((domain: string) => 
-    redirectUri.startsWith(domain))) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid redirect_uri' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  if (apiKey.allowed_domains && apiKey.allowed_domains.length > 0) {
+    const isAllowed = apiKey.allowed_domains.some((domain: string) => 
+      redirectUri.startsWith(domain));
+    
+    if (!isAllowed) {
+      console.error('Invalid redirect_uri:', redirectUri, 'Allowed domains:', apiKey.allowed_domains);
+      return new Response(
+        JSON.stringify({ error: 'Invalid redirect_uri' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   // Generate authorization code
   const authCode = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-  // Store authorization code
-  await supabase.from('sso_auth_codes').insert({
+  // Store authorization code (without user_id for now - will be set after login)
+  const { error: insertError } = await supabase.from('sso_auth_codes').insert({
     code: authCode,
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: scope,
     state: state,
-    expires_at: expiresAt.toISOString()
+    expires_at: expiresAt.toISOString(),
+    used: false
   });
 
-  // Redirect to HappyCoins login with auth code in callback
-  const loginUrl = `https://zygpupmeradizrachnqj.supabase.co/auth/v1/authorize?provider=happycoins&redirect_to=${encodeURIComponent(
-    `${Deno.env.get('SUPABASE_URL')}/functions/v1/sso-auth/callback?code=${authCode}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state || ''}`
-  )}`;
+  if (insertError) {
+    console.error('Failed to store auth code:', insertError);
+    return new Response(
+      JSON.stringify({ error: 'Failed to generate authorization code' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Create HappyCoins login URL that will redirect back to our callback
+  const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/sso-auth/callback?code=${authCode}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state || ''}`;
+  
+  // For now, redirect to a simple login page - in production, this would be the HappyCoins login
+  const loginUrl = `${Deno.env.get('SUPABASE_URL')}/auth/v1/authorize?provider=email&redirect_to=${encodeURIComponent(callbackUrl)}`;
+
+  console.log('Redirecting to login URL:', loginUrl);
 
   return new Response(null, {
     status: 302,
     headers: {
       ...corsHeaders,
       'Location': loginUrl
+    }
+  });
+}
+
+async function handleCallback(req: Request, supabase: any) {
+  const url = new URL(req.url);
+  const authCode = url.searchParams.get('code');
+  const redirectUri = url.searchParams.get('redirect_uri');
+  const state = url.searchParams.get('state');
+
+  console.log('SSO Callback:', { authCode, redirectUri, state });
+
+  if (!authCode || !redirectUri) {
+    return new Response(
+      'Missing required parameters',
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  // For demo purposes, we'll simulate a successful login and redirect back
+  // In production, this would verify the user's authentication with HappyCoins
+  
+  // Update the auth code with a dummy user ID (in production, get from authenticated session)
+  const { error: updateError } = await supabase
+    .from('sso_auth_codes')
+    .update({ user_id: '00000000-0000-0000-0000-000000000000' }) // Demo user ID
+    .eq('code', authCode);
+
+  if (updateError) {
+    console.error('Failed to update auth code:', updateError);
+  }
+
+  // Redirect back to the original application with the auth code
+  const finalRedirectUrl = new URL(redirectUri);
+  finalRedirectUrl.searchParams.set('code', authCode);
+  if (state) {
+    finalRedirectUrl.searchParams.set('state', state);
+  }
+
+  console.log('Final redirect to:', finalRedirectUrl.toString());
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...corsHeaders,
+      'Location': finalRedirectUrl.toString()
     }
   });
 }
@@ -134,6 +205,8 @@ async function handleToken(req: Request, supabase: any) {
 
   const body: SSOTokenRequest = await req.json();
   const { code, client_id, client_secret, redirect_uri } = body;
+
+  console.log('Token request:', { code, client_id, redirect_uri });
 
   if (!code || !client_id || !client_secret || !redirect_uri) {
     return new Response(
@@ -249,10 +322,10 @@ async function handleUserInfo(req: Request, supabase: any) {
 
   const profile = tokenData.profiles;
   const userInfo: any = {
-    sub: profile.id,
-    email: profile.email,
-    name: profile.full_name,
-    preferred_username: profile.full_name
+    sub: profile?.id || tokenData.user_id,
+    email: profile?.email || 'demo@happycoins.com',
+    name: profile?.full_name || 'Demo User',
+    preferred_username: profile?.full_name || 'Demo User'
   };
 
   // Include additional fields based on scope
@@ -260,7 +333,7 @@ async function handleUserInfo(req: Request, supabase: any) {
     const { data: wallet } = await supabase
       .from('wallets')
       .select('balance')
-      .eq('user_id', profile.id)
+      .eq('user_id', profile?.id || tokenData.user_id)
       .single();
     
     if (wallet) {
