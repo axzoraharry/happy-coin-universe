@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Wallet, Home, Coins, Send, Bell, Gift, Code, Shield, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -105,9 +104,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => onPageChange('profile')}>
                   Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   Logout
