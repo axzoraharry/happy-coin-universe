@@ -185,6 +185,19 @@ const Index = () => {
             </div>
           </div>
         );
+      case 'sso':
+        const { SSOGenerator } = await import('@/components/embed/SSOGenerator');
+        return (
+          <div className="space-y-8">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">SSO Integration</h1>
+              <p className="text-muted-foreground">
+                Create Single Sign-On (SSO) authentication widgets and API integrations for your applications.
+              </p>
+            </div>
+            <SSOGenerator />
+          </div>
+        );
       case 'transfers':
         return <TransfersPage />;
       case 'notifications':
