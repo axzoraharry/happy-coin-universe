@@ -267,6 +267,78 @@ export type Database = {
         }
         Relationships: []
       }
+      sso_access_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          revoked: boolean
+          scope: string | null
+          token: string
+          user_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          revoked?: boolean
+          scope?: string | null
+          token: string
+          user_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          revoked?: boolean
+          scope?: string | null
+          token?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      sso_auth_codes: {
+        Row: {
+          client_id: string
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          redirect_uri: string
+          scope: string | null
+          state: string | null
+          used: boolean
+          user_id: string | null
+        }
+        Insert: {
+          client_id: string
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          redirect_uri: string
+          scope?: string | null
+          state?: string | null
+          used?: boolean
+          user_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          redirect_uri?: string
+          scope?: string | null
+          state?: string | null
+          used?: boolean
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       transaction_pins: {
         Row: {
           created_at: string
