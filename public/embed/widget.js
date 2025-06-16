@@ -1,4 +1,3 @@
-
 (function() {
   'use strict';
 
@@ -59,6 +58,7 @@
         compact: false,
         description: 'Payment',
         userEmail: '',
+        apiUrl: 'https://happycoins-wallet.netlify.app/api/wallet-payment', // Default to HappyCoins server
         onSuccess: function() {},
         onError: function() {}
       };
@@ -275,8 +275,9 @@
       this.showMessage(messageDiv, 'Processing payment...', 'info');
 
       try {
-        // Get the current domain for API call
-        const apiUrl = window.location.origin + '/api/wallet-payment';
+        // Use the configured API URL instead of window.location.origin
+        const apiUrl = config.apiUrl;
+        console.log('HappyCoins Widget: Making API call to:', apiUrl);
         
         const response = await fetch(apiUrl, {
           method: 'POST',
@@ -310,6 +311,7 @@
           config.onError(result.error || 'Payment failed');
         }
       } catch (error) {
+        console.error('HappyCoins Widget: API call failed:', error);
         this.showMessage(messageDiv, 'Network error occurred', 'error');
         this.resetButton(button, config);
         config.onError('Network error occurred');
@@ -347,7 +349,8 @@
         description: element.dataset.description || 'Payment',
         userEmail: element.dataset.userEmail || '',
         theme: element.dataset.theme || 'light',
-        compact: element.dataset.compact === 'true'
+        compact: element.dataset.compact === 'true',
+        apiUrl: element.dataset.apiUrl || 'https://happycoins-wallet.netlify.app/api/wallet-payment'
       };
 
       if (config.apiKey && config.amount && config.orderId) {

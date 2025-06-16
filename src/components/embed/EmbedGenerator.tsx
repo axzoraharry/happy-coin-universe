@@ -20,6 +20,7 @@ interface EmbedConfig {
   userEmail: string;
   theme: 'light' | 'dark';
   compact: boolean;
+  apiUrl: string;
 }
 
 export function EmbedGenerator() {
@@ -31,6 +32,7 @@ export function EmbedGenerator() {
     userEmail: '',
     theme: 'light',
     compact: false,
+    apiUrl: `${window.location.origin}/api/wallet-payment`,
   });
   const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
@@ -44,6 +46,7 @@ export function EmbedGenerator() {
       userEmail: config.userEmail || undefined,
       theme: config.theme,
       compact: config.compact,
+      apiUrl: config.apiUrl,
     };
 
     const configString = JSON.stringify(widgetConfig, null, 2)
@@ -75,7 +78,8 @@ export function EmbedGenerator() {
      data-description="${config.description}"
      data-user-email="${config.userEmail}"
      data-theme="${config.theme}"
-     data-compact="${config.compact}">
+     data-compact="${config.compact}"
+     data-api-url="${config.apiUrl}">
 </div>
 <script src="${window.location.origin}/embed/widget.js"></script>`;
   };
@@ -216,6 +220,19 @@ function App() {
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="apiUrl">API URL</Label>
+            <Input
+              id="apiUrl"
+              value={config.apiUrl}
+              onChange={(e) => setConfig(prev => ({ ...prev, apiUrl: e.target.value }))}
+              placeholder="https://your-happycoins-server.com/api/wallet-payment"
+            />
+            <p className="text-sm text-muted-foreground">
+              The URL where the HappyCoins payment API is hosted. Leave as default to use this server.
+            </p>
+          </div>
+
           <div className="flex items-center space-x-4">
             <Button
               variant="outline"
@@ -274,6 +291,12 @@ function App() {
               <li>Use <code>renderWhenReady()</code> instead of <code>render()</code> for better timing</li>
               <li>Check that the container ID matches exactly (case sensitive)</li>
               <li>Ensure the script loads after the HTML element is created</li>
+            </ul>
+            <p className="mt-3"><strong>API URL Configuration:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-4">
+              <li>The widget calls back to the HappyCoins server, not the embedding website</li>
+              <li>Make sure the API URL points to your HappyCoins server instance</li>
+              <li>Check CORS settings if embedding on a different domain</li>
             </ul>
           </div>
         </CardContent>
