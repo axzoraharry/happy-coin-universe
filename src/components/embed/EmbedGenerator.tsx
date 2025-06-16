@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Code, Eye } from 'lucide-react';
+import { Copy, Code, Eye, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PaymentWidget } from './PaymentWidget';
 
@@ -50,12 +50,34 @@ export function EmbedGenerator() {
       .replace(/"/g, "'")
       .replace(/\n/g, '\n    ');
 
+    // Use the actual domain where this widget is hosted
+    const scriptUrl = `${window.location.origin}/embed/widget.js`;
+
     return `<!-- HappyCoins Payment Widget -->
 <div id="happycoins-payment-widget"></div>
-<script src="https://your-domain.com/embed/widget.js"></script>
+<script src="${scriptUrl}"></script>
 <script>
+  // Option 1: Render immediately (DOM must be ready)
   HappyCoinsWidget.render('happycoins-payment-widget', ${configString});
+
+  // Option 2: Render when DOM is ready (recommended)
+  // HappyCoinsWidget.renderWhenReady('happycoins-payment-widget', ${configString});
 </script>`;
+  };
+
+  const generateAutoInitCode = () => {
+    return `<!-- HappyCoins Payment Widget (Auto-init) -->
+<div id="happycoins-payment-widget" 
+     data-happycoins-payment
+     data-api-key="${config.apiKey}"
+     data-amount="${config.amount}"
+     data-order-id="${config.orderId}"
+     data-description="${config.description}"
+     data-user-email="${config.userEmail}"
+     data-theme="${config.theme}"
+     data-compact="${config.compact}">
+</div>
+<script src="${window.location.origin}/embed/widget.js"></script>`;
   };
 
   const generateReactCode = () => {
@@ -236,12 +258,33 @@ function App() {
         </Card>
       )}
 
+      {/* Troubleshooting Card */}
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-orange-800">
+            <AlertTriangle className="h-5 w-5" />
+            <span>Common Integration Issues</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-orange-800">
+          <div className="space-y-2 text-sm">
+            <p><strong>"Container element not found" error:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-4">
+              <li>Make sure the div with the specified ID exists before the script runs</li>
+              <li>Use <code>renderWhenReady()</code> instead of <code>render()</code> for better timing</li>
+              <li>Check that the container ID matches exactly (case sensitive)</li>
+              <li>Ensure the script loads after the HTML element is created</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>HTML Embed Code</CardTitle>
+            <CardTitle>HTML Embed Code (Recommended)</CardTitle>
             <CardDescription>
-              Copy this code and paste it into any website
+              Copy this code and paste it into any website. Uses renderWhenReady() for better reliability.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -255,6 +298,32 @@ function App() {
                   variant="outline"
                   className="absolute top-2 right-2"
                   onClick={() => copyToClipboard(generateEmbedCode(), 'HTML embed code')}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Auto-Init HTML</CardTitle>
+            <CardDescription>
+              Alternative method using data attributes for automatic initialization
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="relative">
+                <pre className="bg-gray-100 p-4 rounded-lg text-sm overflow-x-auto">
+                  <code>{generateAutoInitCode()}</code>
+                </pre>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="absolute top-2 right-2"
+                  onClick={() => copyToClipboard(generateAutoInitCode(), 'Auto-init HTML code')}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
