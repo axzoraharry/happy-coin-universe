@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +32,11 @@ export function SSOGenerator() {
   });
   const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
+
+  const getSupabaseUrl = () => {
+    // In production, use the actual Supabase URL
+    return 'https://zygpupmeradizrachnqj.supabase.co';
+  };
 
   const generateEmbedCode = () => {
     const widgetConfig = {
@@ -104,8 +108,10 @@ function App() {
   };
 
   const generateAPIExample = () => {
+    const supabaseUrl = getSupabaseUrl();
+    
     return `// Step 1: Get authorization code (redirect user to this URL)
-const authUrl = '${window.location.origin}/api/sso-auth/authorize?' +
+const authUrl = '${supabaseUrl}/functions/v1/sso-auth/authorize?' +
   new URLSearchParams({
     client_id: '${config.clientId}',
     redirect_uri: '${config.redirectUri}',
@@ -115,7 +121,7 @@ const authUrl = '${window.location.origin}/api/sso-auth/authorize?' +
   });
 
 // Step 2: Exchange code for access token
-const tokenResponse = await fetch('${window.location.origin}/api/sso-auth/token', {
+const tokenResponse = await fetch('${supabaseUrl}/functions/v1/sso-auth/token', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -129,7 +135,7 @@ const tokenResponse = await fetch('${window.location.origin}/api/sso-auth/token'
 const { access_token } = await tokenResponse.json();
 
 // Step 3: Get user information
-const userResponse = await fetch('${window.location.origin}/api/sso-auth/userinfo', {
+const userResponse = await fetch('${supabaseUrl}/functions/v1/sso-auth/userinfo', {
   headers: { 'Authorization': \`Bearer \${access_token}\` }
 });
 
@@ -291,6 +297,8 @@ console.log('User info:', userInfo);`;
               <li>Check that the container ID matches exactly (case sensitive)</li>
               <li>Ensure the script loads after the HTML element is created</li>
             </ul>
+            <p className="mt-4"><strong>SSO Authentication URL:</strong></p>
+            <p className="text-xs font-mono bg-orange-100 p-2 rounded">{getSupabaseUrl()}/functions/v1/sso-auth/authorize</p>
           </div>
         </CardContent>
       </Card>

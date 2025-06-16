@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,11 @@ export function SSOWidget({
   const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  const getSupabaseUrl = () => {
+    // Use the production Supabase URL
+    return 'https://zygpupmeradizrachnqj.supabase.co';
+  };
 
   useEffect(() => {
     // Check if we're returning from auth
@@ -84,7 +88,10 @@ export function SSOWidget({
         params.append('state', state);
       }
 
-      const authUrl = `/api/sso-auth/authorize?${params.toString()}`;
+      const supabaseUrl = getSupabaseUrl();
+      const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}`;
+      
+      console.log('SSO Widget: Redirecting to:', authUrl);
       window.location.href = authUrl;
 
     } catch (error) {

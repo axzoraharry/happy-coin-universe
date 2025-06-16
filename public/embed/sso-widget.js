@@ -1,5 +1,3 @@
-
-
 (function() {
   'use strict';
 
@@ -355,8 +353,9 @@
           params.append('state', config.state);
         }
 
-        // Get the current domain for the auth URL
-        const authUrl = window.location.origin + '/api/sso-auth/authorize?' + params.toString();
+        // Use the correct Supabase function URL
+        const baseUrl = this.getSupabaseUrl();
+        const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString();
         
         console.log('HappyCoins SSO Widget: Redirecting to:', authUrl);
         
@@ -371,6 +370,22 @@
         this.resetButton(button, config);
         config.onError('Failed to initiate authentication: ' + error.message);
       }
+    },
+
+    getSupabaseUrl: function() {
+      // Try to get Supabase URL from various sources
+      if (typeof window !== 'undefined') {
+        // Check if we're on the HappyCoins domain
+        const currentOrigin = window.location.origin;
+        if (currentOrigin.includes('happycoins') || currentOrigin.includes('supabase')) {
+          return currentOrigin;
+        }
+        
+        // Default to the HappyCoins production URL
+        return 'https://zygpupmeradizrachnqj.supabase.co';
+      }
+      
+      return 'https://zygpupmeradizrachnqj.supabase.co';
     },
 
     showMessage: function(messageDiv, text, type) {
@@ -431,4 +446,3 @@
     window.HappyCoinsSSOWidget.autoInit();
   }
 })();
-
