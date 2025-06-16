@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CreditCard, CheckCircle, XCircle, Lock } from 'lucide-react';
 import { SecurePinInput } from '../wallet/SecurePinInput';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PaymentWidgetProps {
   apiKey: string;
@@ -72,16 +73,22 @@ export function PaymentWidget({
         requestBody.user_pin = pin;
       }
 
-      const response = await fetch('/api/wallet-payment', {
-        method: 'POST',
+      console.log('Making payment request to wallet-payment edge function');
+
+      // Use Supabase Edge Function instead of API route
+      const { data, error } = await supabase.functions.invoke('wallet-payment', {
+        body: requestBody,
         headers: {
-          'Content-Type': 'application/json',
           'x-api-key': apiKey,
-        },
-        body: JSON.stringify(requestBody),
+        }
       });
 
-      const result: PaymentResult = await response.json();
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Payment processing failed');
+      }
+
+      const result: PaymentResult = data;
 
       if (result.success) {
         setStatus('success');
@@ -100,11 +107,12 @@ export function PaymentWidget({
         setShowPinInput(false);
         onError?.(result.error || 'Payment failed');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Payment error:', error);
       setStatus('error');
-      setMessage('Network error occurred');
+      setMessage(error.message || 'Network error occurred');
       setShowPinInput(false);
-      onError?.('Network error occurred');
+      onError?.(error.message || 'Network error occurred');
     } finally {
       if (status !== 'pin_required') {
         setProcessing(false);

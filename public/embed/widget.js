@@ -1,3 +1,4 @@
+
 (function() {
   'use strict';
 
@@ -52,13 +53,13 @@
         return false;
       }
 
-      // Default configuration
+      // Default configuration - use Supabase Edge Function endpoint
       const defaultConfig = {
         theme: 'light',
         compact: false,
         description: 'Payment',
         userEmail: '',
-        apiUrl: 'https://happycoins-wallet.netlify.app/api/wallet-payment', // Default to HappyCoins server
+        apiUrl: 'https://zygpupmeradizrachnqj.supabase.co/functions/v1/wallet-payment', // Use actual Supabase function URL
         onSuccess: function() {},
         onError: function() {}
       };
@@ -275,15 +276,14 @@
       this.showMessage(messageDiv, 'Processing payment...', 'info');
 
       try {
-        // Use the configured API URL instead of window.location.origin
-        const apiUrl = config.apiUrl;
-        console.log('HappyCoins Widget: Making API call to:', apiUrl);
+        console.log('HappyCoins Widget: Making API call to:', config.apiUrl);
         
-        const response = await fetch(apiUrl, {
+        const response = await fetch(config.apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-api-key': config.apiKey,
+            'Authorization': 'Bearer ' + (window.supabase?.auth?.session?.access_token || '')
           },
           body: JSON.stringify({
             external_order_id: config.orderId,
@@ -350,7 +350,7 @@
         userEmail: element.dataset.userEmail || '',
         theme: element.dataset.theme || 'light',
         compact: element.dataset.compact === 'true',
-        apiUrl: element.dataset.apiUrl || 'https://happycoins-wallet.netlify.app/api/wallet-payment'
+        apiUrl: element.dataset.apiUrl || 'https://zygpupmeradizrachnqj.supabase.co/functions/v1/wallet-payment'
       };
 
       if (config.apiKey && config.amount && config.orderId) {
