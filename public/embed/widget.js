@@ -5,16 +5,52 @@
   // HappyCoins Payment Widget
   window.HappyCoinsWidget = {
     render: function(containerId, config) {
+      console.log('HappyCoins Widget: Attempting to render with container ID:', containerId);
       const container = document.getElementById(containerId);
       if (!container) {
-        console.error('HappyCoins Widget: Container element not found');
-        return;
+        console.error('HappyCoins Widget: Container element not found with ID:', containerId);
+        console.log('HappyCoins Widget: Available elements with IDs:', 
+          Array.from(document.querySelectorAll('[id]')).map(el => el.id));
+        return false;
       }
 
+      return this.renderWidget(container, config);
+    },
+
+    renderWhenReady: function(containerId, config, maxAttempts = 10) {
+      console.log('HappyCoins Widget: Rendering when ready for container:', containerId);
+      
+      const attemptRender = (attempt = 1) => {
+        console.log(`HappyCoins Widget: Render attempt ${attempt}/${maxAttempts}`);
+        
+        if (document.getElementById(containerId)) {
+          console.log('HappyCoins Widget: Container found, rendering...');
+          return this.render(containerId, config);
+        }
+        
+        if (attempt < maxAttempts) {
+          console.log('HappyCoins Widget: Container not found, retrying in 100ms...');
+          setTimeout(() => attemptRender(attempt + 1), 100);
+        } else {
+          console.error('HappyCoins Widget: Failed to find container after', maxAttempts, 'attempts');
+          console.log('HappyCoins Widget: DOM state:', document.readyState);
+          console.log('HappyCoins Widget: Available elements with IDs:', 
+            Array.from(document.querySelectorAll('[id]')).map(el => el.id));
+        }
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => attemptRender());
+      } else {
+        attemptRender();
+      }
+    },
+
+    renderWidget: function(container, config) {
       // Validate required config
       if (!config.apiKey || !config.amount || !config.orderId) {
         console.error('HappyCoins Widget: Missing required configuration (apiKey, amount, orderId)');
-        return;
+        return false;
       }
 
       // Default configuration
@@ -35,6 +71,9 @@
 
       // Attach event listeners
       this.attachEventListeners(container, finalConfig);
+      
+      console.log('HappyCoins Widget: Successfully rendered');
+      return true;
     },
 
     createWidgetHTML: function(config) {
@@ -294,6 +333,41 @@
       `;
     }
   };
+
+  // Auto-initialization for data attributes
+  function autoInitialize() {
+    const elements = document.querySelectorAll('[data-happycoins-payment]');
+    console.log('HappyCoins Widget: Found', elements.length, 'elements for auto-initialization');
+    
+    elements.forEach(element => {
+      const config = {
+        apiKey: element.dataset.apiKey,
+        amount: parseFloat(element.dataset.amount),
+        orderId: element.dataset.orderId,
+        description: element.dataset.description || 'Payment',
+        userEmail: element.dataset.userEmail || '',
+        theme: element.dataset.theme || 'light',
+        compact: element.dataset.compact === 'true'
+      };
+
+      if (config.apiKey && config.amount && config.orderId) {
+        console.log('HappyCoins Widget: Auto-initializing element with ID:', element.id);
+        // Create a temporary container div inside the element
+        const container = document.createElement('div');
+        element.appendChild(container);
+        HappyCoinsWidget.renderWidget(container, config);
+      } else {
+        console.error('HappyCoins Widget: Missing required data attributes for auto-initialization');
+      }
+    });
+  }
+
+  // Auto-initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoInitialize);
+  } else {
+    autoInitialize();
+  }
 
   // Add CSS animation for spinner
   const style = document.createElement('style');
