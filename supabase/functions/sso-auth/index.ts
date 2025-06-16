@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -28,6 +27,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Create Supabase client with service role key for database access
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -38,6 +38,7 @@ serve(async (req) => {
     const path = url.pathname;
 
     console.log(`SSO Auth: ${req.method} ${path}`);
+    console.log('Headers:', Object.fromEntries(req.headers.entries()));
 
     if (path.endsWith('/authorize')) {
       return await handleAuthorize(req, supabaseClient);
@@ -57,96 +58,108 @@ serve(async (req) => {
   } catch (error) {
     console.error('SSO Auth Error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
 
 async function handleAuthorize(req: Request, supabase: any) {
-  const url = new URL(req.url);
-  const clientId = url.searchParams.get('client_id');
-  const redirectUri = url.searchParams.get('redirect_uri');
-  const scope = url.searchParams.get('scope') || 'profile email';
-  const state = url.searchParams.get('state');
+  try {
+    const url = new URL(req.url);
+    const clientId = url.searchParams.get('client_id');
+    const redirectUri = url.searchParams.get('redirect_uri');
+    const scope = url.searchParams.get('scope') || 'profile email';
+    const state = url.searchParams.get('state');
 
-  console.log('SSO Authorize request:', { clientId, redirectUri, scope, state });
+    console.log('SSO Authorize request:', { clientId, redirectUri, scope, state });
 
-  if (!clientId || !redirectUri) {
-    return new Response(
-      JSON.stringify({ error: 'Missing required parameters: client_id and redirect_uri' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Verify API key/client_id exists and is active
-  const { data: apiKey, error } = await supabase
-    .from('api_keys')
-    .select('*')
-    .eq('api_key', clientId)
-    .eq('is_active', true)
-    .single();
-
-  if (error || !apiKey) {
-    console.error('Invalid client_id:', clientId, error);
-    return new Response(
-      JSON.stringify({ error: 'Invalid client_id' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Check if redirect_uri is allowed
-  if (apiKey.allowed_domains && apiKey.allowed_domains.length > 0) {
-    const isAllowed = apiKey.allowed_domains.some((domain: string) => 
-      redirectUri.startsWith(domain));
-    
-    if (!isAllowed) {
-      console.error('Invalid redirect_uri:', redirectUri, 'Allowed domains:', apiKey.allowed_domains);
+    if (!clientId || !redirectUri) {
       return new Response(
-        JSON.stringify({ error: 'Invalid redirect_uri' }),
+        JSON.stringify({ error: 'Missing required parameters: client_id and redirect_uri' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-  }
 
-  // Generate authorization code
-  const authCode = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    // Verify API key/client_id exists and is active using service role
+    console.log('Checking API key:', clientId);
+    const { data: apiKey, error } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('api_key', clientId)
+      .eq('is_active', true)
+      .single();
 
-  // Store authorization code (without user_id for now - will be set after login)
-  const { error: insertError } = await supabase.from('sso_auth_codes').insert({
-    code: authCode,
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    scope: scope,
-    state: state,
-    expires_at: expiresAt.toISOString(),
-    used: false
-  });
+    console.log('API key query result:', { data: apiKey, error });
 
-  if (insertError) {
-    console.error('Failed to store auth code:', insertError);
+    if (error || !apiKey) {
+      console.error('Invalid client_id:', clientId, error);
+      return new Response(
+        JSON.stringify({ error: 'Invalid client_id' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if redirect_uri is allowed
+    if (apiKey.allowed_domains && apiKey.allowed_domains.length > 0) {
+      const isAllowed = apiKey.allowed_domains.some((domain: string) => 
+        redirectUri.startsWith(domain));
+      
+      if (!isAllowed) {
+        console.error('Invalid redirect_uri:', redirectUri, 'Allowed domains:', apiKey.allowed_domains);
+        return new Response(
+          JSON.stringify({ error: 'Invalid redirect_uri' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Generate authorization code
+    const authCode = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store authorization code
+    console.log('Storing auth code:', authCode);
+    const { error: insertError } = await supabase.from('sso_auth_codes').insert({
+      code: authCode,
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: scope,
+      state: state,
+      expires_at: expiresAt.toISOString(),
+      used: false
+    });
+
+    if (insertError) {
+      console.error('Failed to store auth code:', insertError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to generate authorization code' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create HappyCoins login URL that will redirect back to our callback
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/sso-auth/callback?code=${authCode}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state || ''}`;
+    
+    // For now, redirect to a simple login page - in production, this would be the HappyCoins login
+    const loginUrl = `${Deno.env.get('SUPABASE_URL')}/auth/v1/authorize?provider=email&redirect_to=${encodeURIComponent(callbackUrl)}`;
+
+    console.log('Redirecting to login URL:', loginUrl);
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        'Location': loginUrl
+      }
+    });
+  } catch (error) {
+    console.error('Error in handleAuthorize:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to generate authorization code' }),
+      JSON.stringify({ error: 'Authorization failed', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-
-  // Create HappyCoins login URL that will redirect back to our callback
-  const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/sso-auth/callback?code=${authCode}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state || ''}`;
-  
-  // For now, redirect to a simple login page - in production, this would be the HappyCoins login
-  const loginUrl = `${Deno.env.get('SUPABASE_URL')}/auth/v1/authorize?provider=email&redirect_to=${encodeURIComponent(callbackUrl)}`;
-
-  console.log('Redirecting to login URL:', loginUrl);
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      ...corsHeaders,
-      'Location': loginUrl
-    }
-  });
 }
 
 async function handleCallback(req: Request, supabase: any) {
