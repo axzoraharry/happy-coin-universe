@@ -1,5 +1,4 @@
 
-
 (function() {
   'use strict';
 
@@ -60,7 +59,7 @@
         compact: false,
         description: 'Payment',
         userEmail: '',
-        apiUrl: 'https://zygpupmeradizrachnqj.supabase.co/functions/v1/wallet-payment', // Use actual Supabase function URL
+        apiUrl: 'https://zygpupmeradizrachnqj.supabase.co/functions/v1/wallet-payment',
         onSuccess: function() {},
         onError: function() {}
       };
@@ -199,6 +198,57 @@
             .hc-widget.hc-compact .hc-widget-header {
               font-size: 14px;
             }
+            .hc-pin-input {
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+            }
+            .hc-pin-title {
+              font-size: 16px;
+              font-weight: 600;
+              text-align: center;
+            }
+            .hc-pin-description {
+              font-size: 14px;
+              color: #6b7280;
+              text-align: center;
+            }
+            .hc-pin-fields {
+              display: flex;
+              gap: 8px;
+              justify-content: center;
+            }
+            .hc-pin-digit {
+              width: 48px;
+              height: 48px;
+              text-align: center;
+              font-size: 18px;
+              border: 2px solid #d1d5db;
+              border-radius: 6px;
+              background: white;
+            }
+            .hc-pin-digit:focus {
+              outline: none;
+              border-color: #3b82f6;
+            }
+            .hc-pin-buttons {
+              display: flex;
+              gap: 8px;
+            }
+            .hc-pin-button {
+              flex: 1;
+              padding: 8px 16px;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
+              background: white;
+              cursor: pointer;
+              font-size: 14px;
+            }
+            .hc-pin-button.primary {
+              background: #3b82f6;
+              color: white;
+              border-color: #3b82f6;
+            }
           </style>
           
           <div class="hc-widget-header">
@@ -210,39 +260,58 @@
             <span class="hc-widget-amount">${config.amount} HC</span>
           </div>
 
-          ${!config.compact ? `
-            <div class="hc-widget-field">
-              <span class="hc-widget-label">Description:</span>
-              <span style="font-size: 14px; color: #6b7280;">${config.description}</span>
-            </div>
-            <div class="hc-widget-field">
-              <span class="hc-widget-label">Order ID:</span>
-              <span style="font-size: 14px; font-family: monospace;">${config.orderId}</span>
-            </div>
-          ` : ''}
+          <div id="hc-main-content">
+            ${!config.compact ? `
+              <div class="hc-widget-field">
+                <span class="hc-widget-label">Description:</span>
+                <span style="font-size: 14px; color: #6b7280;">${config.description}</span>
+              </div>
+              <div class="hc-widget-field">
+                <span class="hc-widget-label">Order ID:</span>
+                <span style="font-size: 14px; font-family: monospace;">${config.orderId}</span>
+              </div>
+            ` : ''}
 
-          ${!config.userEmail ? `
-            <div class="hc-widget-field">
-              <label class="hc-widget-label" for="hc-email">Email Address</label>
-              <input 
-                id="hc-email" 
-                type="email" 
-                class="hc-widget-input" 
-                placeholder="Enter your email"
-                required
-              />
+            ${!config.userEmail ? `
+              <div class="hc-widget-field">
+                <label class="hc-widget-label" for="hc-email">Email Address</label>
+                <input 
+                  id="hc-email" 
+                  type="email" 
+                  class="hc-widget-input" 
+                  placeholder="Enter your email"
+                  required
+                />
+              </div>
+            ` : ''}
+
+            <button class="hc-widget-button" id="hc-pay-button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                <line x1="1" y1="10" x2="23" y2="10"/>
+              </svg>
+              Pay ${config.amount} HC
+            </button>
+
+            <div id="hc-message" class="hc-widget-message" style="display: none;"></div>
+          </div>
+
+          <div id="hc-pin-content" style="display: none;">
+            <div class="hc-pin-input">
+              <div class="hc-pin-title">Verify Payment</div>
+              <div class="hc-pin-description">Enter your 4-digit PIN to complete the payment</div>
+              <div class="hc-pin-fields">
+                <input type="text" class="hc-pin-digit" maxlength="1" data-index="0">
+                <input type="text" class="hc-pin-digit" maxlength="1" data-index="1">
+                <input type="text" class="hc-pin-digit" maxlength="1" data-index="2">
+                <input type="text" class="hc-pin-digit" maxlength="1" data-index="3">
+              </div>
+              <div class="hc-pin-buttons">
+                <button class="hc-pin-button" id="hc-pin-cancel">Cancel</button>
+                <button class="hc-pin-button primary" id="hc-pin-submit">Verify</button>
+              </div>
             </div>
-          ` : ''}
-
-          <button class="hc-widget-button" id="hc-pay-button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-              <line x1="1" y1="10" x2="23" y2="10"/>
-            </svg>
-            Pay ${config.amount} HC
-          </button>
-
-          <div id="hc-message" class="hc-widget-message" style="display: none;"></div>
+          </div>
         </div>
       `;
     },
@@ -251,6 +320,26 @@
       const button = container.querySelector('#hc-pay-button');
       const emailInput = container.querySelector('#hc-email');
       const messageDiv = container.querySelector('#hc-message');
+      const mainContent = container.querySelector('#hc-main-content');
+      const pinContent = container.querySelector('#hc-pin-content');
+      const pinDigits = container.querySelectorAll('.hc-pin-digit');
+      const pinSubmit = container.querySelector('#hc-pin-submit');
+      const pinCancel = container.querySelector('#hc-pin-cancel');
+
+      // Setup PIN input handling
+      pinDigits.forEach((digit, index) => {
+        digit.addEventListener('input', (e) => {
+          if (e.target.value.length === 1 && index < 3) {
+            pinDigits[index + 1].focus();
+          }
+        });
+        
+        digit.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && e.target.value === '' && index > 0) {
+            pinDigits[index - 1].focus();
+          }
+        });
+      });
 
       button.addEventListener('click', async function() {
         const email = config.userEmail || (emailInput ? emailInput.value : '');
@@ -260,11 +349,27 @@
           return;
         }
 
-        HappyCoinsWidget.processPayment(button, messageDiv, email, config);
+        HappyCoinsWidget.processPayment(button, messageDiv, email, config, mainContent, pinContent);
+      });
+
+      pinSubmit.addEventListener('click', () => {
+        const pin = Array.from(pinDigits).map(digit => digit.value).join('');
+        if (pin.length === 4) {
+          const email = config.userEmail || (emailInput ? emailInput.value : '');
+          HappyCoinsWidget.processPayment(button, messageDiv, email, config, mainContent, pinContent, pin);
+        }
+      });
+
+      pinCancel.addEventListener('click', () => {
+        mainContent.style.display = 'block';
+        pinContent.style.display = 'none';
+        pinDigits.forEach(digit => digit.value = '');
+        HappyCoinsWidget.resetButton(button, config);
+        messageDiv.style.display = 'none';
       });
     },
 
-    processPayment: async function(button, messageDiv, email, config) {
+    processPayment: async function(button, messageDiv, email, config, mainContent, pinContent, pin = null) {
       // Disable button and show processing state
       button.disabled = true;
       button.innerHTML = `
@@ -279,6 +384,17 @@
       try {
         console.log('HappyCoins Widget: Making API call to:', config.apiUrl);
         
+        const requestBody = {
+          external_order_id: config.orderId,
+          user_email: email,
+          amount: config.amount,
+          description: config.description,
+        };
+
+        if (pin) {
+          requestBody.user_pin = pin;
+        }
+        
         const response = await fetch(config.apiUrl, {
           method: 'POST',
           headers: {
@@ -286,12 +402,7 @@
             'x-api-key': config.apiKey,
             'Authorization': 'Bearer ' + (window.supabase?.auth?.session?.access_token || '')
           },
-          body: JSON.stringify({
-            external_order_id: config.orderId,
-            user_email: email,
-            amount: config.amount,
-            description: config.description,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         // Handle non-2xx responses properly
@@ -299,6 +410,15 @@
           let errorMessage = 'Payment failed';
           try {
             const errorData = await response.json();
+            if (errorData.pin_required) {
+              // Show PIN input
+              mainContent.style.display = 'none';
+              pinContent.style.display = 'block';
+              this.showMessage(messageDiv, 'PIN verification required', 'info');
+              button.disabled = false;
+              this.resetButton(button, config);
+              return;
+            }
             errorMessage = errorData.error || errorMessage;
           } catch (e) {
             // If we can't parse the error response, use a generic message
@@ -318,7 +438,19 @@
             </svg>
             Payment Complete
           `;
+          // Hide PIN input if showing
+          if (pinContent.style.display !== 'none') {
+            mainContent.style.display = 'block';
+            pinContent.style.display = 'none';
+          }
           config.onSuccess(result);
+        } else if (result.pin_required) {
+          // Show PIN input
+          mainContent.style.display = 'none';
+          pinContent.style.display = 'block';
+          this.showMessage(messageDiv, 'PIN verification required', 'info');
+          button.disabled = false;
+          this.resetButton(button, config);
         } else {
           this.showMessage(messageDiv, result.error || 'Payment failed', 'error');
           this.resetButton(button, config);

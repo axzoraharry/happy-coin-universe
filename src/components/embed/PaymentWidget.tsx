@@ -90,8 +90,25 @@ export function PaymentWidget({
         let errorMessage = 'Payment processing failed';
         
         if (error.message && error.message.includes('non-2xx')) {
-          // Try to get the actual error from the response
-          errorMessage = 'Payment failed - please check your balance or try again';
+          // Try to parse the actual error from the response
+          try {
+            // The error context might contain the actual response
+            if (error.context && error.context.body) {
+              const errorData = JSON.parse(error.context.body);
+              if (errorData.pin_required) {
+                setStatus('pin_required');
+                setMessage('PIN verification required');
+                setShowPinInput(true);
+                setProcessing(false);
+                return;
+              }
+              errorMessage = errorData.error || 'Payment failed';
+            } else {
+              errorMessage = 'Payment failed - please check your balance or try again';
+            }
+          } catch (parseError) {
+            errorMessage = 'Payment failed - please check your balance or try again';
+          }
         } else {
           errorMessage = error.message || 'Payment processing failed';
         }
