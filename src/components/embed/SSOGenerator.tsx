@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,9 +48,12 @@ export function SSOGenerator() {
       .replace(/"/g, "'")
       .replace(/\n/g, '\n    ');
 
+    // Use the actual domain where this widget is hosted
+    const scriptUrl = `${window.location.origin}/embed/sso-widget.js`;
+
     return `<!-- HappyCoins SSO Widget -->
 <div id="happycoins-sso-widget"></div>
-<script src="https://your-domain.com/embed/sso-widget.js"></script>
+<script src="${scriptUrl}"></script>
 <script>
   HappyCoinsSSOWidget.render('happycoins-sso-widget', ${configString});
 </script>`;
@@ -83,7 +85,7 @@ function App() {
 
   const generateAPIExample = () => {
     return `// Step 1: Get authorization code (redirect user to this URL)
-const authUrl = 'https://your-happycoins-domain.com/api/sso-auth/authorize?' +
+const authUrl = '${window.location.origin}/api/sso-auth/authorize?' +
   new URLSearchParams({
     client_id: '${config.clientId}',
     redirect_uri: '${config.redirectUri}',
@@ -93,7 +95,7 @@ const authUrl = 'https://your-happycoins-domain.com/api/sso-auth/authorize?' +
   });
 
 // Step 2: Exchange code for access token
-const tokenResponse = await fetch('https://your-happycoins-domain.com/api/sso-auth/token', {
+const tokenResponse = await fetch('${window.location.origin}/api/sso-auth/token', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -107,7 +109,7 @@ const tokenResponse = await fetch('https://your-happycoins-domain.com/api/sso-au
 const { access_token } = await tokenResponse.json();
 
 // Step 3: Get user information
-const userResponse = await fetch('https://your-happycoins-domain.com/api/sso-auth/userinfo', {
+const userResponse = await fetch('${window.location.origin}/api/sso-auth/userinfo', {
   headers: { 'Authorization': \`Bearer \${access_token}\` }
 });
 
