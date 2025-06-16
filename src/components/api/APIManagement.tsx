@@ -5,10 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Key, Copy, Eye, EyeOff, Plus, Trash2, Globe } from 'lucide-react';
+import { Key, Copy, Eye, EyeOff, Plus, Trash2, Globe, Code } from 'lucide-react';
 import { AccountStatusGuard } from '../common/AccountStatusGuard';
+import { PaymentRequests } from './PaymentRequests';
+import { EmbedGenerator } from '../embed/EmbedGenerator';
+import { IntegrationGuide } from './IntegrationGuide';
 
 interface APIKey {
   id: string;
@@ -184,7 +188,7 @@ export function APIManagement() {
               API Management
             </h1>
             <p className="text-muted-foreground mt-2">
-              Manage API keys for external applications to integrate with your wallet
+              Manage API keys and integrate HappyCoins payments into your applications
             </p>
           </div>
           <Button onClick={() => setShowCreateForm(true)} className="flex items-center space-x-2">
@@ -193,179 +197,202 @@ export function APIManagement() {
           </Button>
         </div>
 
-        {showCreateForm && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New API Key</CardTitle>
-              <CardDescription>
-                Generate API credentials for external application integration
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="appName">Application Name *</Label>
-                <Input
-                  id="appName"
-                  placeholder="My E-commerce Store"
-                  value={newApp.name}
-                  onChange={(e) => setNewApp(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
+        <Tabs defaultValue="keys" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="keys">API Keys</TabsTrigger>
+            <TabsTrigger value="embed">Embed Widget</TabsTrigger>
+            <TabsTrigger value="requests">Payment Requests</TabsTrigger>
+            <TabsTrigger value="guide">Integration Guide</TabsTrigger>
+          </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="webhookUrl">Webhook URL (Optional)</Label>
-                <Input
-                  id="webhookUrl"
-                  placeholder="https://your-app.com/webhook"
-                  value={newApp.webhook_url}
-                  onChange={(e) => setNewApp(prev => ({ ...prev, webhook_url: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="domains">Allowed Domains (Optional)</Label>
-                <Textarea
-                  id="domains"
-                  placeholder="example.com, app.example.com"
-                  value={newApp.allowed_domains}
-                  onChange={(e) => setNewApp(prev => ({ ...prev, allowed_domains: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Comma-separated list of domains that can use this API key
-                </p>
-              </div>
-
-              <div className="flex space-x-2">
-                <Button onClick={createAPIKey}>Create API Key</Button>
-                <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid gap-6">
-          {apiKeys.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Key className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No API Keys</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Create your first API key to start integrating external applications with your wallet.
-                </p>
-                <Button onClick={() => setShowCreateForm(true)}>
-                  Create API Key
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            apiKeys.map((apiKey) => (
-              <Card key={apiKey.id} className={!apiKey.is_active ? 'opacity-60' : ''}>
+          <TabsContent value="keys" className="space-y-6">
+            {showCreateForm && (
+              <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center space-x-2">
-                        <span>{apiKey.application_name}</span>
-                        <Badge variant={apiKey.is_active ? 'default' : 'secondary'}>
-                          {apiKey.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription>
-                        Created on {new Date(apiKey.created_at).toLocaleDateString()}
-                        {apiKey.last_used_at && (
-                          <> • Last used: {new Date(apiKey.last_used_at).toLocaleDateString()}</>
-                        )}
-                      </CardDescription>
-                    </div>
-                    {apiKey.is_active && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deactivateAPIKey(apiKey.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                  <CardTitle>Create New API Key</CardTitle>
+                  <CardDescription>
+                    Generate API credentials for external application integration
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        value={apiKey.api_key}
-                        readOnly
-                        className="font-mono text-sm"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(apiKey.api_key, 'API Key')}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Label htmlFor="appName">Application Name *</Label>
+                    <Input
+                      id="appName"
+                      placeholder="My E-commerce Store"
+                      value={newApp.name}
+                      onChange={(e) => setNewApp(prev => ({ ...prev, name: e.target.value }))}
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Secret Key</Label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        type={showSecrets[apiKey.id] ? 'text' : 'password'}
-                        value={apiKey.secret_key}
-                        readOnly
-                        className="font-mono text-sm"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleSecretVisibility(apiKey.id)}
-                      >
-                        {showSecrets[apiKey.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(apiKey.secret_key, 'Secret Key')}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Label htmlFor="webhookUrl">Webhook URL (Optional)</Label>
+                    <Input
+                      id="webhookUrl"
+                      placeholder="https://your-app.com/webhook"
+                      value={newApp.webhook_url}
+                      onChange={(e) => setNewApp(prev => ({ ...prev, webhook_url: e.target.value }))}
+                    />
                   </div>
 
-                  {apiKey.webhook_url && (
-                    <div className="space-y-2">
-                      <Label>Webhook URL</Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          value={apiKey.webhook_url}
-                          readOnly
-                          className="text-sm"
-                        />
-                        <Globe className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="domains">Allowed Domains (Optional)</Label>
+                    <Textarea
+                      id="domains"
+                      placeholder="example.com, app.example.com"
+                      value={newApp.allowed_domains}
+                      onChange={(e) => setNewApp(prev => ({ ...prev, allowed_domains: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Comma-separated list of domains that can use this API key
+                    </p>
+                  </div>
 
-                  {apiKey.allowed_domains && apiKey.allowed_domains.length > 0 && (
-                    <div className="space-y-2">
-                      <Label>Allowed Domains</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {apiKey.allowed_domains.map((domain, index) => (
-                          <Badge key={index} variant="outline">
-                            {domain}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex space-x-2">
+                    <Button onClick={createAPIKey}>Create API Key</Button>
+                    <Button variant="outline" onClick={() => setShowCreateForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
-            ))
-          )}
-        </div>
+            )}
+
+            <div className="grid gap-6">
+              {apiKeys.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Key className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No API Keys</h3>
+                    <p className="text-muted-foreground text-center mb-4">
+                      Create your first API key to start integrating external applications with your wallet.
+                    </p>
+                    <Button onClick={() => setShowCreateForm(true)}>
+                      Create API Key
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                apiKeys.map((apiKey) => (
+                  <Card key={apiKey.id} className={!apiKey.is_active ? 'opacity-60' : ''}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center space-x-2">
+                            <span>{apiKey.application_name}</span>
+                            <Badge variant={apiKey.is_active ? 'default' : 'secondary'}>
+                              {apiKey.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </CardTitle>
+                          <CardDescription>
+                            Created on {new Date(apiKey.created_at).toLocaleDateString()}
+                            {apiKey.last_used_at && (
+                              <> • Last used: {new Date(apiKey.last_used_at).toLocaleDateString()}</>
+                            )}
+                          </CardDescription>
+                        </div>
+                        {apiKey.is_active && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deactivateAPIKey(apiKey.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>API Key</Label>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            value={apiKey.api_key}
+                            readOnly
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(apiKey.api_key, 'API Key')}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Secret Key</Label>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            type={showSecrets[apiKey.id] ? 'text' : 'password'}
+                            value={apiKey.secret_key}
+                            readOnly
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleSecretVisibility(apiKey.id)}
+                          >
+                            {showSecrets[apiKey.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(apiKey.secret_key, 'Secret Key')}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {apiKey.webhook_url && (
+                        <div className="space-y-2">
+                          <Label>Webhook URL</Label>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              value={apiKey.webhook_url}
+                              readOnly
+                              className="text-sm"
+                            />
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                      )}
+
+                      {apiKey.allowed_domains && apiKey.allowed_domains.length > 0 && (
+                        <div className="space-y-2">
+                          <Label>Allowed Domains</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {apiKey.allowed_domains.map((domain, index) => (
+                              <Badge key={index} variant="outline">
+                                {domain}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="embed">
+            <EmbedGenerator />
+          </TabsContent>
+
+          <TabsContent value="requests">
+            <PaymentRequests />
+          </TabsContent>
+
+          <TabsContent value="guide">
+            <IntegrationGuide />
+          </TabsContent>
+        </Tabs>
       </div>
     </AccountStatusGuard>
   );
