@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Code, Eye, Shield } from 'lucide-react';
+import { Copy, Code, Eye, Shield, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SSOWidget } from './SSOWidget';
 
@@ -55,8 +56,27 @@ export function SSOGenerator() {
 <div id="happycoins-sso-widget"></div>
 <script src="${scriptUrl}"></script>
 <script>
+  // Option 1: Render immediately (DOM must be ready)
   HappyCoinsSSOWidget.render('happycoins-sso-widget', ${configString});
+
+  // Option 2: Render when DOM is ready (recommended)
+  // HappyCoinsSSOWidget.renderWhenReady('happycoins-sso-widget', ${configString});
 </script>`;
+  };
+
+  const generateAutoInitCode = () => {
+    return `<!-- HappyCoins SSO Widget (Auto-init) -->
+<div id="happycoins-sso-widget" 
+     data-happycoins-sso
+     data-client-id="${config.clientId}"
+     data-redirect-uri="${config.redirectUri}"
+     data-scope="${config.scope}"
+     data-state="${config.state}"
+     data-app-name="${config.appName}"
+     data-theme="${config.theme}"
+     data-compact="${config.compact}">
+</div>
+<script src="${window.location.origin}/embed/sso-widget.js"></script>`;
   };
 
   const generateReactCode = () => {
@@ -254,12 +274,33 @@ console.log('User info:', userInfo);`;
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Troubleshooting Card */}
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-orange-800">
+            <AlertTriangle className="h-5 w-5" />
+            <span>Common Integration Issues</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-orange-800">
+          <div className="space-y-2 text-sm">
+            <p><strong>"Container element not found" error:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-4">
+              <li>Make sure the div with the specified ID exists before the script runs</li>
+              <li>Use <code>renderWhenReady()</code> instead of <code>render()</code> for better timing</li>
+              <li>Check that the container ID matches exactly (case sensitive)</li>
+              <li>Ensure the script loads after the HTML element is created</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>HTML Embed Code</CardTitle>
+            <CardTitle>HTML Embed Code (Recommended)</CardTitle>
             <CardDescription>
-              Copy this code and paste it into any website
+              Copy this code and paste it into any website. Uses renderWhenReady() for better reliability.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -272,6 +313,30 @@ console.log('User info:', userInfo);`;
                 variant="outline"
                 className="absolute top-2 right-2"
                 onClick={() => copyToClipboard(generateEmbedCode(), 'HTML embed code')}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Auto-Init HTML</CardTitle>
+            <CardDescription>
+              Alternative method using data attributes for automatic initialization
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              <pre className="bg-gray-100 p-4 rounded-lg text-sm overflow-x-auto">
+                <code>{generateAutoInitCode()}</code>
+              </pre>
+              <Button
+                size="sm"
+                variant="outline"
+                className="absolute top-2 right-2"
+                onClick={() => copyToClipboard(generateAutoInitCode(), 'Auto-init HTML code')}
               >
                 <Copy className="h-4 w-4" />
               </Button>

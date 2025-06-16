@@ -1,21 +1,29 @@
 
+
 (function() {
   'use strict';
 
-  // HappyCoins SSO Widget
+  // HappyCoins SSO Widget with improved error handling
   window.HappyCoinsSSOWidget = {
     render: function(containerId, config) {
+      // Add debug logging
+      console.log('HappyCoins SSO Widget: Attempting to render in container:', containerId);
+      
       const container = document.getElementById(containerId);
       if (!container) {
-        console.error('HappyCoins SSO Widget: Container element not found');
+        console.error('HappyCoins SSO Widget: Container element not found. Make sure an element with ID "' + containerId + '" exists in the DOM.');
+        console.error('Available elements with IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
         return;
       }
 
       // Validate required config
-      if (!config.clientId || !config.redirectUri) {
-        console.error('HappyCoins SSO Widget: Missing required configuration (clientId, redirectUri)');
+      if (!config || !config.clientId || !config.redirectUri) {
+        console.error('HappyCoins SSO Widget: Missing required configuration. Required: clientId, redirectUri');
+        console.error('Received config:', config);
         return;
       }
+
+      console.log('HappyCoins SSO Widget: Rendering with config:', config);
 
       // Default configuration
       const defaultConfig = {
@@ -24,8 +32,8 @@
         appName: 'Application',
         theme: 'light',
         compact: false,
-        onSuccess: function() {},
-        onError: function() {}
+        onSuccess: function(code) { console.log('SSO Success:', code); },
+        onError: function(error) { console.error('SSO Error:', error); }
       };
 
       const finalConfig = Object.assign({}, defaultConfig, config);
@@ -39,6 +47,35 @@
 
       // Check for auth callback on page load
       this.checkForAuthCallback(finalConfig);
+
+      console.log('HappyCoins SSO Widget: Successfully rendered');
+    },
+
+    // Utility function to render when DOM is ready
+    renderWhenReady: function(containerId, config, maxRetries = 10, retryDelay = 100) {
+      let retries = 0;
+      
+      const attemptRender = () => {
+        const container = document.getElementById(containerId);
+        if (container) {
+          this.render(containerId, config);
+        } else {
+          retries++;
+          if (retries < maxRetries) {
+            console.log('HappyCoins SSO Widget: Container not found, retrying in ' + retryDelay + 'ms... (attempt ' + retries + '/' + maxRetries + ')');
+            setTimeout(attemptRender, retryDelay);
+          } else {
+            console.error('HappyCoins SSO Widget: Container "' + containerId + '" not found after ' + maxRetries + ' attempts');
+          }
+        }
+      };
+
+      // Check if DOM is already loaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attemptRender);
+      } else {
+        attemptRender();
+      }
     },
 
     generateState: function() {
@@ -59,6 +96,10 @@
               border-radius: 8px;
               padding: ${config.compact ? '16px' : '24px'};
               background: white;
+              box-sizing: border-box;
+            }
+            .hc-sso-widget * {
+              box-sizing: border-box;
             }
             .hc-sso-widget.hc-sso-dark {
               background: #1a1a1a;
@@ -76,6 +117,7 @@
               margin-right: 8px;
               width: 20px;
               height: 20px;
+              flex-shrink: 0;
             }
             .hc-sso-widget-badge {
               background: #f8fafc;
@@ -152,12 +194,14 @@
               margin-right: 8px;
               width: 16px;
               height: 16px;
+              flex-shrink: 0;
             }
             .hc-sso-widget-message {
               margin-top: 12px;
               padding: 8px 12px;
               border-radius: 6px;
               font-size: 13px;
+              word-break: break-word;
             }
             .hc-sso-widget-message.success {
               background: #dcfce7;
@@ -174,8 +218,27 @@
               color: #1d4ed8;
               border: 1px solid #bfdbfe;
             }
+            .hc-sso-widget.hc-sso-dark .hc-sso-widget-message.success {
+              background: #166534;
+              color: #dcfce7;
+            }
+            .hc-sso-widget.hc-sso-dark .hc-sso-widget-message.error {
+              background: #dc2626;
+              color: #fef2f2;
+            }
+            .hc-sso-widget.hc-sso-dark .hc-sso-widget-message.info {
+              background: #1e3a8a;
+              color: #bfdbfe;
+            }
             .hc-sso-widget.hc-sso-compact .hc-sso-widget-header {
               font-size: 14px;
+            }
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+            .hc-sso-spin {
+              animation: spin 1s linear infinite;
             }
           </style>
           
@@ -191,11 +254,11 @@
           ${!config.compact ? `
             <div class="hc-sso-widget-field">
               <span class="hc-sso-widget-label">Application:</span>
-              <span class="hc-sso-widget-value">${config.appName}</span>
+              <span class="hc-sso-widget-value">${this.escapeHtml(config.appName)}</span>
             </div>
             <div class="hc-sso-widget-field">
               <span class="hc-sso-widget-label">Permissions:</span>
-              <span class="hc-sso-widget-value">${config.scope}</span>
+              <span class="hc-sso-widget-value">${this.escapeHtml(config.scope)}</span>
             </div>
             <div class="hc-sso-widget-info">
               <strong>Secure Authentication:</strong> Sign in using your HappyCoins wallet credentials. 
@@ -217,9 +280,20 @@
       `;
     },
 
+    escapeHtml: function(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    },
+
     attachEventListeners: function(container, config) {
       const button = container.querySelector('#hc-sso-button');
       const messageDiv = container.querySelector('#hc-sso-message');
+
+      if (!button || !messageDiv) {
+        console.error('HappyCoins SSO Widget: Could not find button or message elements');
+        return;
+      }
 
       button.addEventListener('click', function() {
         HappyCoinsSSOWidget.initiateAuth(button, messageDiv, config);
@@ -234,27 +308,34 @@
 
       if (code) {
         if (config.state && returnedState !== config.state) {
+          console.error('HappyCoins SSO Widget: Invalid state parameter');
           this.showMessage(null, 'Invalid state parameter', 'error');
           config.onError('Invalid state parameter');
           return;
         }
 
+        console.log('HappyCoins SSO Widget: Authentication successful');
         this.showMessage(null, 'Authentication successful!', 'success');
         config.onSuccess(code);
         
         // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       } else if (error) {
-        this.showMessage(null, error, 'error');
+        console.error('HappyCoins SSO Widget: Authentication error:', error);
+        this.showMessage(null, 'Authentication failed: ' + error, 'error');
         config.onError(error);
       }
     },
 
     initiateAuth: function(button, messageDiv, config) {
+      console.log('HappyCoins SSO Widget: Initiating authentication');
+      
       // Disable button and show processing state
       button.disabled = true;
       button.innerHTML = `
-        <svg style="margin-right: 8px; width: 16px; height: 16px; animation: spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="hc-sso-spin" style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12a9 9 0 11-6.219-8.56"/>
         </svg>
         Redirecting...
@@ -277,25 +358,39 @@
         // Get the current domain for the auth URL
         const authUrl = window.location.origin + '/api/sso-auth/authorize?' + params.toString();
         
-        // Redirect to auth endpoint
-        window.location.href = authUrl;
+        console.log('HappyCoins SSO Widget: Redirecting to:', authUrl);
+        
+        // Small delay to ensure UI updates are visible
+        setTimeout(function() {
+          window.location.href = authUrl;
+        }, 500);
 
       } catch (error) {
-        this.showMessage(messageDiv, 'Failed to initiate authentication', 'error');
+        console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);
+        this.showMessage(messageDiv, 'Failed to initiate authentication: ' + error.message, 'error');
         this.resetButton(button, config);
-        config.onError('Failed to initiate authentication');
+        config.onError('Failed to initiate authentication: ' + error.message);
       }
     },
 
     showMessage: function(messageDiv, text, type) {
+      // Try to find message div if not provided
+      if (!messageDiv) {
+        messageDiv = document.querySelector('#hc-sso-message');
+      }
+      
       if (messageDiv) {
         messageDiv.style.display = 'block';
         messageDiv.textContent = text;
         messageDiv.className = `hc-sso-widget-message ${type}`;
+      } else {
+        console.log('HappyCoins SSO Widget Message (' + type + '):', text);
       }
     },
 
     resetButton: function(button, config) {
+      if (!button) return;
+      
       button.disabled = false;
       button.innerHTML = `
         <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -308,13 +403,32 @@
     }
   };
 
-  // Add CSS animation for spinner
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-  `;
-  document.head.appendChild(style);
+  // Auto-initialization helper
+  window.HappyCoinsSSOWidget.autoInit = function() {
+    // Look for auto-init elements
+    const autoInitElements = document.querySelectorAll('[data-happycoins-sso]');
+    autoInitElements.forEach(function(element) {
+      const config = {
+        clientId: element.getAttribute('data-client-id'),
+        redirectUri: element.getAttribute('data-redirect-uri'),
+        scope: element.getAttribute('data-scope') || 'profile email',
+        state: element.getAttribute('data-state'),
+        appName: element.getAttribute('data-app-name') || 'Application',
+        theme: element.getAttribute('data-theme') || 'light',
+        compact: element.getAttribute('data-compact') === 'true'
+      };
+      
+      if (config.clientId && config.redirectUri) {
+        window.HappyCoinsSSOWidget.render(element.id, config);
+      }
+    });
+  };
+
+  // Auto-initialize on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.HappyCoinsSSOWidget.autoInit);
+  } else {
+    window.HappyCoinsSSOWidget.autoInit();
+  }
 })();
+
