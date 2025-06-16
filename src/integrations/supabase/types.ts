@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          allowed_domains: string[] | null
+          api_key: string
+          application_name: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          secret_key: string
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          allowed_domains?: string[] | null
+          api_key: string
+          application_name: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          secret_key: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          allowed_domains?: string[] | null
+          api_key?: string
+          application_name?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          secret_key?: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       coin_exchanges: {
         Row: {
           amount_received: number
@@ -101,6 +143,66 @@ export type Database = {
           title?: string
         }
         Relationships: []
+      }
+      payment_requests: {
+        Row: {
+          amount: number
+          api_key_id: string
+          callback_url: string | null
+          created_at: string
+          description: string | null
+          external_order_id: string
+          id: string
+          metadata: Json | null
+          status: string
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          api_key_id: string
+          callback_url?: string | null
+          created_at?: string
+          description?: string | null
+          external_order_id: string
+          id?: string
+          metadata?: Json | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          api_key_id?: string
+          callback_url?: string | null
+          created_at?: string
+          description?: string | null
+          external_order_id?: string
+          id?: string
+          metadata?: Json | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_requests_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_requests_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -361,6 +463,60 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_logs: {
+        Row: {
+          api_key_id: string
+          attempt_count: number
+          created_at: string
+          id: string
+          payload: Json
+          payment_request_id: string | null
+          response_body: string | null
+          response_status: number | null
+          success: boolean
+          webhook_url: string
+        }
+        Insert: {
+          api_key_id: string
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          payload: Json
+          payment_request_id?: string | null
+          response_body?: string | null
+          response_status?: number | null
+          success?: boolean
+          webhook_url: string
+        }
+        Update: {
+          api_key_id?: string
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          payload?: Json
+          payment_request_id?: string | null
+          response_body?: string | null
+          response_status?: number | null
+          success?: boolean
+          webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_logs_payment_request_id_fkey"
+            columns: ["payment_request_id"]
+            isOneToOne: false
+            referencedRelation: "payment_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -379,6 +535,27 @@ export type Database = {
           p_user_id: string
           p_coins_to_exchange: number
           p_exchange_rate?: number
+        }
+        Returns: Json
+      }
+      generate_api_keys: {
+        Args: {
+          p_user_id: string
+          p_application_name: string
+          p_webhook_url?: string
+          p_allowed_domains?: string[]
+        }
+        Returns: Json
+      }
+      process_external_payment: {
+        Args: {
+          p_api_key: string
+          p_external_order_id: string
+          p_user_email: string
+          p_amount: number
+          p_description?: string
+          p_callback_url?: string
+          p_metadata?: Json
         }
         Returns: Json
       }

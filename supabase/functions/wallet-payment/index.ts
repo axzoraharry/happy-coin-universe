@@ -1,0 +1,181 @@
+
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+}
+
+interface PaymentRequest {
+  external_order_id: string;
+  user_email: string;
+  amount: number;
+  description?: string;
+  callback_url?: string;
+  metadata?: any;
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { 
+        status: 405, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+
+  try {
+    // Get API key from headers
+    const apiKey = req.headers.get('x-api-key');
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: 'API key required in x-api-key header' }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Parse request body
+    const paymentData: PaymentRequest = await req.json();
+
+    // Validate required fields
+    if (!paymentData.external_order_id || !paymentData.user_email || !paymentData.amount) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing required fields: external_order_id, user_email, amount' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Validate amount
+    if (paymentData.amount <= 0) {
+      return new Response(
+        JSON.stringify({ error: 'Amount must be greater than 0' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    console.log(`Processing payment request for order: ${paymentData.external_order_id}`);
+
+    // Process the payment using the database function
+    const { data: result, error } = await supabase.rpc('process_external_payment', {
+      p_api_key: apiKey,
+      p_external_order_id: paymentData.external_order_id,
+      p_user_email: paymentData.user_email,
+      p_amount: paymentData.amount,
+      p_description: paymentData.description || 'External payment',
+      p_callback_url: paymentData.callback_url || null,
+      p_metadata: paymentData.metadata || null
+    });
+
+    if (error) {
+      console.error('Database error:', error);
+      return new Response(
+        JSON.stringify({ error: 'Internal server error' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    if (!result?.success) {
+      console.log('Payment failed:', result?.error);
+      return new Response(
+        JSON.stringify({ 
+          error: result?.error || 'Payment processing failed' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('Payment processed successfully:', result);
+
+    // If there's a callback URL, trigger webhook (fire and forget)
+    if (paymentData.callback_url) {
+      // Start webhook delivery in background
+      const webhookPayload = {
+        external_order_id: paymentData.external_order_id,
+        payment_request_id: result.payment_request_id,
+        transaction_id: result.transaction_id,
+        reference_id: result.reference_id,
+        amount: paymentData.amount,
+        status: 'completed',
+        timestamp: new Date().toISOString(),
+        metadata: paymentData.metadata
+      };
+
+      // Fire webhook without waiting
+      fetch(paymentData.callback_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'HappyCoins-Webhook/1.0'
+        },
+        body: JSON.stringify(webhookPayload)
+      }).catch(error => {
+        console.error('Webhook delivery failed:', error);
+        // Log webhook failure to database
+        supabase.from('webhook_logs').insert({
+          api_key_id: result.api_key_id,
+          payment_request_id: result.payment_request_id,
+          webhook_url: paymentData.callback_url,
+          payload: webhookPayload,
+          success: false,
+          response_body: error.message
+        });
+      });
+    }
+
+    // Return success response
+    return new Response(
+      JSON.stringify({
+        success: true,
+        payment_request_id: result.payment_request_id,
+        transaction_id: result.transaction_id,
+        reference_id: result.reference_id,
+        new_balance: result.new_balance,
+        message: 'Payment processed successfully'
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+});
