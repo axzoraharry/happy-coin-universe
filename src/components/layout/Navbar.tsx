@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Wallet, Home, Coins, Send, Bell, Gift, Code, Shield, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface NavbarProps {
   currentPage: string;
@@ -16,9 +17,35 @@ interface NavbarProps {
 
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { toast } = useToast();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to sign out. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Signed out",
+          description: "You have been successfully signed out.",
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred during sign out.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -97,7 +124,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 <DropdownMenuItem onClick={() => onPageChange('profile')}>
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -202,6 +229,14 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 className="w-full justify-start"
               >
                 Profile
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                Logout
               </Button>
             </div>
           </div>
