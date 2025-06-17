@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,29 +85,56 @@ export function PaymentWidget({
       if (error) {
         console.error('Supabase function error:', error);
         
-        // Handle specific error cases
+        // Handle specific error cases - check for PIN requirement in the error
         let errorMessage = 'Payment processing failed';
+        let pinRequired = false;
         
-        if (error.message && error.message.includes('non-2xx')) {
-          // Try to parse the actual error from the response
+        // Check if the error message contains PIN requirement information
+        if (error.message && (
+          error.message.includes('PIN verification required') || 
+          error.message.includes('pin_required')
+        )) {
+          pinRequired = true;
+        }
+        
+        // Also check the error context if available
+        if (error.context) {
           try {
-            // The error context might contain the actual response
-            if (error.context && error.context.body) {
-              const errorData = JSON.parse(error.context.body);
-              if (errorData.pin_required) {
-                setStatus('pin_required');
-                setMessage('PIN verification required');
-                setShowPinInput(true);
-                setProcessing(false);
-                return;
-              }
-              errorMessage = errorData.error || 'Payment failed';
+            let errorData;
+            if (typeof error.context === 'string') {
+              errorData = JSON.parse(error.context);
+            } else if (error.context.body) {
+              errorData = typeof error.context.body === 'string' 
+                ? JSON.parse(error.context.body) 
+                : error.context.body;
             } else {
-              errorMessage = 'Payment failed - please check your balance or try again';
+              errorData = error.context;
+            }
+            
+            if (errorData && errorData.pin_required) {
+              pinRequired = true;
+            }
+            
+            if (errorData && errorData.error) {
+              errorMessage = errorData.error;
             }
           } catch (parseError) {
-            errorMessage = 'Payment failed - please check your balance or try again';
+            console.error('Error parsing context:', parseError);
           }
+        }
+        
+        // If PIN is required, show PIN input
+        if (pinRequired) {
+          setStatus('pin_required');
+          setMessage('PIN verification required');
+          setShowPinInput(true);
+          setProcessing(false);
+          return;
+        }
+        
+        // For other errors, use the error message or fallback
+        if (error.message && error.message.includes('non-2xx')) {
+          errorMessage = 'Payment failed - please check your balance or try again';
         } else {
           errorMessage = error.message || 'Payment processing failed';
         }
