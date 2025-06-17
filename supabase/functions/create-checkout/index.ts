@@ -42,7 +42,9 @@ serve(async (req) => {
     const amountInINR = amount * 1000;
 
     // Configure payment method types based on selection
-    const paymentMethodTypes = paymentMethod === 'upi' ? ['upi'] : ['card'];
+    // Note: 'upi' is not a valid Stripe payment method type
+    // For UPI-like functionality, we use 'card' but can add UPI-specific handling later
+    const paymentMethodTypes = paymentMethod === 'upi' ? ['card'] : ['card'];
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -52,7 +54,10 @@ serve(async (req) => {
         {
           price_data: {
             currency: "inr",
-            product_data: { name: `${amount} Happy Coins` },
+            product_data: { 
+              name: `${amount} Happy Coins`,
+              description: paymentMethod === 'upi' ? 'Payment via UPI method' : 'Payment via Card'
+            },
             unit_amount: amountInINR * 100, // Convert to paise (INR cents)
           },
           quantity: 1,
@@ -73,6 +78,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error: any) {
+    console.error('Stripe checkout error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
