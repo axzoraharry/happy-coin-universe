@@ -115,12 +115,13 @@ export function PaymentWidget({
           }
           
           const result = await response.json();
-          console.log('Direct fetch success response:', result);
+          console.log('Payment success:', result);
           
           if (result.success) {
             setStatus('success');
             setMessage('Payment completed successfully!');
             setShowPinInput(false);
+            setProcessing(false); // Make sure processing is set to false
             onSuccess?.(result);
           } else {
             throw new Error(result.error || 'Payment failed');
@@ -130,6 +131,7 @@ export function PaymentWidget({
           setStatus('error');
           setMessage(fetchError.message || 'Payment processing failed');
           setShowPinInput(false);
+          setProcessing(false);
           onError?.(fetchError.message || 'Payment processing failed');
         }
         return;
@@ -141,6 +143,7 @@ export function PaymentWidget({
         setStatus('success');
         setMessage('Payment completed successfully!');
         setShowPinInput(false);
+        setProcessing(false); // Make sure processing is set to false
         onSuccess?.(result);
       } else if (result.pin_required) {
         setStatus('pin_required');
@@ -152,6 +155,7 @@ export function PaymentWidget({
         setStatus('error');
         setMessage(result.error || 'Payment failed');
         setShowPinInput(false);
+        setProcessing(false);
         onError?.(result.error || 'Payment failed');
       }
     } catch (error: any) {
@@ -159,11 +163,8 @@ export function PaymentWidget({
       setStatus('error');
       setMessage(error.message || 'Network error occurred');
       setShowPinInput(false);
+      setProcessing(false);
       onError?.(error.message || 'Network error occurred');
-    } finally {
-      if (status !== 'pin_required') {
-        setProcessing(false);
-      }
     }
   };
 
@@ -238,7 +239,7 @@ export function PaymentWidget({
           >
             {getStatusIcon()}
             <span className="ml-2">
-              {processing ? 'Processing...' : status === 'success' ? 'Paid' : 'Pay Now'}
+              {status === 'success' ? 'Payment Complete' : processing ? 'Processing...' : 'Pay Now'}
             </span>
           </Button>
           
@@ -297,7 +298,7 @@ export function PaymentWidget({
         >
           {getStatusIcon()}
           <span className="ml-2">
-            {processing ? 'Processing Payment...' : status === 'success' ? 'Payment Complete' : `Pay ${amount} HC`}
+            {status === 'success' ? 'Payment Complete' : processing ? 'Processing Payment...' : `Pay ${amount} HC`}
           </span>
         </Button>
 
