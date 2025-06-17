@@ -38,15 +38,18 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
+    // Convert Happy Coins to INR (1 HC = 1000 INR)
+    const amountInINR = amount * 1000;
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: "inr",
             product_data: { name: `${amount} Happy Coins` },
-            unit_amount: amount * 100, // Convert to cents
+            unit_amount: amountInINR * 100, // Convert to paise (INR cents)
           },
           quantity: 1,
         },

@@ -11,7 +11,7 @@ export default function CoinsPage() {
       <div>
         <h1 className="text-3xl font-bold mb-2">Coins & Rewards</h1>
         <p className="text-muted-foreground">
-          Earn coins through daily bonuses, complete offers, exchange them for Happy Coins, or purchase directly.
+          Earn coins through daily bonuses, complete offers, exchange them for Happy Coins, or purchase directly. 1000 INR = 1 Happy Coin.
         </p>
       </div>
 

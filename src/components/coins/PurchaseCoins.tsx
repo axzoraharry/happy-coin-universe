@@ -16,7 +16,7 @@ export function PurchaseCoins() {
   const { toast } = useToast();
   const { isActive, showDeactivatedAccountError } = useAccountStatus();
 
-  const predefinedAmounts = [10, 25, 50, 100, 250, 500];
+  const predefinedAmounts = [1, 5, 10, 25, 50, 100]; // Changed to smaller values for INR
 
   const handlePurchase = async (purchaseAmount: number) => {
     if (!isActive) {
@@ -73,7 +73,7 @@ export function PurchaseCoins() {
             <span>Purchase Happy Coins</span>
           </CardTitle>
           <CardDescription>
-            Buy Happy Coins securely with Stripe. 1 USD = 1 Happy Coin
+            Buy Happy Coins securely with Stripe. 1000 INR = 1 Happy Coin
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -124,7 +124,7 @@ export function PurchaseCoins() {
           <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
             <p>• Secure payment processing by Stripe</p>
             <p>• Instant delivery to your wallet</p>
-            <p>• 1 USD = 1 Happy Coin</p>
+            <p>• 1000 INR = 1 Happy Coin</p>
           </div>
         </CardContent>
       </Card>

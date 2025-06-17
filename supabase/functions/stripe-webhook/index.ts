@@ -67,7 +67,7 @@ serve(async (req) => {
             user_id: userId,
             transaction_type: 'credit',
             amount: happyCoins,
-            description: `Purchase of ${happyCoins} Happy Coins`,
+            description: `Purchase of ${happyCoins} Happy Coins (${happyCoins * 1000} INR)`,
             reference_id: session.id,
             status: 'completed'
           });
@@ -82,7 +82,7 @@ serve(async (req) => {
             type: 'success'
           });
 
-        console.log(`Successfully processed payment for user ${userId}: ${happyCoins} HC`);
+        console.log(`Successfully processed payment for user ${userId}: ${happyCoins} HC (${happyCoins * 1000} INR)`);
       } catch (error) {
         console.error('Error processing payment:', error);
       }
