@@ -14,7 +14,7 @@ interface PaymentRequest {
   description?: string;
   callback_url?: string;
   metadata?: any;
-  user_pin?: string; // Added PIN support
+  user_pin?: string;
 }
 
 serve(async (req) => {
@@ -48,6 +48,12 @@ serve(async (req) => {
 
     // Parse request body
     const paymentData: PaymentRequest = await req.json();
+    console.log('Payment request received:', {
+      external_order_id: paymentData.external_order_id,
+      user_email: paymentData.user_email,
+      amount: paymentData.amount,
+      has_pin: !!paymentData.user_pin
+    });
 
     // Validate required fields
     if (!paymentData.external_order_id || !paymentData.user_email || !paymentData.amount) {
@@ -93,9 +99,21 @@ serve(async (req) => {
     });
 
     if (error) {
-      console.error('Database error:', error);
+      console.error('Database RPC error:', error);
+      
+      // Check if it's a specific database error we can handle
+      if (error.code === 'PGRST116') {
+        return new Response(
+          JSON.stringify({ error: 'Database function not found' }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'Internal server error' }),
+        JSON.stringify({ error: 'Database error: ' + error.message }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -103,14 +121,27 @@ serve(async (req) => {
       );
     }
 
-    if (!result?.success) {
-      console.log('Payment failed:', result?.error);
+    console.log('Database function result:', result);
+
+    if (!result) {
+      console.error('No result returned from database function');
+      return new Response(
+        JSON.stringify({ error: 'No response from payment processor' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    if (!result.success) {
+      console.log('Payment failed:', result.error);
       
       // Check if PIN is required
-      if (result?.pin_required) {
+      if (result.pin_required) {
         return new Response(
           JSON.stringify({ 
-            error: result?.error || 'PIN verification required',
+            error: result.error || 'PIN verification required',
             pin_required: true
           }),
           { 
@@ -122,7 +153,7 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify({ 
-          error: result?.error || 'Payment processing failed' 
+          error: result.error || 'Payment processing failed' 
         }),
         { 
           status: 400, 
@@ -131,7 +162,11 @@ serve(async (req) => {
       );
     }
 
-    console.log('Payment processed successfully:', result);
+    console.log('Payment processed successfully:', {
+      payment_request_id: result.payment_request_id,
+      transaction_id: result.transaction_id,
+      pin_verified: result.pin_verified
+    });
 
     // If there's a callback URL, trigger webhook (fire and forget)
     if (paymentData.callback_url) {
@@ -190,7 +225,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        error: 'Internal server error: ' + error.message,
+        details: error.stack
+      }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
