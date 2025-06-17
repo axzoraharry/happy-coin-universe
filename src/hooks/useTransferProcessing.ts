@@ -17,6 +17,9 @@ interface TransferResult {
   reference_id?: string;
 }
 
+const MINIMUM_TRANSFER_AMOUNT = 1; // 1 Happy Coin
+const MINIMUM_ACCOUNT_BALANCE = 1; // 1 Happy Coin
+
 export function useTransferProcessing() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -36,10 +39,21 @@ export function useTransferProcessing() {
       return false;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
+    const transferAmount = parseFloat(amount);
+
+    if (!amount || transferAmount <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (transferAmount < MINIMUM_TRANSFER_AMOUNT) {
+      toast({
+        title: "Transfer Amount Too Low",
+        description: `Minimum transfer amount is ${MINIMUM_TRANSFER_AMOUNT} HC`,
         variant: "destructive",
       });
       return false;
@@ -61,7 +75,35 @@ export function useTransferProcessing() {
         return false;
       }
 
-      const transferAmount = parseFloat(amount);
+      // Check current balance and validate minimum balance requirements
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (walletError) throw walletError;
+
+      const currentBalance = parseFloat(wallet.balance.toString());
+      const balanceAfterTransfer = currentBalance - transferAmount;
+
+      if (currentBalance < MINIMUM_ACCOUNT_BALANCE) {
+        toast({
+          title: "Insufficient Balance",
+          description: `Your account must have at least ${MINIMUM_ACCOUNT_BALANCE} HC minimum balance`,
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      if (balanceAfterTransfer < MINIMUM_ACCOUNT_BALANCE) {
+        toast({
+          title: "Transfer Not Allowed",
+          description: `Transfer would leave your account below the minimum balance of ${MINIMUM_ACCOUNT_BALANCE} HC`,
+          variant: "destructive",
+        });
+        return false;
+      }
 
       // Use the new secure transfer function
       const { data: rawResult, error: transferError } = await supabase.rpc('process_secure_wallet_transfer' as any, {

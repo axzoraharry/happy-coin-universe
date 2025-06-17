@@ -11,6 +11,9 @@ interface SecureTransferResult {
   reference_id?: string;
 }
 
+const MINIMUM_TRANSFER_AMOUNT = 1; // 1 Happy Coin
+const MINIMUM_ACCOUNT_BALANCE = 1; // 1 Happy Coin
+
 export function useSecureTransfer() {
   const [loading, setLoading] = useState(false);
   const [showPinInput, setShowPinInput] = useState(false);
@@ -18,7 +21,7 @@ export function useSecureTransfer() {
   const { toast } = useToast();
   const { isActive, showDeactivatedAccountError } = useAccountStatus();
 
-  const initiateTransfer = (transferData: {
+  const initiateTransfer = async (transferData: {
     recipientId: string;
     amount: string;
     description: string;
@@ -28,8 +31,71 @@ export function useSecureTransfer() {
       return;
     }
 
-    setPendingTransfer(transferData);
-    setShowPinInput(true);
+    const transferAmount = parseFloat(transferData.amount);
+
+    // Check minimum transfer amount
+    if (transferAmount < MINIMUM_TRANSFER_AMOUNT) {
+      toast({
+        title: "Transfer Amount Too Low",
+        description: `Minimum transfer amount is ${MINIMUM_TRANSFER_AMOUNT} HC`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if user has sufficient balance (including minimum balance requirement)
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data: wallet, error } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      const currentBalance = parseFloat(wallet.balance.toString());
+      const balanceAfterTransfer = currentBalance - transferAmount;
+
+      if (currentBalance < MINIMUM_ACCOUNT_BALANCE) {
+        toast({
+          title: "Insufficient Balance",
+          description: `Your account must have at least ${MINIMUM_ACCOUNT_BALANCE} HC minimum balance`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (balanceAfterTransfer < MINIMUM_ACCOUNT_BALANCE) {
+        toast({
+          title: "Transfer Not Allowed",
+          description: `Transfer would leave your account below the minimum balance of ${MINIMUM_ACCOUNT_BALANCE} HC`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (currentBalance < transferAmount) {
+        toast({
+          title: "Insufficient Funds",
+          description: "You don't have enough balance for this transfer",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setPendingTransfer(transferData);
+      setShowPinInput(true);
+    } catch (error: any) {
+      console.error('Error checking balance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to verify account balance",
+        variant: "destructive",
+      });
+    }
   };
 
   const executeTransfer = async (pin: string) => {
@@ -100,6 +166,8 @@ export function useSecureTransfer() {
     pendingTransfer,
     initiateTransfer,
     executeTransfer,
-    cancelTransfer
+    cancelTransfer,
+    MINIMUM_TRANSFER_AMOUNT,
+    MINIMUM_ACCOUNT_BALANCE
   };
 }
