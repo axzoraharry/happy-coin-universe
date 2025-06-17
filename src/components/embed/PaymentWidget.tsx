@@ -85,61 +85,53 @@ export function PaymentWidget({
       if (error) {
         console.error('Supabase function error:', error);
         
-        // Handle specific error cases - check for PIN requirement in the error
-        let errorMessage = 'Payment processing failed';
-        let pinRequired = false;
-        
-        // Check if the error message contains PIN requirement information
-        if (error.message && (
-          error.message.includes('PIN verification required') || 
-          error.message.includes('pin_required')
-        )) {
-          pinRequired = true;
-        }
-        
-        // Also check the error context if available
-        if (error.context) {
-          try {
-            let errorData;
-            if (typeof error.context === 'string') {
-              errorData = JSON.parse(error.context);
-            } else if (error.context.body) {
-              errorData = typeof error.context.body === 'string' 
-                ? JSON.parse(error.context.body) 
-                : error.context.body;
-            } else {
-              errorData = error.context;
+        // For Supabase function errors, we need to make a direct HTTP call to get the actual response
+        try {
+          const response = await fetch(`https://zygpupmeradizrachnqj.supabase.co/functions/v1/wallet-payment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'Authorization': `Bearer ${supabase.supabaseKey}`
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.log('Direct fetch error response:', errorData);
+            
+            // Check if PIN is required
+            if (errorData.pin_required) {
+              setStatus('pin_required');
+              setMessage('PIN verification required');
+              setShowPinInput(true);
+              setProcessing(false);
+              return;
             }
             
-            if (errorData && errorData.pin_required) {
-              pinRequired = true;
-            }
-            
-            if (errorData && errorData.error) {
-              errorMessage = errorData.error;
-            }
-          } catch (parseError) {
-            console.error('Error parsing context:', parseError);
+            throw new Error(errorData.error || 'Payment processing failed');
           }
+          
+          const result = await response.json();
+          console.log('Direct fetch success response:', result);
+          
+          if (result.success) {
+            setStatus('success');
+            setMessage('Payment completed successfully!');
+            setShowPinInput(false);
+            onSuccess?.(result);
+          } else {
+            throw new Error(result.error || 'Payment failed');
+          }
+        } catch (fetchError: any) {
+          console.error('Direct fetch error:', fetchError);
+          setStatus('error');
+          setMessage(fetchError.message || 'Payment processing failed');
+          setShowPinInput(false);
+          onError?.(fetchError.message || 'Payment processing failed');
         }
-        
-        // If PIN is required, show PIN input
-        if (pinRequired) {
-          setStatus('pin_required');
-          setMessage('PIN verification required');
-          setShowPinInput(true);
-          setProcessing(false);
-          return;
-        }
-        
-        // For other errors, use the error message or fallback
-        if (error.message && error.message.includes('non-2xx')) {
-          errorMessage = 'Payment failed - please check your balance or try again';
-        } else {
-          errorMessage = error.message || 'Payment processing failed';
-        }
-        
-        throw new Error(errorMessage);
+        return;
       }
 
       const result: PaymentResult = data;
