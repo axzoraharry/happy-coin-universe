@@ -6,19 +6,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Coins } from 'lucide-react';
+import { CreditCard, Coins, Smartphone } from 'lucide-react';
 import { AccountStatusGuard } from '../common/AccountStatusGuard';
 import { useAccountStatus } from '@/hooks/useAccountStatus';
 
 export function PurchaseCoins() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi'>('card');
   const { toast } = useToast();
   const { isActive, showDeactivatedAccountError } = useAccountStatus();
 
   const predefinedAmounts = [1, 5, 10, 25, 50, 100]; // Changed to smaller values for INR
 
-  const handlePurchase = async (purchaseAmount: number) => {
+  const handlePurchase = async (purchaseAmount: number, selectedPaymentMethod: 'card' | 'upi' = paymentMethod) => {
     if (!isActive) {
       showDeactivatedAccountError();
       return;
@@ -27,7 +28,10 @@ export function PurchaseCoins() {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { amount: purchaseAmount }
+        body: { 
+          amount: purchaseAmount,
+          paymentMethod: selectedPaymentMethod
+        }
       });
 
       if (error) throw error;
@@ -77,6 +81,29 @@ export function PurchaseCoins() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Payment Method Selection */}
+          <div>
+            <Label className="text-sm font-medium mb-3 block">Payment Method</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant={paymentMethod === 'card' ? 'default' : 'outline'}
+                onClick={() => setPaymentMethod('card')}
+                className="flex items-center justify-center space-x-2 h-12"
+              >
+                <CreditCard className="h-4 w-4" />
+                <span>Card</span>
+              </Button>
+              <Button
+                variant={paymentMethod === 'upi' ? 'default' : 'outline'}
+                onClick={() => setPaymentMethod('upi')}
+                className="flex items-center justify-center space-x-2 h-12"
+              >
+                <Smartphone className="h-4 w-4" />
+                <span>UPI</span>
+              </Button>
+            </div>
+          </div>
+
           <div>
             <Label className="text-sm font-medium mb-3 block">Quick Purchase</Label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -115,7 +142,7 @@ export function PurchaseCoins() {
                 disabled={loading || !amount}
                 className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
               >
-                <CreditCard className="h-4 w-4 mr-2" />
+                {paymentMethod === 'upi' ? <Smartphone className="h-4 w-4 mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
                 Buy
               </Button>
             </div>
@@ -125,6 +152,7 @@ export function PurchaseCoins() {
             <p>• Secure payment processing by Stripe</p>
             <p>• Instant delivery to your wallet</p>
             <p>• 1000 INR = 1 Happy Coin</p>
+            <p>• {paymentMethod === 'upi' ? 'Pay using UPI apps like GPay, PhonePe, Paytm' : 'Pay with any debit/credit card'}</p>
           </div>
         </CardContent>
       </Card>

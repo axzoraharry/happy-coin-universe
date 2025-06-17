@@ -25,7 +25,7 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
-    const { amount } = await req.json();
+    const { amount, paymentMethod = 'card' } = await req.json();
     if (!amount || amount <= 0) throw new Error("Invalid amount");
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -41,9 +41,13 @@ serve(async (req) => {
     // Convert Happy Coins to INR (1 HC = 1000 INR)
     const amountInINR = amount * 1000;
 
+    // Configure payment method types based on selection
+    const paymentMethodTypes = paymentMethod === 'upi' ? ['upi'] : ['card'];
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
+      payment_method_types: paymentMethodTypes,
       line_items: [
         {
           price_data: {
@@ -60,6 +64,7 @@ serve(async (req) => {
       metadata: {
         user_id: user.id,
         happy_coins: amount.toString(),
+        payment_method: paymentMethod,
       },
     });
 
