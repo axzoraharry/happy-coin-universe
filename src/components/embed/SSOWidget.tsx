@@ -74,7 +74,7 @@ export function SSOWidget({
 
     setProcessing(true);
     setStatus('processing');
-    setMessage('Redirecting to HappyCoins authentication...');
+    setMessage('Opening HappyCoins authentication...');
 
     try {
       const params = new URLSearchParams({
@@ -91,15 +91,75 @@ export function SSOWidget({
       const supabaseUrl = getSupabaseUrl();
       const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}`;
       
-      console.log('SSO Widget: Redirecting to:', authUrl);
+      console.log('SSO Widget: Opening authorization window:', authUrl);
       
-      // Direct redirect - much simpler and more reliable
-      window.location.href = authUrl;
+      // Open authorization in a new window instead of popup
+      const authWindow = window.open(
+        authUrl,
+        'happycoins-auth',
+        'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes'
+      );
+
+      if (!authWindow) {
+        throw new Error('Popup blocked - please allow popups for this site');
+      }
+
+      // Monitor the popup window
+      const checkClosed = setInterval(() => {
+        if (authWindow.closed) {
+          clearInterval(checkClosed);
+          setProcessing(false);
+          setStatus('idle');
+          setMessage('');
+        }
+      }, 1000);
+
+      // Listen for messages from the popup window
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== supabaseUrl && event.origin !== window.location.origin) {
+          return;
+        }
+
+        if (event.data.type === 'HAPPYCOINS_AUTH_SUCCESS') {
+          clearInterval(checkClosed);
+          authWindow.close();
+          window.removeEventListener('message', messageListener);
+          
+          setStatus('success');
+          setMessage('Authentication successful!');
+          setProcessing(false);
+          onSuccess?.(event.data.code);
+        } else if (event.data.type === 'HAPPYCOINS_AUTH_ERROR') {
+          clearInterval(checkClosed);
+          authWindow.close();
+          window.removeEventListener('message', messageListener);
+          
+          setStatus('error');
+          setMessage(event.data.error);
+          setProcessing(false);
+          onError?.(event.data.error);
+        }
+      };
+
+      window.addEventListener('message', messageListener);
+
+      // Cleanup after 5 minutes
+      setTimeout(() => {
+        if (!authWindow.closed) {
+          authWindow.close();
+          clearInterval(checkClosed);
+          window.removeEventListener('message', messageListener);
+          setProcessing(false);
+          setStatus('error');
+          setMessage('Authentication timed out');
+          onError?.('Authentication timed out');
+        }
+      }, 300000);
 
     } catch (error) {
       console.error('SSO request failed:', error);
       setStatus('error');
-      setMessage('Failed to initiate authentication');
+      setMessage('Failed to open authentication window: ' + (error as Error).message);
       setProcessing(false);
       onError?.('Failed to initiate authentication');
     }
@@ -141,7 +201,7 @@ export function SSOWidget({
           >
             {getStatusIcon()}
             <span className="ml-2">
-              {processing ? 'Signing in...' : status === 'success' ? 'Signed In' : 'Sign In'}
+              {processing ? 'Opening...' : status === 'success' ? 'Signed In' : 'Sign In'}
             </span>
           </Button>
           
@@ -193,7 +253,7 @@ export function SSOWidget({
         >
           {getStatusIcon()}
           <span className="ml-2">
-            {processing ? 'Authenticating...' : status === 'success' ? 'Authentication Complete' : 'Authorize with HappyCoins'}
+            {processing ? 'Opening Authentication...' : status === 'success' ? 'Authentication Complete' : 'Authorize with HappyCoins'}
           </span>
         </Button>
 
