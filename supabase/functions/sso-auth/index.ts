@@ -39,6 +39,7 @@ serve(async (req) => {
 
     console.log(`SSO Auth: ${req.method} ${path}`);
     console.log('Headers:', Object.fromEntries(req.headers.entries()));
+    console.log('URL params:', Object.fromEntries(url.searchParams.entries()));
 
     if (path.endsWith('/authorize')) {
       return await handleAuthorize(req, supabaseClient);
@@ -76,6 +77,7 @@ async function handleAuthorize(req: Request, supabase: any) {
     console.log('SSO Authorize request:', { clientId, redirectUri, scope, state, hasUrlToken: !!accessTokenFromUrl });
 
     if (!clientId || !redirectUri) {
+      console.error('Missing required parameters:', { clientId: !!clientId, redirectUri: !!redirectUri });
       return new Response(
         JSON.stringify({ error: 'Missing required parameters: client_id and redirect_uri' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -95,14 +97,38 @@ async function handleAuthorize(req: Request, supabase: any) {
     if (!token) {
       console.error('No valid authorization token found');
       
-      // Redirect to login page with return URL
-      const loginUrl = `${Deno.env.get('SUPABASE_URL') || 'https://zygpupmeradizrachnqj.supabase.co'}/?return_to=${encodeURIComponent(req.url)}`;
+      // Create a proper error page instead of redirect loop
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Required - HappyCoins SSO</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
+            .error-container { max-width: 500px; margin: 0 auto; }
+            .error-title { color: #dc3545; margin-bottom: 20px; }
+            .error-message { margin-bottom: 30px; }
+            .retry-button { 
+              background: #007bff; color: white; padding: 10px 20px; 
+              text-decoration: none; border-radius: 5px; display: inline-block;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="error-container">
+            <h1 class="error-title">Authentication Required</h1>
+            <p class="error-message">You must be signed in to your HappyCoins account to use SSO authentication.</p>
+            <a href="/" class="retry-button">Go to HappyCoins Login</a>
+          </div>
+        </body>
+        </html>
+      `;
       
-      return new Response(null, {
-        status: 302,
+      return new Response(errorHtml, {
+        status: 401,
         headers: {
           ...corsHeaders,
-          'Location': loginUrl
+          'Content-Type': 'text/html'
         }
       });
     }
@@ -113,14 +139,37 @@ async function handleAuthorize(req: Request, supabase: any) {
     if (authError || !user) {
       console.error('Invalid user token:', authError);
       
-      // Redirect to login page
-      const loginUrl = `${Deno.env.get('SUPABASE_URL') || 'https://zygpupmeradizrachnqj.supabase.co'}/`;
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invalid Token - HappyCoins SSO</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
+            .error-container { max-width: 500px; margin: 0 auto; }
+            .error-title { color: #dc3545; margin-bottom: 20px; }
+            .error-message { margin-bottom: 30px; }
+            .retry-button { 
+              background: #007bff; color: white; padding: 10px 20px; 
+              text-decoration: none; border-radius: 5px; display: inline-block;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="error-container">
+            <h1 class="error-title">Authentication Expired</h1>
+            <p class="error-message">Your authentication token has expired. Please sign in again.</p>
+            <a href="/" class="retry-button">Go to HappyCoins Login</a>
+          </div>
+        </body>
+        </html>
+      `;
       
-      return new Response(null, {
-        status: 302,
+      return new Response(errorHtml, {
+        status: 401,
         headers: {
           ...corsHeaders,
-          'Location': loginUrl
+          'Content-Type': 'text/html'
         }
       });
     }

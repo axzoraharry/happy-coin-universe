@@ -157,49 +157,16 @@ export function SSOWidget({
       console.log('SSO Widget: Redirecting to:', authUrl);
       console.log('SSO Widget: Using access token:', accessToken ? 'Present' : 'Missing');
       
-      // Create a form to submit with authorization header
-      const form = document.createElement('form');
-      form.method = 'GET';
-      form.action = authUrl;
+      // Instead of complex fetch logic, directly redirect with auth header in URL
+      // This is a more reliable approach for SSO flows
+      const urlWithToken = `${authUrl}&access_token=${encodeURIComponent(accessToken)}`;
       
-      // Add authorization as a header by using a hidden iframe approach
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      
-      // Make the request with proper authorization header
-      fetch(authUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        redirect: 'manual'
-      }).then(response => {
-        if (response.type === 'opaqueredirect' || response.status === 302) {
-          // Handle redirect manually
-          window.location.href = authUrl + `&token=${encodeURIComponent(accessToken)}`;
-        } else if (response.status === 401) {
-          setStatus('auth_required');
-          setMessage('Authentication expired. Please sign in again.');
-          setProcessing(false);
-          handleSignInRedirect();
-        } else {
-          return response.text().then(text => {
-            console.error('Unexpected response:', response.status, text);
-            setStatus('error');
-            setMessage('Authentication failed');
-            setProcessing(false);
-          });
-        }
-      }).catch(error => {
-        console.error('SSO request failed:', error);
-        // Fallback: redirect with token in URL (less secure but functional)
-        const urlWithToken = `${authUrl}&access_token=${encodeURIComponent(accessToken)}`;
+      setTimeout(() => {
         window.location.href = urlWithToken;
-      });
+      }, 500);
 
     } catch (error) {
+      console.error('SSO request failed:', error);
       setStatus('error');
       setMessage('Failed to initiate authentication');
       setProcessing(false);
