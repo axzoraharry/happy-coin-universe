@@ -260,7 +260,7 @@
     },
 
     initiateAuth: function(button, messageDiv, config) {
-      console.log('HappyCoins SSO Widget: Initiating authentication');
+      console.log('HappyCoins SSO Widget: Initiating authentication with direct redirect');
       
       button.disabled = true;
       button.innerHTML = `
@@ -289,8 +289,10 @@
         
         console.log('HappyCoins SSO Widget: Redirecting to authorization:', authUrl);
         
-        // Direct redirect (no popup)
-        window.location.href = authUrl;
+        // Use direct window location redirect - no popups
+        setTimeout(() => {
+          window.location.href = authUrl;
+        }, 500);
 
       } catch (error) {
         console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);

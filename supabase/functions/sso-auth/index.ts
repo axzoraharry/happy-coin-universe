@@ -104,7 +104,7 @@ async function handleAuthorize(req: Request, supabase: any) {
           <div class="error-container">
             <h1 class="error-title">Invalid Request</h1>
             <p class="error-message">Missing required parameters: client_id and redirect_uri</p>
-            <button onclick="window.close()" class="retry-button">Close Window</button>
+            <button onclick="window.history.back()" class="retry-button">Go Back</button>
           </div>
         </body>
         </html>
@@ -156,7 +156,7 @@ async function handleAuthorize(req: Request, supabase: any) {
           <div class="error-container">
             <h1 class="error-title">Invalid Application</h1>
             <p class="error-message">The application you're trying to connect to is not authorized or has been disabled. Please contact the application provider.</p>
-            <button onclick="window.close()" class="retry-button">Close Window</button>
+            <button onclick="window.history.back()" class="retry-button">Go Back</button>
           </div>
         </body>
         </html>
@@ -205,7 +205,7 @@ async function handleAuthorize(req: Request, supabase: any) {
             <div class="error-container">
               <h1 class="error-title">Invalid Redirect URL</h1>
               <p class="error-message">The redirect URL is not authorized for this application. Please contact the application provider.</p>
-              <button onclick="window.close()" class="retry-button">Close Window</button>
+              <button onclick="window.history.back()" class="retry-button">Go Back</button>
             </div>
           </body>
           </html>
@@ -366,17 +366,7 @@ async function handleAuthorize(req: Request, supabase: any) {
           
           function cancelAuth() {
             const redirectUrl = '${redirectUri}?error=access_denied' + (${state ? `'&state=${state}'` : `''`});
-            
-            // Send message to parent window and close popup
-            if (window.opener) {
-              window.opener.postMessage({
-                type: 'HAPPYCOINS_AUTH_ERROR',
-                error: 'User cancelled authorization'
-              }, '*');
-              window.close();
-            } else {
-              window.location.href = redirectUrl;
-            }
+            window.location.href = redirectUrl;
           }
           
           // Handle potential communication with parent window
@@ -427,7 +417,7 @@ async function handleAuthorize(req: Request, supabase: any) {
         <div class="error-container">
           <h1 class="error-title">Authorization Error</h1>
           <p class="error-message">An error occurred during authorization. Please try again.</p>
-          <button onclick="window.close()" class="retry-button">Close Window</button>
+          <button onclick="window.history.back()" class="retry-button">Go Back</button>
         </div>
       </body>
       </html>
@@ -488,15 +478,16 @@ async function handleComplete(req: Request, supabase: any) {
       return new Response('Failed to generate authorization code', { status: 500 });
     }
     
-    // Redirect back to the application with the authorization code
+    // Build the final redirect URL to the application's redirect_uri
     const finalRedirectUrl = new URL(redirect_uri);
     finalRedirectUrl.searchParams.set('code', authCode);
     if (state) {
       finalRedirectUrl.searchParams.set('state', state);
     }
     
-    console.log('Redirecting to:', finalRedirectUrl.toString());
+    console.log('Redirecting to application redirect_uri:', finalRedirectUrl.toString());
     
+    // Redirect back to the application with the authorization code
     return new Response(null, {
       status: 302,
       headers: {
