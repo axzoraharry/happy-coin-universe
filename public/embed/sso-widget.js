@@ -1,30 +1,28 @@
+
 (function() {
   'use strict';
 
-  // HappyCoins SSO Widget with improved error handling
+  // HappyCoins SSO Widget with secure authentication
   window.HappyCoinsSSOWidget = {
     render: function(containerId, config) {
-      // Add debug logging
       console.log('HappyCoins SSO Widget: Attempting to render in container:', containerId);
       
       const container = document.getElementById(containerId);
       if (!container) {
         console.error('HappyCoins SSO Widget: Container element not found. Make sure an element with ID "' + containerId + '" exists in the DOM.');
-        console.error('Available elements with IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
         return;
       }
 
       // Validate required config
       if (!config || !config.clientId || !config.redirectUri) {
         console.error('HappyCoins SSO Widget: Missing required configuration. Required: clientId, redirectUri');
-        console.error('Received config:', config);
         return;
       }
 
       console.log('HappyCoins SSO Widget: Rendering with config:', config);
 
       // Default configuration
-      const defaultConfig = {
+      const defaultConfig = Object.assign({}, {
         scope: 'profile email',
         state: this.generateState(),
         appName: 'Application',
@@ -32,24 +30,21 @@
         compact: false,
         onSuccess: function(code) { console.log('SSO Success:', code); },
         onError: function(error) { console.error('SSO Error:', error); }
-      };
-
-      const finalConfig = Object.assign({}, defaultConfig, config);
+      }, config);
 
       // Create widget HTML
-      const widgetHtml = this.createWidgetHTML(finalConfig);
+      const widgetHtml = this.createWidgetHTML(defaultConfig);
       container.innerHTML = widgetHtml;
 
       // Attach event listeners
-      this.attachEventListeners(container, finalConfig);
+      this.attachEventListeners(container, defaultConfig);
 
       // Check for auth callback on page load
-      this.checkForAuthCallback(finalConfig);
+      this.checkForAuthCallback(defaultConfig);
 
       console.log('HappyCoins SSO Widget: Successfully rendered');
     },
 
-    // Utility function to render when DOM is ready
     renderWhenReady: function(containerId, config, maxRetries = 10, retryDelay = 100) {
       let retries = 0;
       
@@ -68,7 +63,6 @@
         }
       };
 
-      // Check if DOM is already loaded
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', attemptRender);
       } else {
@@ -96,9 +90,7 @@
               background: white;
               box-sizing: border-box;
             }
-            .hc-sso-widget * {
-              box-sizing: border-box;
-            }
+            .hc-sso-widget * { box-sizing: border-box; }
             .hc-sso-widget.hc-sso-dark {
               background: #1a1a1a;
               border-color: #374151;
@@ -132,39 +124,27 @@
               color: white;
               border-color: #4b5563;
             }
-            .hc-sso-widget-field {
-              margin-bottom: ${config.compact ? '12px' : '16px'};
-            }
-            .hc-sso-widget-label {
-              display: block;
-              margin-bottom: 4px;
-              font-size: 14px;
-              font-weight: 500;
-              color: #374151;
-            }
-            .hc-sso-widget.hc-sso-dark .hc-sso-widget-label {
-              color: #d1d5db;
-            }
-            .hc-sso-widget-value {
-              font-size: 14px;
-              color: #6b7280;
-            }
-            .hc-sso-widget.hc-sso-dark .hc-sso-widget-value {
-              color: #9ca3af;
-            }
-            .hc-sso-widget-info {
-              background: #eff6ff;
-              border: 1px solid #bfdbfe;
-              border-radius: 6px;
+            .hc-sso-widget-status {
               padding: 12px;
+              border-radius: 6px;
               margin-bottom: 16px;
               font-size: 13px;
-              color: #1d4ed8;
+              text-align: center;
             }
-            .hc-sso-widget.hc-sso-dark .hc-sso-widget-info {
-              background: #1e3a8a;
-              border-color: #3b82f6;
-              color: #bfdbfe;
+            .hc-sso-widget-status.auth-required {
+              background: #fef3c7;
+              color: #92400e;
+              border: 1px solid #fcd34d;
+            }
+            .hc-sso-widget-status.authenticated {
+              background: #d1fae5;
+              color: #047857;
+              border: 1px solid #a7f3d0;
+            }
+            .hc-sso-widget-status.loading {
+              background: #e0f2fe;
+              color: #0369a1;
+              border: 1px solid #7dd3fc;
             }
             .hc-sso-widget-button {
               width: 100%;
@@ -181,12 +161,16 @@
               justify-content: center;
               transition: background-color 0.2s;
             }
-            .hc-sso-widget-button:hover {
-              background: #2563eb;
-            }
+            .hc-sso-widget-button:hover { background: #2563eb; }
             .hc-sso-widget-button:disabled {
               background: #9ca3af;
               cursor: not-allowed;
+            }
+            .hc-sso-widget-button.auth-required {
+              background: #f59e0b;
+            }
+            .hc-sso-widget-button.auth-required:hover {
+              background: #d97706;
             }
             .hc-sso-widget-button svg {
               margin-right: 8px;
@@ -211,25 +195,10 @@
               color: #dc2626;
               border: 1px solid #fecaca;
             }
-            .hc-sso-widget-message.info {
-              background: #eff6ff;
-              color: #1d4ed8;
-              border: 1px solid #bfdbfe;
-            }
-            .hc-sso-widget.hc-sso-dark .hc-sso-widget-message.success {
-              background: #166534;
-              color: #dcfce7;
-            }
-            .hc-sso-widget.hc-sso-dark .hc-sso-widget-message.error {
-              background: #dc2626;
-              color: #fef2f2;
-            }
-            .hc-sso-widget.hc-sso-dark .hc-sso-widget-message.info {
-              background: #1e3a8a;
-              color: #bfdbfe;
-            }
-            .hc-sso-widget.hc-sso-compact .hc-sso-widget-header {
-              font-size: 14px;
+            .hc-sso-widget-message.warning {
+              background: #fef3c7;
+              color: #92400e;
+              border: 1px solid #fcd34d;
             }
             @keyframes spin {
               from { transform: rotate(0deg); }
@@ -249,28 +218,20 @@
             <span class="hc-sso-widget-badge">SSO</span>
           </div>
 
-          ${!config.compact ? `
-            <div class="hc-sso-widget-field">
-              <span class="hc-sso-widget-label">Application:</span>
-              <span class="hc-sso-widget-value">${this.escapeHtml(config.appName)}</span>
-            </div>
-            <div class="hc-sso-widget-field">
-              <span class="hc-sso-widget-label">Permissions:</span>
-              <span class="hc-sso-widget-value">${this.escapeHtml(config.scope)}</span>
-            </div>
-            <div class="hc-sso-widget-info">
-              <strong>Secure Authentication:</strong> Sign in using your HappyCoins wallet credentials. 
-              Your login information is encrypted and secure.
-            </div>
-          ` : ''}
+          <div id="hc-sso-status" class="hc-sso-widget-status loading">
+            <svg class="hc-sso-spin" style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12a9 9 0 11-6.219-8.56"/>
+            </svg>
+            Checking authentication status...
+          </div>
 
-          <button class="hc-sso-widget-button" id="hc-sso-button">
+          <button class="hc-sso-widget-button" id="hc-sso-button" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
               <polyline points="10,17 15,12 10,7"/>
               <line x1="15" y1="12" x2="3" y2="12"/>
             </svg>
-            ${config.compact ? 'Sign In' : 'Sign In with HappyCoins'}
+            Loading...
           </button>
 
           <div id="hc-sso-message" class="hc-sso-widget-message" style="display: none;"></div>
@@ -278,24 +239,107 @@
       `;
     },
 
-    escapeHtml: function(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    },
-
     attachEventListeners: function(container, config) {
       const button = container.querySelector('#hc-sso-button');
       const messageDiv = container.querySelector('#hc-sso-message');
+      const statusDiv = container.querySelector('#hc-sso-status');
 
-      if (!button || !messageDiv) {
-        console.error('HappyCoins SSO Widget: Could not find button or message elements');
+      if (!button || !messageDiv || !statusDiv) {
+        console.error('HappyCoins SSO Widget: Could not find required elements');
         return;
       }
 
+      // Check authentication status first
+      this.checkAuthenticationStatus(button, statusDiv, messageDiv, config);
+
       button.addEventListener('click', function() {
-        HappyCoinsSSOWidget.initiateAuth(button, messageDiv, config);
+        const isAuthRequired = button.classList.contains('auth-required');
+        if (isAuthRequired) {
+          HappyCoinsSSOWidget.redirectToLogin();
+        } else {
+          HappyCoinsSSOWidget.initiateAuth(button, messageDiv, config);
+        }
       });
+    },
+
+    checkAuthenticationStatus: function(button, statusDiv, messageDiv, config) {
+      // For embedded widgets, we need to check if user is authenticated with HappyCoins
+      // This is a simplified check - in a real implementation, you'd verify with your auth system
+      const baseUrl = this.getSupabaseUrl();
+      
+      // Try to check authentication by making a request to userinfo endpoint
+      // This is not a perfect solution for embedded widgets, but demonstrates the security principle
+      fetch(baseUrl + '/functions/v1/sso-auth/userinfo', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + (localStorage.getItem('supabase.auth.token') || ''),
+          'Content-Type': 'application/json'
+        }
+      }).then(response => {
+        if (response.ok) {
+          // User is authenticated
+          this.updateAuthenticatedState(button, statusDiv, messageDiv);
+        } else {
+          // User needs to authenticate
+          this.updateAuthRequiredState(button, statusDiv, messageDiv);
+        }
+      }).catch(error => {
+        console.log('Auth check failed, assuming authentication required:', error);
+        this.updateAuthRequiredState(button, statusDiv, messageDiv);
+      });
+    },
+
+    updateAuthenticatedState: function(button, statusDiv, messageDiv) {
+      statusDiv.className = 'hc-sso-widget-status authenticated';
+      statusDiv.innerHTML = `
+        <svg style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 12l2 2 4-4"/>
+          <circle cx="12" cy="12" r="10"/>
+        </svg>
+        Authenticated with HappyCoins
+      `;
+      
+      button.disabled = false;
+      button.classList.remove('auth-required');
+      button.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+          <polyline points="10,17 15,12 10,7"/>
+          <line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Authorize Application
+      `;
+    },
+
+    updateAuthRequiredState: function(button, statusDiv, messageDiv) {
+      statusDiv.className = 'hc-sso-widget-status auth-required';
+      statusDiv.innerHTML = `
+        <svg style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m21,14-2.5-2.5-2.5,2.5"/>
+          <path d="M12 16c-4 0-8-4-8-8s4-8 8-8c1.5 0 3 .5 4 1"/>
+        </svg>
+        Authentication required
+      `;
+      
+      button.disabled = false;
+      button.classList.add('auth-required');
+      button.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+          <polyline points="10,17 15,12 10,7"/>
+          <line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Sign In to HappyCoins
+      `;
+      
+      this.showMessage(messageDiv, 'You must sign in to your HappyCoins account to use SSO authentication', 'warning');
+    },
+
+    redirectToLogin: function() {
+      // Redirect to HappyCoins login page
+      // In a real implementation, this would be the actual HappyCoins login URL
+      const loginUrl = this.getSupabaseUrl();
+      window.open(loginUrl, '_blank');
     },
 
     checkForAuthCallback: function(config) {
@@ -316,7 +360,6 @@
         this.showMessage(null, 'Authentication successful!', 'success');
         config.onSuccess(code);
         
-        // Clean up URL
         if (window.history && window.history.replaceState) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -330,7 +373,6 @@
     initiateAuth: function(button, messageDiv, config) {
       console.log('HappyCoins SSO Widget: Initiating authentication');
       
-      // Disable button and show processing state
       button.disabled = true;
       button.innerHTML = `
         <svg class="hc-sso-spin" style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -353,13 +395,11 @@
           params.append('state', config.state);
         }
 
-        // Use the correct Supabase function URL
         const baseUrl = this.getSupabaseUrl();
         const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString();
         
         console.log('HappyCoins SSO Widget: Redirecting to:', authUrl);
         
-        // Small delay to ensure UI updates are visible
         setTimeout(function() {
           window.location.href = authUrl;
         }, 500);
@@ -373,23 +413,17 @@
     },
 
     getSupabaseUrl: function() {
-      // Try to get Supabase URL from various sources
       if (typeof window !== 'undefined') {
-        // Check if we're on the HappyCoins domain
         const currentOrigin = window.location.origin;
         if (currentOrigin.includes('happycoins') || currentOrigin.includes('supabase')) {
           return currentOrigin;
         }
-        
-        // Default to the HappyCoins production URL
         return 'https://zygpupmeradizrachnqj.supabase.co';
       }
-      
       return 'https://zygpupmeradizrachnqj.supabase.co';
     },
 
     showMessage: function(messageDiv, text, type) {
-      // Try to find message div if not provided
       if (!messageDiv) {
         messageDiv = document.querySelector('#hc-sso-message');
       }
@@ -420,7 +454,6 @@
 
   // Auto-initialization helper
   window.HappyCoinsSSOWidget.autoInit = function() {
-    // Look for auto-init elements
     const autoInitElements = document.querySelectorAll('[data-happycoins-sso]');
     autoInitElements.forEach(function(element) {
       const config = {

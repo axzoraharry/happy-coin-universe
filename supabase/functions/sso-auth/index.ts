@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -82,16 +81,38 @@ async function handleAuthorize(req: Request, supabase: any) {
       );
     }
 
-    // Verify API key/client_id exists and is active using service role
-    console.log('Checking API key:', clientId);
+    // Get auth token from request headers
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('No valid authorization header found');
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.substring(7);
+
+    // Verify the user is authenticated by checking the token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error('Invalid user token:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+
+    // Verify API key/client_id exists and is active
     const { data: apiKey, error } = await supabase
       .from('api_keys')
       .select('*')
       .eq('api_key', clientId)
       .eq('is_active', true)
       .single();
-
-    console.log('API key query result:', { data: apiKey, error });
 
     if (error || !apiKey) {
       console.error('Invalid client_id:', clientId, error);
@@ -119,14 +140,14 @@ async function handleAuthorize(req: Request, supabase: any) {
     const authCode = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Store authorization code
-    console.log('Storing auth code:', authCode);
+    // Store authorization code with the authenticated user ID
     const { error: insertError } = await supabase.from('sso_auth_codes').insert({
       code: authCode,
       client_id: clientId,
       redirect_uri: redirectUri,
       scope: scope,
       state: state,
+      user_id: user.id, // Store the actual authenticated user ID
       expires_at: expiresAt.toISOString(),
       used: false
     });
@@ -139,21 +160,25 @@ async function handleAuthorize(req: Request, supabase: any) {
       );
     }
 
-    console.log('Auth code stored successfully');
+    console.log('Auth code stored successfully for user:', user.id);
 
-    // Create HappyCoins login URL that will redirect back to our callback
-    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/sso-auth/callback?code=${authCode}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state || ''}`;
-    
-    // For demo purposes, simulate login and redirect directly to callback
-    console.log('Redirecting to callback URL:', callbackUrl);
+    // Redirect back to the application with the authorization code
+    const finalRedirectUrl = new URL(redirectUri);
+    finalRedirectUrl.searchParams.set('code', authCode);
+    if (state) {
+      finalRedirectUrl.searchParams.set('state', state);
+    }
+
+    console.log('Final redirect to:', finalRedirectUrl.toString());
 
     return new Response(null, {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': callbackUrl
+        'Location': finalRedirectUrl.toString()
       }
     });
+
   } catch (error) {
     console.error('Error in handleAuthorize:', error);
     return new Response(
@@ -178,27 +203,13 @@ async function handleCallback(req: Request, supabase: any) {
     );
   }
 
-  // For demo purposes, we'll simulate a successful login and redirect back
-  // In production, this would verify the user's authentication with HappyCoins
-  
-  // Update the auth code with a dummy user ID (in production, get from authenticated session)
-  const { error: updateError } = await supabase
-    .from('sso_auth_codes')
-    .update({ user_id: '00000000-0000-0000-0000-000000000000' }) // Demo user ID
-    .eq('code', authCode);
-
-  if (updateError) {
-    console.error('Failed to update auth code:', updateError);
-  }
-
-  // Redirect back to the original application with the auth code
+  // This endpoint should not be used anymore since we're doing direct redirects
+  // But keeping it for backward compatibility
   const finalRedirectUrl = new URL(redirectUri);
   finalRedirectUrl.searchParams.set('code', authCode);
   if (state) {
     finalRedirectUrl.searchParams.set('state', state);
   }
-
-  console.log('Final redirect to:', finalRedirectUrl.toString());
 
   return new Response(null, {
     status: 302,
@@ -270,6 +281,14 @@ async function handleToken(req: Request, supabase: any) {
     );
   }
 
+  // Verify the user_id exists (should be set during authorize)
+  if (!authCodeData.user_id) {
+    return new Response(
+      JSON.stringify({ error: 'Invalid authorization code - no user associated' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   // Mark code as used
   await supabase
     .from('sso_auth_codes')
@@ -280,7 +299,7 @@ async function handleToken(req: Request, supabase: any) {
   const accessToken = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
 
-  // Store access token
+  // Store access token with the real user ID
   await supabase.from('sso_access_tokens').insert({
     token: accessToken,
     user_id: authCodeData.user_id,
@@ -337,9 +356,9 @@ async function handleUserInfo(req: Request, supabase: any) {
   const profile = tokenData.profiles;
   const userInfo: any = {
     sub: profile?.id || tokenData.user_id,
-    email: profile?.email || 'demo@happycoins.com',
-    name: profile?.full_name || 'Demo User',
-    preferred_username: profile?.full_name || 'Demo User'
+    email: profile?.email || 'unknown@happycoins.com',
+    name: profile?.full_name || 'HappyCoins User',
+    preferred_username: profile?.full_name || 'HappyCoins User'
   };
 
   // Include additional fields based on scope
