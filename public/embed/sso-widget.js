@@ -124,24 +124,11 @@
               color: white;
               border-color: #4b5563;
             }
-            .hc-sso-widget-status {
+            .hc-sso-widget-info {
               padding: 12px;
               border-radius: 6px;
               margin-bottom: 16px;
               font-size: 13px;
-              text-align: center;
-            }
-            .hc-sso-widget-status.auth-required {
-              background: #fef3c7;
-              color: #92400e;
-              border: 1px solid #fcd34d;
-            }
-            .hc-sso-widget-status.authenticated {
-              background: #d1fae5;
-              color: #047857;
-              border: 1px solid #a7f3d0;
-            }
-            .hc-sso-widget-status.loading {
               background: #e0f2fe;
               color: #0369a1;
               border: 1px solid #7dd3fc;
@@ -166,12 +153,6 @@
               background: #9ca3af;
               cursor: not-allowed;
             }
-            .hc-sso-widget-button.auth-required {
-              background: #f59e0b;
-            }
-            .hc-sso-widget-button.auth-required:hover {
-              background: #d97706;
-            }
             .hc-sso-widget-button svg {
               margin-right: 8px;
               width: 16px;
@@ -195,10 +176,10 @@
               color: #dc2626;
               border: 1px solid #fecaca;
             }
-            .hc-sso-widget-message.warning {
-              background: #fef3c7;
-              color: #92400e;
-              border: 1px solid #fcd34d;
+            .hc-sso-widget-message.info {
+              background: #e0f2fe;
+              color: #0369a1;
+              border: 1px solid #7dd3fc;
             }
             @keyframes spin {
               from { transform: rotate(0deg); }
@@ -218,26 +199,20 @@
             <span class="hc-sso-widget-badge">SSO</span>
           </div>
 
-          <div id="hc-sso-status" class="hc-sso-widget-status auth-required">
-            <svg style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="m21,14-2.5-2.5-2.5,2.5"/>
-              <path d="M12 16c-4 0-8-4-8-8s4-8 8-8c1.5 0 3 .5 4 1"/>
-            </svg>
-            Authentication required
+          <div class="hc-sso-widget-info">
+            <strong>Secure Authentication:</strong> Sign in using your HappyCoins wallet credentials. Your login information is encrypted and secure.
           </div>
 
-          <button class="hc-sso-widget-button auth-required" id="hc-sso-button">
+          <button class="hc-sso-widget-button" id="hc-sso-button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
               <polyline points="10,17 15,12 10,7"/>
               <line x1="15" y1="12" x2="3" y2="12"/>
             </svg>
-            Sign In to HappyCoins
+            Authorize with HappyCoins
           </button>
 
-          <div id="hc-sso-message" class="hc-sso-widget-message warning" style="display: block;">
-            You must sign in to your HappyCoins account to use SSO authentication
-          </div>
+          <div id="hc-sso-message" class="hc-sso-widget-message" style="display: none;"></div>
         </div>
       `;
     },
@@ -245,9 +220,8 @@
     attachEventListeners: function(container, config) {
       const button = container.querySelector('#hc-sso-button');
       const messageDiv = container.querySelector('#hc-sso-message');
-      const statusDiv = container.querySelector('#hc-sso-status');
 
-      if (!button || !messageDiv || !statusDiv) {
+      if (!button || !messageDiv) {
         console.error('HappyCoins SSO Widget: Could not find required elements');
         return;
       }
@@ -315,8 +289,10 @@
         
         console.log('HappyCoins SSO Widget: Redirecting to:', authUrl);
         
-        // Use full page redirect instead of popup for better compatibility
-        window.location.href = authUrl;
+        // Direct redirect - simple and reliable
+        setTimeout(function() {
+          window.location.href = authUrl;
+        }, 500);
 
       } catch (error) {
         console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);
@@ -348,14 +324,14 @@
       if (!button) return;
       
       button.disabled = false;
-      button.className = 'hc-sso-widget-button auth-required';
+      button.className = 'hc-sso-widget-button';
       button.innerHTML = `
         <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
           <polyline points="10,17 15,12 10,7"/>
           <line x1="15" y1="12" x2="3" y2="12"/>
         </svg>
-        Sign In to HappyCoins
+        Authorize with HappyCoins
       `;
     }
   };
