@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -189,7 +190,7 @@ export function SSOWidget({
       
       console.log('SSO Widget: Redirecting to authorization:', authUrl);
       
-      // Direct redirect to authorization page
+      // Direct redirect (no popup)
       window.location.href = authUrl;
 
     } catch (error) {

@@ -2,7 +2,7 @@
 (function() {
   'use strict';
 
-  // HappyCoins SSO Widget with secure authentication
+  // HappyCoins SSO Widget with direct redirect (no popup)
   window.HappyCoinsSSOWidget = {
     render: function(containerId, config) {
       console.log('HappyCoins SSO Widget: Attempting to render in container:', containerId);
@@ -267,10 +267,10 @@
         <svg class="hc-sso-spin" style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12a9 9 0 11-6.219-8.56"/>
         </svg>
-        Opening...
+        Redirecting...
       `;
 
-      this.showMessage(messageDiv, 'Opening HappyCoins authentication...', 'info');
+      this.showMessage(messageDiv, 'Redirecting to HappyCoins authentication...', 'info');
 
       try {
         const params = new URLSearchParams({
@@ -287,70 +287,14 @@
         const baseUrl = this.getSupabaseUrl();
         const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString();
         
-        console.log('HappyCoins SSO Widget: Opening authorization window:', authUrl);
+        console.log('HappyCoins SSO Widget: Redirecting to authorization:', authUrl);
         
-        // Open authorization in a new window
-        const authWindow = window.open(
-          authUrl,
-          'happycoins-auth',
-          'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes'
-        );
-
-        if (!authWindow) {
-          throw new Error('Popup blocked - please allow popups for this site');
-        }
-
-        // Monitor the popup window
-        const checkClosed = setInterval(function() {
-          if (authWindow.closed) {
-            clearInterval(checkClosed);
-            HappyCoinsSSOWidget.resetButton(button, config);
-            HappyCoinsSSOWidget.showMessage(messageDiv, '', 'info');
-          }
-        }, 1000);
-
-        // Listen for messages from the popup window
-        const messageListener = function(event) {
-          if (event.origin !== baseUrl && event.origin !== window.location.origin) {
-            return;
-          }
-
-          if (event.data.type === 'HAPPYCOINS_AUTH_SUCCESS') {
-            clearInterval(checkClosed);
-            authWindow.close();
-            window.removeEventListener('message', messageListener);
-            
-            HappyCoinsSSOWidget.showMessage(messageDiv, 'Authentication successful!', 'success');
-            HappyCoinsSSOWidget.resetButton(button, config);
-            config.onSuccess(event.data.code);
-          } else if (event.data.type === 'HAPPYCOINS_AUTH_ERROR') {
-            clearInterval(checkClosed);
-            authWindow.close();
-            window.removeEventListener('message', messageListener);
-            
-            HappyCoinsSSOWidget.showMessage(messageDiv, event.data.error, 'error');
-            HappyCoinsSSOWidget.resetButton(button, config);
-            config.onError(event.data.error);
-          }
-        };
-
-        window.addEventListener('message', messageListener);
-
-        // Cleanup after 5 minutes
-        setTimeout(function() {
-          if (!authWindow.closed) {
-            authWindow.close();
-            clearInterval(checkClosed);
-            window.removeEventListener('message', messageListener);
-            HappyCoinsSSOWidget.showMessage(messageDiv, 'Authentication timed out', 'error');
-            HappyCoinsSSOWidget.resetButton(button, config);
-            config.onError('Authentication timed out');
-          }
-        }, 300000);
+        // Direct redirect (no popup)
+        window.location.href = authUrl;
 
       } catch (error) {
-        console.error('HappyCoins SSO Widget: Failed to open authentication window:', error);
-        this.showMessage(messageDiv, 'Failed to open authentication window: ' + error.message, 'error');
+        console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);
+        this.showMessage(messageDiv, 'Failed to initiate authentication: ' + error.message, 'error');
         this.resetButton(button, config);
         config.onError('Failed to initiate authentication: ' + error.message);
       }
@@ -387,31 +331,6 @@
         </svg>
         Authorize with HappyCoins
       `;
-    },
-
-    renderWhenReady: function(containerId, config, maxRetries = 10, retryDelay = 100) {
-      let retries = 0;
-      
-      const attemptRender = () => {
-        const container = document.getElementById(containerId);
-        if (container) {
-          this.render(containerId, config);
-        } else {
-          retries++;
-          if (retries < maxRetries) {
-            console.log('HappyCoins SSO Widget: Container not found, retrying in ' + retryDelay + 'ms... (attempt ' + retries + '/' + maxRetries + ')');
-            setTimeout(attemptRender, retryDelay);
-          } else {
-            console.error('HappyCoins SSO Widget: Container "' + containerId + '" not found after ' + maxRetries + ' attempts');
-          }
-        }
-      };
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', attemptRender);
-      } else {
-        attemptRender();
-      }
     },
 
     generateState: function() {
