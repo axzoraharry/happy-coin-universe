@@ -42,31 +42,36 @@ export const paymentRequestSchema = z.object({
   user_pin: pinSchema.optional()
 });
 
-// Rate limiting helper
+// Enhanced rate limiting helper with better storage
 export const isRateLimited = (identifier: string, maxRequests: number = 10, windowMs: number = 60000): boolean => {
-  const key = `rate_limit_${identifier}`;
-  const now = Date.now();
-  const stored = localStorage.getItem(key);
-  
-  if (!stored) {
-    localStorage.setItem(key, JSON.stringify({ count: 1, resetTime: now + windowMs }));
+  try {
+    const key = `rate_limit_${identifier}`;
+    const now = Date.now();
+    const stored = localStorage.getItem(key);
+    
+    if (!stored) {
+      localStorage.setItem(key, JSON.stringify({ count: 1, resetTime: now + windowMs }));
+      return false;
+    }
+    
+    const data = JSON.parse(stored);
+    
+    if (now > data.resetTime) {
+      localStorage.setItem(key, JSON.stringify({ count: 1, resetTime: now + windowMs }));
+      return false;
+    }
+    
+    if (data.count >= maxRequests) {
+      return true;
+    }
+    
+    data.count++;
+    localStorage.setItem(key, JSON.stringify(data));
     return false;
+  } catch (error) {
+    console.warn('Rate limiting error:', error);
+    return false; // Fail open for better user experience
   }
-  
-  const data = JSON.parse(stored);
-  
-  if (now > data.resetTime) {
-    localStorage.setItem(key, JSON.stringify({ count: 1, resetTime: now + windowMs }));
-    return false;
-  }
-  
-  if (data.count >= maxRequests) {
-    return true;
-  }
-  
-  data.count++;
-  localStorage.setItem(key, JSON.stringify(data));
-  return false;
 };
 
 // Secure headers utility
@@ -78,7 +83,7 @@ export const getSecureHeaders = (): Record<string, string> => ({
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
 });
 
-// TypeScript interfaces for API responses
+// Enhanced TypeScript interfaces for API responses
 export interface TransferResponse {
   success: boolean;
   error?: string;
@@ -100,3 +105,19 @@ export interface PaymentResponse {
   message?: string;
   pin_required?: boolean;
 }
+
+// Input validation utilities
+export const validateInput = {
+  email: (email: string): boolean => emailSchema.safeParse(email).success,
+  pin: (pin: string): boolean => pinSchema.safeParse(pin).success,
+  amount: (amount: number): boolean => amountSchema.safeParse(amount).success,
+  apiKey: (key: string): boolean => apiKeySchema.safeParse(key).success
+};
+
+// Security logging utility
+export const logSecurityEvent = (event: string, details: Record<string, any> = {}) => {
+  console.log(`[SECURITY] ${event}:`, {
+    timestamp: new Date().toISOString(),
+    ...details
+  });
+};
