@@ -43,13 +43,13 @@ export function SSOWidget({
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const { data: { user, session }, error } = await supabase.auth.getUser();
+        const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         
-        setUser(user);
+        setUser(session?.user || null);
         setAccessToken(session?.access_token || null);
         
-        if (!user) {
+        if (!session?.user) {
           setStatus('auth_required');
           setMessage('Please sign in to your HappyCoins account to continue');
         } else {
