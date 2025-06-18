@@ -296,7 +296,7 @@
         Redirecting...
       `;
 
-      this.showMessage(messageDiv, 'Redirecting to HappyCoins authentication...', 'info');
+      this.showMessage(messageDiv, 'Opening HappyCoins authentication...', 'info');
 
       try {
         const params = new URLSearchParams({
@@ -313,11 +313,10 @@
         const baseUrl = this.getSupabaseUrl();
         const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString();
         
-        console.log('HappyCoins SSO Widget: Redirecting to:', authUrl);
+        console.log('HappyCoins SSO Widget: Opening authorization URL:', authUrl);
         
-        setTimeout(function() {
-          window.location.href = authUrl;
-        }, 500);
+        // Open the authorization page in the same window
+        window.location.href = authUrl;
 
       } catch (error) {
         console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);
