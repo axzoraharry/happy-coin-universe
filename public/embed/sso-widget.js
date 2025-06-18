@@ -1,4 +1,3 @@
-
 (function() {
   'use strict';
 
@@ -315,18 +314,20 @@
         
         console.log('HappyCoins SSO Widget: Opening authorization popup:', authUrl);
         
-        // Open the authorization page in a popup window with proper settings
+        // Create a proper popup window with correct settings
         const popup = window.open(
-          authUrl,
+          '', // Empty URL initially
           'happycoins-sso',
-          'width=500,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,directories=no,status=no,titlebar=yes'
+          'width=500,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,directories=no,status=no,titlebar=yes,left=' + 
+          (window.screen.width / 2 - 250) + ',top=' + (window.screen.height / 2 - 350)
         );
 
         if (!popup) {
           throw new Error('Popup blocked. Please allow popups for this site.');
         }
 
-        // Focus the popup
+        // Navigate the popup to the authorization URL
+        popup.location.href = authUrl;
         popup.focus();
 
         // Monitor the popup for completion
