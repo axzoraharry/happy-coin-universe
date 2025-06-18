@@ -60,7 +60,7 @@ export function SecureTransferForm() {
 
       toast({
         title: "Transfer Successful",
-        description: `$${amount} sent to ${recipientEmail}. Reference: ${result.reference_id || 'N/A'}`,
+        description: `${amount} HC sent to ${recipientEmail}. Reference: ${result.reference_id || 'N/A'}`,
       });
 
       // Reset form
@@ -120,7 +120,7 @@ export function SecureTransferForm() {
             onCancel={handlePinCancel}
             isVerifying={loading}
             title="Authorize Transfer"
-            description={`Confirm transfer of $${amount} to ${recipientEmail}`}
+            description={`Confirm transfer of ${amount} HC to ${recipientEmail}`}
           />
         </CardContent>
       </Card>
@@ -132,11 +132,11 @@ export function SecureTransferForm() {
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Send className="h-5 w-5" />
-          <span>Secure Money Transfer</span>
+          <span>Secure Happy Coins Transfer</span>
           <Shield className="h-4 w-4 text-green-600" />
         </CardTitle>
         <CardDescription>
-          Transfer money securely with enhanced validation and rate limiting
+          Transfer Happy Coins securely with enhanced validation and rate limiting
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -161,7 +161,7 @@ export function SecureTransferForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount (max $10,000)</Label>
+            <Label htmlFor="amount">Amount (max 10,000 HC)</Label>
             <Input
               id="amount"
               type="number"
@@ -221,7 +221,7 @@ export function SecureTransferForm() {
 
           <Button type="submit" disabled={loading} className="w-full">
             <Send className="h-4 w-4 mr-2" />
-            {loading ? 'Processing Secure Transfer...' : 'Send Money Securely'}
+            {loading ? 'Processing Secure Transfer...' : 'Send Happy Coins Securely'}
           </Button>
         </form>
       </CardContent>
