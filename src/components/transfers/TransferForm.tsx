@@ -52,7 +52,7 @@ export function TransferForm() {
       if (recipientProfile.id === user.id) {
         toast({
           title: "Invalid Transfer",
-          description: "You cannot transfer money to yourself",
+          description: "You cannot transfer Happy Coins to yourself",
           variant: "destructive",
         });
         return;
@@ -141,20 +141,20 @@ export function TransferForm() {
           {
             user_id: user.id,
             title: 'Transfer Sent',
-            message: `$${amount} sent to ${recipientEmail}`,
+            message: `${amount} HC sent to ${recipientEmail}`,
             type: 'transaction'
           },
           {
             user_id: recipientProfile.id,
             title: 'Transfer Received',
-            message: `$${amount} received from ${user.email}`,
+            message: `${amount} HC received from ${user.email}`,
             type: 'transaction'
           }
         ]);
 
       toast({
         title: "Transfer Successful",
-        description: `$${amount} sent to ${recipientEmail}`,
+        description: `${amount} HC sent to ${recipientEmail}`,
       });
 
       // Reset form
@@ -183,9 +183,9 @@ export function TransferForm() {
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <ArrowLeftRight className="h-5 w-5" />
-          <span>Send Money</span>
+          <span>Send Happy Coins</span>
         </CardTitle>
-        <CardDescription>Transfer money to another user</CardDescription>
+        <CardDescription>Transfer Happy Coins to another user</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleTransfer} className="space-y-4">
@@ -202,7 +202,7 @@ export function TransferForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
+            <Label htmlFor="amount">Amount (Happy Coins)</Label>
             <Input
               id="amount"
               type="number"
@@ -228,7 +228,7 @@ export function TransferForm() {
 
           <Button type="submit" disabled={loading} className="w-full">
             <Send className="h-4 w-4 mr-2" />
-            {loading ? 'Processing Transfer...' : 'Send Money'}
+            {loading ? 'Processing Transfer...' : 'Send Happy Coins'}
           </Button>
         </form>
       </CardContent>

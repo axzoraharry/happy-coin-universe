@@ -69,7 +69,7 @@ export function useTransferProcessing() {
       if (recipient.id === user.id) {
         toast({
           title: "Invalid Transfer",
-          description: "You cannot transfer money to yourself",
+          description: "You cannot transfer Happy Coins to yourself",
           variant: "destructive",
         });
         return false;
