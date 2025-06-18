@@ -60,7 +60,7 @@ export function SecureTransferForm() {
 
       toast({
         title: "Transfer Successful",
-        description: `$${amount} sent to ${recipientEmail}. Reference: ${result.reference_id}`,
+        description: `$${amount} sent to ${recipientEmail}. Reference: ${result.reference_id || 'N/A'}`,
       });
 
       // Reset form

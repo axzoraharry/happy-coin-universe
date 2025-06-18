@@ -77,3 +77,26 @@ export const getSecureHeaders = (): Record<string, string> => ({
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
 });
+
+// TypeScript interfaces for API responses
+export interface TransferResponse {
+  success: boolean;
+  error?: string;
+  reference_id?: string;
+  sender_new_balance?: number;
+  recipient_new_balance?: number;
+  pin_verified?: boolean;
+  daily_limit_remaining?: number;
+}
+
+export interface PaymentResponse {
+  success: boolean;
+  error?: string;
+  payment_request_id?: string;
+  transaction_id?: string;
+  reference_id?: string;
+  new_balance?: number;
+  pin_verified?: boolean;
+  message?: string;
+  pin_required?: boolean;
+}

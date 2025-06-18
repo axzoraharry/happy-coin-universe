@@ -1,7 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { transferRequestSchema, paymentRequestSchema, isRateLimited, sanitizeInput } from './validation';
-import { useToast } from '@/hooks/use-toast';
+import { transferRequestSchema, paymentRequestSchema, isRateLimited, sanitizeInput, TransferResponse, PaymentResponse } from './validation';
 
 interface SecureTransferOptions {
   recipientEmail: string;
@@ -30,7 +29,7 @@ export class SecureApiClient {
     return SecureApiClient.instance;
   }
 
-  async secureTransfer(options: SecureTransferOptions) {
+  async secureTransfer(options: SecureTransferOptions): Promise<TransferResponse> {
     // Rate limiting check
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Authentication required');
@@ -72,12 +71,15 @@ export class SecureApiClient {
     });
 
     if (error) throw new Error(error.message);
-    if (!data?.success) throw new Error(data?.error || 'Transfer failed');
+    
+    // Type assertion for the response
+    const result = data as TransferResponse;
+    if (!result?.success) throw new Error(result?.error || 'Transfer failed');
 
-    return data;
+    return result;
   }
 
-  async secureExternalPayment(options: SecurePaymentOptions) {
+  async secureExternalPayment(options: SecurePaymentOptions): Promise<PaymentResponse> {
     // Input validation
     const validatedData = paymentRequestSchema.parse({
       external_order_id: sanitizeInput(options.external_order_id),
@@ -102,7 +104,9 @@ export class SecureApiClient {
     });
 
     if (error) throw error;
-    return data;
+    
+    // Type assertion for the response
+    return data as PaymentResponse;
   }
 
   async validateApiKey(apiKey: string): Promise<boolean> {
