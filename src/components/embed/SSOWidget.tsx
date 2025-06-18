@@ -93,16 +93,19 @@ export function SSOWidget({
       
       console.log('SSO Widget: Opening authorization window:', authUrl);
       
-      // Open authorization in a new window instead of popup
+      // Open authorization in a popup window with specific features for better HTML rendering
       const authWindow = window.open(
         authUrl,
         'happycoins-auth',
-        'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes'
+        'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,menubar=no,toolbar=no'
       );
 
       if (!authWindow) {
         throw new Error('Popup blocked - please allow popups for this site');
       }
+
+      // Focus the popup window
+      authWindow.focus();
 
       // Monitor the popup window
       const checkClosed = setInterval(() => {
@@ -116,6 +119,7 @@ export function SSOWidget({
 
       // Listen for messages from the popup window
       const messageListener = (event: MessageEvent) => {
+        // Allow messages from the Supabase domain and our own domain
         if (event.origin !== supabaseUrl && event.origin !== window.location.origin) {
           return;
         }

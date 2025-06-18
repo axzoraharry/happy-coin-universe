@@ -78,10 +78,46 @@ async function handleAuthorize(req: Request, supabase: any) {
 
     if (!clientId || !redirectUri) {
       console.error('Missing required parameters:', { clientId: !!clientId, redirectUri: !!redirectUri });
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameters: client_id and redirect_uri' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Invalid Request - HappyCoins SSO</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
+            .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
+            .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
+            .retry-button { 
+              background: #007bff; color: white; padding: 12px 24px; 
+              text-decoration: none; border-radius: 5px; display: inline-block;
+              font-weight: bold; border: none; cursor: pointer;
+            }
+            .retry-button:hover { background: #0056b3; }
+          </style>
+        </head>
+        <body>
+          <div class="error-container">
+            <h1 class="error-title">Invalid Request</h1>
+            <p class="error-message">Missing required parameters: client_id and redirect_uri</p>
+            <button onclick="window.close()" class="retry-button">Close Window</button>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      return new Response(errorHtml, {
+        status: 400,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
     }
 
     // Verify API key/client_id exists and is active
@@ -97,18 +133,20 @@ async function handleAuthorize(req: Request, supabase: any) {
       
       const errorHtml = `
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Invalid Client - HappyCoins SSO</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; }
+            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
             .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
             .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
             .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
             .retry-button { 
               background: #007bff; color: white; padding: 12px 24px; 
               text-decoration: none; border-radius: 5px; display: inline-block;
-              font-weight: bold;
+              font-weight: bold; border: none; cursor: pointer;
             }
             .retry-button:hover { background: #0056b3; }
           </style>
@@ -117,7 +155,7 @@ async function handleAuthorize(req: Request, supabase: any) {
           <div class="error-container">
             <h1 class="error-title">Invalid Application</h1>
             <p class="error-message">The application you're trying to connect to is not authorized or has been disabled. Please contact the application provider.</p>
-            <a href="javascript:window.close()" class="retry-button">Close Window</a>
+            <button onclick="window.close()" class="retry-button">Close Window</button>
           </div>
         </body>
         </html>
@@ -126,8 +164,10 @@ async function handleAuthorize(req: Request, supabase: any) {
       return new Response(errorHtml, {
         status: 401,
         headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/html'
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
       });
     }
@@ -142,18 +182,20 @@ async function handleAuthorize(req: Request, supabase: any) {
         
         const errorHtml = `
           <!DOCTYPE html>
-          <html>
+          <html lang="en">
           <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Invalid Redirect - HappyCoins SSO</title>
             <style>
-              body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; }
+              body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
               .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
               .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
               .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
               .retry-button { 
                 background: #007bff; color: white; padding: 12px 24px; 
                 text-decoration: none; border-radius: 5px; display: inline-block;
-                font-weight: bold;
+                font-weight: bold; border: none; cursor: pointer;
               }
               .retry-button:hover { background: #0056b3; }
             </style>
@@ -162,7 +204,7 @@ async function handleAuthorize(req: Request, supabase: any) {
             <div class="error-container">
               <h1 class="error-title">Invalid Redirect URL</h1>
               <p class="error-message">The redirect URL is not authorized for this application. Please contact the application provider.</p>
-              <a href="javascript:window.close()" class="retry-button">Close Window</a>
+              <button onclick="window.close()" class="retry-button">Close Window</button>
             </div>
           </body>
           </html>
@@ -171,8 +213,10 @@ async function handleAuthorize(req: Request, supabase: any) {
         return new Response(errorHtml, {
           status: 400,
           headers: {
-            ...corsHeaders,
-            'Content-Type': 'text/html'
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
         });
       }
@@ -182,13 +226,15 @@ async function handleAuthorize(req: Request, supabase: any) {
     const baseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const authorizationHtml = `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Authorize with HappyCoins</title>
         <style>
           body { 
-            font-family: Arial, sans-serif; 
-            padding: 40px; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            padding: 20px; 
             text-align: center; 
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
@@ -196,13 +242,16 @@ async function handleAuthorize(req: Request, supabase: any) {
             display: flex;
             align-items: center;
             justify-content: center;
+            box-sizing: border-box;
           }
           .auth-container { 
             max-width: 400px; 
+            width: 100%;
             background: white; 
             padding: 40px; 
             border-radius: 15px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-sizing: border-box;
           }
           .logo { 
             font-size: 32px; 
@@ -258,6 +307,8 @@ async function handleAuthorize(req: Request, supabase: any) {
             display: inline-block;
             margin-top: 15px;
             font-size: 14px;
+            border: none;
+            cursor: pointer;
           }
           .cancel-button:hover {
             background: #5a6268;
@@ -288,9 +339,9 @@ async function handleAuthorize(req: Request, supabase: any) {
             Continue to HappyCoins Login
           </button>
           
-          <a href="${redirectUri}?error=access_denied&state=${state || ''}" class="cancel-button">
+          <button class="cancel-button" onclick="cancelAuth()">
             Cancel
-          </a>
+          </button>
           
           <div class="security-note">
             You will be redirected to HappyCoins to sign in. After signing in, you'll be brought back to authorize this application.
@@ -311,6 +362,26 @@ async function handleAuthorize(req: Request, supabase: any) {
             // Redirect to the actual HappyCoins application for authentication
             window.location.href = '${baseUrl}/?sso_auth=true&return_to=' + encodeURIComponent(window.location.href);
           }
+          
+          function cancelAuth() {
+            const redirectUrl = '${redirectUri}?error=access_denied' + (${state ? `'&state=${state}'` : `''`});
+            
+            // Send message to parent window and close popup
+            if (window.opener) {
+              window.opener.postMessage({
+                type: 'HAPPYCOINS_AUTH_ERROR',
+                error: 'User cancelled authorization'
+              }, '*');
+              window.close();
+            } else {
+              window.location.href = redirectUrl;
+            }
+          }
+          
+          // Handle potential communication with parent window
+          window.addEventListener('load', function() {
+            console.log('Authorization page loaded successfully');
+          });
         </script>
       </body>
       </html>
@@ -319,17 +390,57 @@ async function handleAuthorize(req: Request, supabase: any) {
     return new Response(authorizationHtml, {
       status: 200,
       headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/html'
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'X-Content-Type-Options': 'nosniff'
       }
     });
 
   } catch (error) {
     console.error('Error in handleAuthorize:', error);
-    return new Response(
-      JSON.stringify({ error: 'Authorization failed', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    
+    const errorHtml = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Error - HappyCoins SSO</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
+          .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
+          .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
+          .retry-button { 
+            background: #007bff; color: white; padding: 12px 24px; 
+            text-decoration: none; border-radius: 5px; display: inline-block;
+            font-weight: bold; border: none; cursor: pointer;
+          }
+          .retry-button:hover { background: #0056b3; }
+        </style>
+      </head>
+      <body>
+        <div class="error-container">
+          <h1 class="error-title">Authorization Error</h1>
+          <p class="error-message">An error occurred during authorization. Please try again.</p>
+          <button onclick="window.close()" class="retry-button">Close Window</button>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    return new Response(errorHtml, {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   }
 }
 
