@@ -350,22 +350,17 @@ async function handleAuthorize(req: Request, supabase: any) {
         
         <script>
           function authorizeApp() {
-            // Create a unique session ID for this authorization request
-            const sessionId = 'sso_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-            
-            // Store authorization request details in sessionStorage with the session ID
-            sessionStorage.setItem(sessionId, JSON.stringify({
-              client_id: '${clientId}',
-              redirect_uri: '${redirectUri}',
-              scope: '${scope}',
-              state: '${state || ''}',
-              app_name: '${apiKey.application_name || 'Application'}'
-            }));
+            // Create a temporary authorization record to store the request details
+            const tempAuthId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substring(2);
             
             // Build the return URL to complete the SSO flow after login
             const currentUrl = new URL(window.location.href);
             const returnUrl = currentUrl.origin + currentUrl.pathname.replace('/authorize', '/complete') + 
-              '?session_id=' + encodeURIComponent(sessionId);
+              '?temp_auth_id=' + encodeURIComponent(tempAuthId) +
+              '&client_id=' + encodeURIComponent('${clientId}') +
+              '&redirect_uri=' + encodeURIComponent('${redirectUri}') +
+              '&scope=' + encodeURIComponent('${scope}') +
+              '&state=' + encodeURIComponent('${state || ''}');
             
             console.log('Redirecting to HappyCoins with return URL:', returnUrl);
             
@@ -449,137 +444,56 @@ async function handleComplete(req: Request, supabase: any) {
   try {
     const url = new URL(req.url);
     const userId = url.searchParams.get('user_id');
-    const sessionId = url.searchParams.get('session_id');
+    const tempAuthId = url.searchParams.get('temp_auth_id');
+    const clientId = url.searchParams.get('client_id');
+    const redirectUri = url.searchParams.get('redirect_uri');
+    const scope = url.searchParams.get('scope');
+    const state = url.searchParams.get('state');
     
-    console.log('SSO Complete request:', { userId, sessionId });
+    console.log('SSO Complete request:', { userId, tempAuthId, clientId, redirectUri, scope, state });
     
-    if (!sessionId) {
-      console.error('Missing session_id parameter');
-      return new Response('Missing session ID', { status: 400 });
+    if (!tempAuthId || !clientId || !redirectUri || !userId) {
+      console.error('Missing required parameters for completion');
+      return new Response('Missing required parameters', { status: 400 });
     }
     
-    // Return a page that retrieves the stored auth request from sessionStorage
-    const completeHtml = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Completing Authorization - HappyCoins SSO</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            padding: 40px; 
-            text-align: center; 
-            background: #f5f5f5; 
-            margin: 0; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-          }
-          .loading-container { 
-            max-width: 400px; 
-            background: white; 
-            padding: 40px; 
-            border-radius: 10px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-          }
-          .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-          }
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          .message {
-            color: #666;
-            margin-bottom: 20px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="loading-container">
-          <div class="spinner"></div>
-          <div class="message">Completing your authorization...</div>
-          <div id="status"></div>
-        </div>
-        
-        <script>
-          async function completeAuthorization() {
-            try {
-              const sessionId = '${sessionId}';
-              const userId = '${userId || ''}';
-              
-              console.log('Completing authorization with session ID:', sessionId);
-              
-              // Get stored auth request from sessionStorage
-              const storedRequest = sessionStorage.getItem(sessionId);
-              if (!storedRequest) {
-                throw new Error('No stored authorization request found');
-              }
-              
-              const authRequest = JSON.parse(storedRequest);
-              console.log('Retrieved auth request:', authRequest);
-              
-              // Clear the stored request
-              sessionStorage.removeItem(sessionId);
-              
-              if (!userId) {
-                throw new Error('User ID not provided - authentication may have failed');
-              }
-              
-              // Generate authorization code
-              const authCode = 'ac_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-              
-              // Store authorization code temporarily in sessionStorage for the token exchange
-              const codeData = {
-                code: authCode,
-                user_id: userId,
-                client_id: authRequest.client_id,
-                redirect_uri: authRequest.redirect_uri,
-                scope: authRequest.scope,
-                state: authRequest.state,
-                expires_at: Date.now() + (10 * 60 * 1000) // 10 minutes
-              };
-              
-              sessionStorage.setItem('auth_code_' + authCode, JSON.stringify(codeData));
-              
-              // Build the final redirect URL to the application's redirect_uri
-              const finalRedirectUrl = new URL(authRequest.redirect_uri);
-              finalRedirectUrl.searchParams.set('code', authCode);
-              if (authRequest.state) {
-                finalRedirectUrl.searchParams.set('state', authRequest.state);
-              }
-              
-              console.log('Redirecting to application redirect_uri:', finalRedirectUrl.toString());
-              
-              // Redirect back to the application with the authorization code
-              window.location.href = finalRedirectUrl.toString();
-              
-            } catch (error) {
-              console.error('Error completing authorization:', error);
-              document.getElementById('status').innerHTML = '<div style="color: red;">Error: ' + error.message + '</div>';
-            }
-          }
-          
-          // Start the completion process
-          completeAuthorization();
-        </script>
-      </body>
-      </html>
-    `;
+    // Generate authorization code
+    const authCode = 'ac_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+    const expiresAt = new Date(Date.now() + (10 * 60 * 1000)); // 10 minutes
     
-    return new Response(completeHtml, {
-      status: 200,
+    // Store the authorization code in the database
+    const { error: insertError } = await supabase
+      .from('sso_auth_codes')
+      .insert({
+        code: authCode,
+        user_id: userId,
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scope: scope || 'profile email',
+        state: state || null,
+        expires_at: expiresAt.toISOString(),
+        used: false
+      });
+    
+    if (insertError) {
+      console.error('Error storing authorization code:', insertError);
+      return new Response('Failed to generate authorization code', { status: 500 });
+    }
+    
+    // Build the final redirect URL to the application's redirect_uri
+    const finalRedirectUrl = new URL(redirectUri);
+    finalRedirectUrl.searchParams.set('code', authCode);
+    if (state) {
+      finalRedirectUrl.searchParams.set('state', state);
+    }
+    
+    console.log('SSO Complete: Redirecting to application redirect_uri:', finalRedirectUrl.toString());
+    
+    // Direct redirect to the application's redirect_uri
+    return new Response(null, {
+      status: 302,
       headers: {
-        'Content-Type': 'text/html; charset=utf-8',
+        'Location': finalRedirectUrl.toString(),
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
