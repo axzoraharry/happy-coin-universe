@@ -56,13 +56,16 @@ export function SSOWidget({
     checkAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user || null);
       if (session?.user) {
         if (status === 'unauthenticated') {
           setStatus('idle');
           setMessage('');
         }
+        
+        // Check if we need to complete SSO flow after login
+        await checkAndCompleteSSOFlow(session.user);
       } else {
         setStatus('unauthenticated');
         setMessage('Please log in to your HappyCoins account first');
@@ -71,6 +74,53 @@ export function SSOWidget({
 
     return () => subscription.unsubscribe();
   }, [status]);
+
+  const checkAndCompleteSSOFlow = async (user: any) => {
+    // Check if there's a pending SSO auth request
+    const ssoRequest = sessionStorage.getItem('sso_auth_request');
+    if (ssoRequest) {
+      try {
+        const authRequest = JSON.parse(ssoRequest);
+        console.log('Completing SSO flow for user:', user.id, 'with request:', authRequest);
+        
+        // Clear the stored request
+        sessionStorage.removeItem('sso_auth_request');
+        
+        // Complete the SSO authorization
+        await completeSSOAuthorization(user.id, authRequest);
+      } catch (error) {
+        console.error('Error completing SSO flow:', error);
+      }
+    }
+  };
+
+  const completeSSOAuthorization = async (userId: string, authRequest: any) => {
+    try {
+      setProcessing(true);
+      setStatus('processing');
+      setMessage('Completing authorization...');
+      
+      const params = new URLSearchParams({
+        user_id: userId,
+        sso_request: encodeURIComponent(JSON.stringify(authRequest))
+      });
+      
+      const supabaseUrl = getSupabaseUrl();
+      const completeUrl = `${supabaseUrl}/functions/v1/sso-auth/complete?${params.toString()}`;
+      
+      console.log('Completing SSO authorization:', completeUrl);
+      
+      // Redirect to complete the SSO flow
+      window.location.href = completeUrl;
+      
+    } catch (error) {
+      console.error('Error completing SSO authorization:', error);
+      setStatus('error');
+      setMessage('Failed to complete authorization: ' + (error as Error).message);
+      setProcessing(false);
+      onError?.('Failed to complete authorization');
+    }
+  };
 
   useEffect(() => {
     // Check for auth callback on component mount
@@ -152,7 +202,16 @@ export function SSOWidget({
   };
 
   const handleLoginPrompt = () => {
-    // Redirect to login page or show login modal
+    // Store the SSO request details before redirecting to login
+    sessionStorage.setItem('sso_auth_request', JSON.stringify({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: scope,
+      state: state || '',
+      app_name: appName
+    }));
+    
+    // Redirect to login page
     window.location.href = '/';
   };
 

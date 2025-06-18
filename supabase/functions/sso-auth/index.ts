@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -50,6 +49,8 @@ serve(async (req) => {
       return await handleUserInfo(req, supabaseClient);
     } else if (path.endsWith('/callback')) {
       return await handleCallback(req, supabaseClient);
+    } else if (path.endsWith('/complete')) {
+      return await handleComplete(req, supabaseClient);
     }
 
     return new Response(
@@ -441,6 +442,74 @@ async function handleAuthorize(req: Request, supabase: any) {
         'Expires': '0'
       }
     });
+  }
+}
+
+async function handleComplete(req: Request, supabase: any) {
+  try {
+    const url = new URL(req.url);
+    const userId = url.searchParams.get('user_id');
+    
+    console.log('SSO Complete request:', { userId });
+    
+    // Get SSO auth request from query params or session
+    const ssoRequest = url.searchParams.get('sso_request');
+    
+    if (!ssoRequest) {
+      return new Response('Missing SSO request data', { status: 400 });
+    }
+    
+    const authRequest = JSON.parse(decodeURIComponent(ssoRequest));
+    const { client_id, redirect_uri, scope, state } = authRequest;
+    
+    if (!userId || !client_id || !redirect_uri) {
+      return new Response('Missing required parameters', { status: 400 });
+    }
+    
+    // Generate authorization code
+    const authCode = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    
+    // Store authorization code in database
+    const { error: insertError } = await supabase
+      .from('sso_auth_codes')
+      .insert({
+        code: authCode,
+        user_id: userId,
+        client_id: client_id,
+        redirect_uri: redirect_uri,
+        scope: scope,
+        state: state,
+        expires_at: expiresAt.toISOString()
+      });
+    
+    if (insertError) {
+      console.error('Error storing auth code:', insertError);
+      return new Response('Failed to generate authorization code', { status: 500 });
+    }
+    
+    // Redirect back to the application with the authorization code
+    const finalRedirectUrl = new URL(redirect_uri);
+    finalRedirectUrl.searchParams.set('code', authCode);
+    if (state) {
+      finalRedirectUrl.searchParams.set('state', state);
+    }
+    
+    console.log('Redirecting to:', finalRedirectUrl.toString());
+    
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': finalRedirectUrl.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in handleComplete:', error);
+    return new Response('Internal server error', { status: 500 });
   }
 }
 
