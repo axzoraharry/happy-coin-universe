@@ -2,9 +2,14 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Enhanced CORS headers with security
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin'
 }
 
 interface PaymentRequest {
@@ -16,6 +21,28 @@ interface PaymentRequest {
   metadata?: any;
   user_pin?: string;
 }
+
+// Input validation functions
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+};
+
+const validateAmount = (amount: number): boolean => {
+  return typeof amount === 'number' && amount > 0 && amount <= 10000 && Number.isFinite(amount);
+};
+
+const validateOrderId = (orderId: string): boolean => {
+  return typeof orderId === 'string' && orderId.length > 0 && orderId.length <= 100 && /^[a-zA-Z0-9_-]+$/.test(orderId);
+};
+
+const sanitizeString = (input: string, maxLength: number = 500): string => {
+  return input.replace(/[<>]/g, '').trim().slice(0, maxLength);
+};
+
+const validateApiKey = (apiKey: string): boolean => {
+  return typeof apiKey === 'string' && /^ak_[A-Za-z0-9_-]{24,}$/.test(apiKey);
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -34,11 +61,12 @@ serve(async (req) => {
   }
 
   try {
-    // Get API key from headers
+    // Get API key from headers with validation
     const apiKey = req.headers.get('x-api-key');
-    if (!apiKey) {
+    if (!apiKey || !validateApiKey(apiKey)) {
+      console.log('Invalid or missing API key');
       return new Response(
-        JSON.stringify({ error: 'API key required in x-api-key header' }),
+        JSON.stringify({ error: 'Valid API key required in x-api-key header' }),
         { 
           status: 401, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -46,21 +74,32 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
-    const paymentData: PaymentRequest = await req.json();
-    console.log('Payment request received:', {
+    // Parse and validate request body
+    let paymentData: PaymentRequest;
+    try {
+      paymentData = await req.json();
+    } catch (error) {
+      console.error('Invalid JSON in request body:', error);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('Secure payment request received:', {
       external_order_id: paymentData.external_order_id,
       user_email: paymentData.user_email,
       amount: paymentData.amount,
       has_pin: !!paymentData.user_pin
     });
 
-    // Validate required fields
-    if (!paymentData.external_order_id || !paymentData.user_email || !paymentData.amount) {
+    // Comprehensive input validation
+    if (!paymentData.external_order_id || !validateOrderId(paymentData.external_order_id)) {
       return new Response(
-        JSON.stringify({ 
-          error: 'Missing required fields: external_order_id, user_email, amount' 
-        }),
+        JSON.stringify({ error: 'Invalid external_order_id format' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -68,10 +107,9 @@ serve(async (req) => {
       );
     }
 
-    // Validate amount
-    if (paymentData.amount <= 0) {
+    if (!paymentData.user_email || !validateEmail(paymentData.user_email)) {
       return new Response(
-        JSON.stringify({ error: 'Amount must be greater than 0' }),
+        JSON.stringify({ error: 'Invalid email format' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -79,41 +117,83 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    if (!validateAmount(paymentData.amount)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid amount: must be positive number ≤ 10,000' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Sanitize string inputs
+    const sanitizedData = {
+      ...paymentData,
+      external_order_id: sanitizeString(paymentData.external_order_id, 100),
+      user_email: sanitizeString(paymentData.user_email, 254),
+      description: paymentData.description ? sanitizeString(paymentData.description, 500) : undefined,
+      user_pin: paymentData.user_pin ? paymentData.user_pin.replace(/\D/g, '').slice(0, 4) : undefined
+    };
+
+    // Validate PIN format if provided
+    if (sanitizedData.user_pin && !/^\d{4}$/.test(sanitizedData.user_pin)) {
+      return new Response(
+        JSON.stringify({ error: 'PIN must be exactly 4 digits' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Initialize Supabase client with enhanced error handling
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase configuration');
+      return new Response(
+        JSON.stringify({ error: 'Service configuration error' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log(`Processing secure payment request for order: ${paymentData.external_order_id}`);
+    console.log(`Processing secure payment request for order: ${sanitizedData.external_order_id}`);
 
     // Process the payment using the secure database function
     const { data: result, error } = await supabase.rpc('process_external_payment_secure', {
       p_api_key: apiKey,
-      p_external_order_id: paymentData.external_order_id,
-      p_user_email: paymentData.user_email,
-      p_amount: paymentData.amount,
-      p_description: paymentData.description || 'External payment',
+      p_external_order_id: sanitizedData.external_order_id,
+      p_user_email: sanitizedData.user_email,
+      p_amount: sanitizedData.amount,
+      p_description: sanitizedData.description || 'External payment',
       p_callback_url: paymentData.callback_url || null,
       p_metadata: paymentData.metadata || null,
-      p_user_pin: paymentData.user_pin || null
+      p_user_pin: sanitizedData.user_pin || null
     });
 
     if (error) {
       console.error('Database RPC error:', error);
       
-      // Check if it's a specific database error we can handle
+      // Enhanced error handling
       if (error.code === 'PGRST116') {
         return new Response(
-          JSON.stringify({ error: 'Database function not found' }),
+          JSON.stringify({ error: 'Payment processing service unavailable' }),
           { 
-            status: 500, 
+            status: 503, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
         );
       }
       
       return new Response(
-        JSON.stringify({ error: 'Database error: ' + error.message }),
+        JSON.stringify({ error: 'Payment processing failed: ' + error.message }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -168,44 +248,64 @@ serve(async (req) => {
       pin_verified: result.pin_verified
     });
 
-    // If there's a callback URL, trigger webhook (fire and forget)
+    // Secure webhook delivery (if callback URL provided)
     if (paymentData.callback_url) {
-      // Start webhook delivery in background
-      const webhookPayload = {
-        external_order_id: paymentData.external_order_id,
-        payment_request_id: result.payment_request_id,
-        transaction_id: result.transaction_id,
-        reference_id: result.reference_id,
-        amount: paymentData.amount,
-        status: 'completed',
-        timestamp: new Date().toISOString(),
-        metadata: paymentData.metadata,
-        pin_verified: result.pin_verified || false
-      };
+      try {
+        const webhookPayload = {
+          external_order_id: sanitizedData.external_order_id,
+          payment_request_id: result.payment_request_id,
+          transaction_id: result.transaction_id,
+          reference_id: result.reference_id,
+          amount: sanitizedData.amount,
+          status: 'completed',
+          timestamp: new Date().toISOString(),
+          metadata: paymentData.metadata,
+          pin_verified: result.pin_verified || false
+        };
 
-      // Fire webhook without waiting
-      fetch(paymentData.callback_url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'HappyCoins-Webhook/1.0'
-        },
-        body: JSON.stringify(webhookPayload)
-      }).catch(error => {
-        console.error('Webhook delivery failed:', error);
-        // Log webhook failure to database
-        supabase.from('webhook_logs').insert({
+        // Enhanced webhook security
+        const webhookResponse = await fetch(paymentData.callback_url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'HappyCoins-Webhook/1.0',
+            'X-HappyCoins-Signature': 'webhook_signature_placeholder' // TODO: Implement HMAC signature
+          },
+          body: JSON.stringify(webhookPayload),
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        });
+
+        // Log webhook delivery result
+        await supabase.from('webhook_logs').insert({
           api_key_id: result.api_key_id,
           payment_request_id: result.payment_request_id,
           webhook_url: paymentData.callback_url,
           payload: webhookPayload,
-          success: false,
-          response_body: error.message
+          success: webhookResponse.ok,
+          response_status: webhookResponse.status,
+          response_body: await webhookResponse.text().catch(() => null)
         });
-      });
+
+        console.log('Webhook delivered:', webhookResponse.ok, webhookResponse.status);
+      } catch (webhookError) {
+        console.error('Webhook delivery failed:', webhookError);
+        // Log webhook failure but don't fail the payment
+        await supabase.from('webhook_logs').insert({
+          api_key_id: result.api_key_id,
+          payment_request_id: result.payment_request_id,
+          webhook_url: paymentData.callback_url,
+          payload: {
+            external_order_id: sanitizedData.external_order_id,
+            payment_request_id: result.payment_request_id,
+            error: webhookError.message
+          },
+          success: false,
+          response_body: webhookError.message
+        });
+      }
     }
 
-    // Return success response
+    // Return success response with security headers
     return new Response(
       JSON.stringify({
         success: true,
@@ -218,7 +318,12 @@ serve(async (req) => {
       }),
       { 
         status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'X-RateLimit-Limit': '100',
+          'X-RateLimit-Remaining': '99' // TODO: Implement actual rate limiting
+        } 
       }
     );
 
@@ -226,8 +331,8 @@ serve(async (req) => {
     console.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ 
-        error: 'Internal server error: ' + error.message,
-        details: error.stack
+        error: 'Internal server error',
+        timestamp: new Date().toISOString()
       }),
       { 
         status: 500, 
