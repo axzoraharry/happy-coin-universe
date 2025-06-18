@@ -72,9 +72,8 @@ async function handleAuthorize(req: Request, supabase: any) {
     const redirectUri = url.searchParams.get('redirect_uri');
     const scope = url.searchParams.get('scope') || 'profile email';
     const state = url.searchParams.get('state');
-    const accessTokenFromUrl = url.searchParams.get('access_token');
 
-    console.log('SSO Authorize request:', { clientId, redirectUri, scope, state, hasUrlToken: !!accessTokenFromUrl });
+    console.log('SSO Authorize request:', { clientId, redirectUri, scope, state });
 
     if (!clientId || !redirectUri) {
       console.error('Missing required parameters:', { clientId: !!clientId, redirectUri: !!redirectUri });
@@ -84,112 +83,52 @@ async function handleAuthorize(req: Request, supabase: any) {
       );
     }
 
-    // Get auth token from request headers or URL parameter
-    let token = null;
-    const authHeader = req.headers.get('Authorization');
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else if (accessTokenFromUrl) {
-      token = accessTokenFromUrl;
-    }
-
-    if (!token) {
-      console.error('No valid authorization token found');
-      
-      // Create a proper error page instead of redirect loop
-      const errorHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Authentication Required - HappyCoins SSO</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
-            .error-container { max-width: 500px; margin: 0 auto; }
-            .error-title { color: #dc3545; margin-bottom: 20px; }
-            .error-message { margin-bottom: 30px; }
-            .retry-button { 
-              background: #007bff; color: white; padding: 10px 20px; 
-              text-decoration: none; border-radius: 5px; display: inline-block;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="error-container">
-            <h1 class="error-title">Authentication Required</h1>
-            <p class="error-message">You must be signed in to your HappyCoins account to use SSO authentication.</p>
-            <a href="/" class="retry-button">Go to HappyCoins Login</a>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      return new Response(errorHtml, {
-        status: 401,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/html'
-        }
-      });
-    }
-
-    // Verify the user is authenticated by checking the token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Invalid user token:', authError);
-      
-      const errorHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Invalid Token - HappyCoins SSO</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
-            .error-container { max-width: 500px; margin: 0 auto; }
-            .error-title { color: #dc3545; margin-bottom: 20px; }
-            .error-message { margin-bottom: 30px; }
-            .retry-button { 
-              background: #007bff; color: white; padding: 10px 20px; 
-              text-decoration: none; border-radius: 5px; display: inline-block;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="error-container">
-            <h1 class="error-title">Authentication Expired</h1>
-            <p class="error-message">Your authentication token has expired. Please sign in again.</p>
-            <a href="/" class="retry-button">Go to HappyCoins Login</a>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      return new Response(errorHtml, {
-        status: 401,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/html'
-        }
-      });
-    }
-
-    console.log('Authenticated user:', user.id);
-
     // Verify API key/client_id exists and is active
-    const { data: apiKey, error } = await supabase
+    const { data: apiKey, error: apiKeyError } = await supabase
       .from('api_keys')
       .select('*')
       .eq('api_key', clientId)
       .eq('is_active', true)
       .single();
 
-    if (error || !apiKey) {
-      console.error('Invalid client_id:', clientId, error);
-      return new Response(
-        JSON.stringify({ error: 'Invalid client_id' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (apiKeyError || !apiKey) {
+      console.error('Invalid client_id:', clientId, apiKeyError);
+      
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invalid Client - HappyCoins SSO</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; }
+            .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
+            .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
+            .retry-button { 
+              background: #007bff; color: white; padding: 12px 24px; 
+              text-decoration: none; border-radius: 5px; display: inline-block;
+              font-weight: bold;
+            }
+            .retry-button:hover { background: #0056b3; }
+          </style>
+        </head>
+        <body>
+          <div class="error-container">
+            <h1 class="error-title">Invalid Application</h1>
+            <p class="error-message">The application you're trying to connect to is not authorized or has been disabled. Please contact the application provider.</p>
+            <a href="javascript:window.close()" class="retry-button">Close Window</a>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      return new Response(errorHtml, {
+        status: 401,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/html'
+        }
+      });
     }
 
     // Check if redirect_uri is allowed
@@ -199,53 +138,187 @@ async function handleAuthorize(req: Request, supabase: any) {
       
       if (!isAllowed) {
         console.error('Invalid redirect_uri:', redirectUri, 'Allowed domains:', apiKey.allowed_domains);
-        return new Response(
-          JSON.stringify({ error: 'Invalid redirect_uri' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        
+        const errorHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Invalid Redirect - HappyCoins SSO</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; }
+              .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+              .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
+              .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
+              .retry-button { 
+                background: #007bff; color: white; padding: 12px 24px; 
+                text-decoration: none; border-radius: 5px; display: inline-block;
+                font-weight: bold;
+              }
+              .retry-button:hover { background: #0056b3; }
+            </style>
+          </head>
+          <body>
+            <div class="error-container">
+              <h1 class="error-title">Invalid Redirect URL</h1>
+              <p class="error-message">The redirect URL is not authorized for this application. Please contact the application provider.</p>
+              <a href="javascript:window.close()" class="retry-button">Close Window</a>
+            </div>
+          </body>
+          </html>
+        `;
+        
+        return new Response(errorHtml, {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'text/html'
+          }
+        });
       }
     }
 
-    // Generate authorization code
-    const authCode = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    // Create an authorization page that redirects to HappyCoins login
+    const authorizationHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Authorize with HappyCoins</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            padding: 40px; 
+            text-align: center; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .auth-container { 
+            max-width: 400px; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+          }
+          .logo { 
+            font-size: 32px; 
+            font-weight: bold; 
+            color: #333; 
+            margin-bottom: 10px;
+          }
+          .subtitle { 
+            color: #666; 
+            margin-bottom: 30px; 
+            font-size: 16px;
+          }
+          .app-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+          }
+          .app-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+          }
+          .permissions {
+            color: #666;
+            font-size: 14px;
+          }
+          .auth-button { 
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white; 
+            padding: 15px 30px; 
+            text-decoration: none; 
+            border-radius: 25px; 
+            display: inline-block;
+            font-weight: bold;
+            font-size: 16px;
+            transition: transform 0.2s;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            box-sizing: border-box;
+          }
+          .auth-button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+          }
+          .cancel-button {
+            background: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 15px;
+            font-size: 14px;
+          }
+          .cancel-button:hover {
+            background: #5a6268;
+          }
+          .security-note {
+            font-size: 12px;
+            color: #999;
+            margin-top: 20px;
+            line-height: 1.4;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="auth-container">
+          <div class="logo">🪙 HappyCoins</div>
+          <div class="subtitle">Secure Digital Wallet</div>
+          
+          <div class="app-info">
+            <div class="app-name">${apiKey.application_name}</div>
+            <div class="permissions">Requesting access to: ${scope}</div>
+          </div>
+          
+          <p style="color: #333; margin-bottom: 30px;">
+            "${apiKey.application_name}" wants to connect to your HappyCoins account.
+          </p>
+          
+          <button class="auth-button" onclick="authorizeApp()">
+            Continue to HappyCoins
+          </button>
+          
+          <a href="${redirectUri}?error=access_denied&state=${state || ''}" class="cancel-button">
+            Cancel
+          </a>
+          
+          <div class="security-note">
+            You will be redirected to HappyCoins to sign in. After signing in, you'll be brought back to authorize this application.
+          </div>
+        </div>
+        
+        <script>
+          function authorizeApp() {
+            // Store authorization request details
+            sessionStorage.setItem('sso_auth_request', JSON.stringify({
+              client_id: '${clientId}',
+              redirect_uri: '${redirectUri}',
+              scope: '${scope}',
+              state: '${state || ''}',
+              app_name: '${apiKey.application_name}'
+            }));
+            
+            // Redirect to HappyCoins main page where user can sign in
+            window.location.href = '${Deno.env.get('SUPABASE_URL')}/?sso_auth=true';
+          }
+        </script>
+      </body>
+      </html>
+    `;
 
-    // Store authorization code with the authenticated user ID
-    const { error: insertError } = await supabase.from('sso_auth_codes').insert({
-      code: authCode,
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      scope: scope,
-      state: state,
-      user_id: user.id, // Store the actual authenticated user ID
-      expires_at: expiresAt.toISOString(),
-      used: false
-    });
-
-    if (insertError) {
-      console.error('Failed to store auth code:', insertError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate authorization code' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('Auth code stored successfully for user:', user.id);
-
-    // Redirect back to the application with the authorization code
-    const finalRedirectUrl = new URL(redirectUri);
-    finalRedirectUrl.searchParams.set('code', authCode);
-    if (state) {
-      finalRedirectUrl.searchParams.set('state', state);
-    }
-
-    console.log('Final redirect to:', finalRedirectUrl.toString());
-
-    return new Response(null, {
-      status: 302,
+    return new Response(authorizationHtml, {
+      status: 200,
       headers: {
         ...corsHeaders,
-        'Location': finalRedirectUrl.toString()
+        'Content-Type': 'text/html'
       }
     });
 

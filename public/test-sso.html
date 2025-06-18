@@ -1,0 +1,158 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HappyCoins SSO Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .widget-container {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            background: #fafafa;
+        }
+        .code-block {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🪙 HappyCoins SSO Integration Test</h1>
+        
+        <div class="info status">
+            <strong>Test Instructions:</strong>
+            <ol>
+                <li>Make sure you have a valid API key created in your HappyCoins account</li>
+                <li>Update the clientId below with your actual API key</li>
+                <li>Update the redirectUri to match your application's callback URL</li>
+                <li>Click the SSO widget to test the authentication flow</li>
+            </ol>
+        </div>
+
+        <div class="widget-container">
+            <h3>SSO Widget Test</h3>
+            <div id="happycoins-sso-widget"></div>
+        </div>
+
+        <div class="code-block">
+            <strong>Configuration:</strong><br>
+            Client ID: test-client-123<br>
+            Redirect URI: https://example.com/callback<br>
+            Scope: profile email<br>
+            Theme: light
+        </div>
+
+        <div id="status-messages"></div>
+    </div>
+
+    <!-- Load the SSO Widget -->
+    <script src="https://zygpupmeradizrachnqj.supabase.co/storage/v1/object/public/public/embed/sso-widget.js"></script>
+    
+    <script>
+        // Configuration for the SSO widget
+        const ssoConfig = {
+            clientId: 'test-client-123', // Replace with your actual API key
+            redirectUri: window.location.origin + window.location.pathname, // This page
+            scope: 'profile email',
+            appName: 'Test Application',
+            theme: 'light',
+            compact: false,
+            onSuccess: function(authCode) {
+                addStatusMessage('Success! Authorization code received: ' + authCode, 'success');
+                console.log('SSO Success - Auth Code:', authCode);
+                
+                // You would typically exchange this code for an access token
+                // using your backend server and the /token endpoint
+            },
+            onError: function(error) {
+                addStatusMessage('SSO Error: ' + error, 'error');
+                console.error('SSO Error:', error);
+            }
+        };
+
+        // Function to add status messages
+        function addStatusMessage(message, type) {
+            const statusDiv = document.getElementById('status-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type + ' status';
+            messageDiv.innerHTML = '<strong>' + new Date().toLocaleTimeString() + ':</strong> ' + message;
+            statusDiv.appendChild(messageDiv);
+        }
+
+        // Initialize the SSO widget when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                addStatusMessage('Initializing HappyCoins SSO Widget...', 'info');
+                
+                // Check if the widget library loaded
+                if (typeof HappyCoinsSSOWidget === 'undefined') {
+                    addStatusMessage('Failed to load SSO widget library', 'error');
+                    return;
+                }
+
+                // Render the widget
+                HappyCoinsSSOWidget.render('happycoins-sso-widget', ssoConfig);
+                addStatusMessage('SSO Widget initialized successfully', 'success');
+                
+            } catch (error) {
+                addStatusMessage('Error initializing widget: ' + error.message, 'error');
+                console.error('Widget initialization error:', error);
+            }
+        });
+
+        // Check for auth callback on page load
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            const state = urlParams.get('state');
+
+            if (code) {
+                addStatusMessage('Authorization callback received with code: ' + code, 'success');
+                if (ssoConfig.onSuccess) {
+                    ssoConfig.onSuccess(code);
+                }
+            } else if (error) {
+                addStatusMessage('Authorization callback received with error: ' + error, 'error');
+                if (ssoConfig.onError) {
+                    ssoConfig.onError(error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
