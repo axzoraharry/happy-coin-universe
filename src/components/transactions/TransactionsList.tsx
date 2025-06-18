@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -201,7 +200,7 @@ export function TransactionsList() {
                 <div className="text-right space-y-1">
                   <p className={`font-bold text-lg ${getTransactionColor(transaction.transaction_type)}`}>
                     {(transaction.transaction_type === 'credit' || transaction.transaction_type === 'transfer_in') ? '+' : '-'}
-                    ${transaction.amount.toFixed(2)}
+                    {transaction.amount.toFixed(2)} HC
                   </p>
                   {getStatusBadge(transaction.status)}
                   {transaction.reference_id && (
