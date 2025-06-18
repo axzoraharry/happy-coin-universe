@@ -240,6 +240,33 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          identifier: string
+          requests: number
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          identifier: string
+          requests?: number
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          identifier?: string
+          requests?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       referrals: {
         Row: {
           bonus_awarded: boolean
@@ -594,6 +621,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_rate_limits: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       delete_user_completely: {
         Args: { p_user_id: string }
         Returns: Json
@@ -658,6 +689,16 @@ export type Database = {
         }
         Returns: Json
       }
+      process_secure_wallet_transfer_v2: {
+        Args: {
+          sender_id: string
+          recipient_id: string
+          transfer_amount: number
+          transfer_description?: string
+          sender_pin?: string
+        }
+        Returns: Json
+      }
       process_wallet_transfer: {
         Args: {
           sender_id: string
@@ -678,6 +719,14 @@ export type Database = {
       set_secure_transaction_pin: {
         Args: { p_user_id: string; p_pin: string }
         Returns: Json
+      }
+      validate_api_key_format: {
+        Args: { p_api_key: string }
+        Returns: boolean
+      }
+      validate_redirect_uri: {
+        Args: { p_uri: string; p_allowed_domains: string[] }
+        Returns: boolean
       }
       verify_transaction_pin: {
         Args: { p_user_id: string; p_pin: string }
