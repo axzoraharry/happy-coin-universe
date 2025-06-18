@@ -315,16 +315,19 @@
         
         console.log('HappyCoins SSO Widget: Opening authorization popup:', authUrl);
         
-        // Open the authorization page in a popup window
+        // Open the authorization page in a popup window with proper settings
         const popup = window.open(
           authUrl,
           'happycoins-sso',
-          'width=500,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,directories=no,status=no'
+          'width=500,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,directories=no,status=no,titlebar=yes'
         );
 
         if (!popup) {
           throw new Error('Popup blocked. Please allow popups for this site.');
         }
+
+        // Focus the popup
+        popup.focus();
 
         // Monitor the popup for completion
         this.monitorPopup(popup, config, button, messageDiv);
@@ -340,14 +343,46 @@
     monitorPopup: function(popup, config, button, messageDiv) {
       const self = this;
       let checkClosed;
+      let hasCompleted = false;
+
+      const completeAuth = function(code, error) {
+        if (hasCompleted) return;
+        hasCompleted = true;
+        
+        clearInterval(checkClosed);
+        
+        if (!popup.closed) {
+          popup.close();
+        }
+
+        if (code) {
+          console.log('HappyCoins SSO Widget: Authentication successful');
+          button.innerHTML = `
+            <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            Authentication Complete
+          `;
+          button.className = 'hc-sso-widget-button';
+          button.style.background = '#10b981';
+          self.showMessage(messageDiv, 'Authentication successful!', 'success');
+          config.onSuccess(code);
+        } else if (error) {
+          console.error('HappyCoins SSO Widget: Authentication error:', error);
+          self.showMessage(messageDiv, 'Authentication failed: ' + error, 'error');
+          self.resetButton(button, config);
+          config.onError(error);
+        } else {
+          console.log('HappyCoins SSO Widget: Authentication cancelled');
+          self.showMessage(messageDiv, 'Authentication cancelled', 'warning');
+          self.resetButton(button, config);
+        }
+      };
 
       const checkCallback = function() {
         try {
           if (popup.closed) {
-            clearInterval(checkClosed);
-            console.log('HappyCoins SSO Widget: Popup closed');
-            self.resetButton(button, config);
-            self.showMessage(messageDiv, 'Authentication cancelled', 'warning');
+            completeAuth(null, null);
             return;
           }
 
@@ -362,45 +397,23 @@
 
           // Check if we're back to our redirect URI
           if (popupUrl && popupUrl.startsWith(config.redirectUri)) {
-            clearInterval(checkClosed);
-            
             // Parse the callback URL for code/error
             const urlParams = new URLSearchParams(popup.location.search);
             const code = urlParams.get('code');
             const error = urlParams.get('error');
             const returnedState = urlParams.get('state');
 
-            popup.close();
-
             if (code) {
               if (config.state && returnedState !== config.state) {
                 console.error('HappyCoins SSO Widget: Invalid state parameter');
-                self.showMessage(messageDiv, 'Invalid state parameter', 'error');
-                config.onError('Invalid state parameter');
-                self.resetButton(button, config);
+                completeAuth(null, 'Invalid state parameter');
                 return;
               }
-
-              console.log('HappyCoins SSO Widget: Authentication successful');
-              button.innerHTML = `
-                <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 6L9 17l-5-5"/>
-                </svg>
-                Authentication Complete
-              `;
-              button.className = 'hc-sso-widget-button';
-              button.style.background = '#10b981';
-              self.showMessage(messageDiv, 'Authentication successful!', 'success');
-              config.onSuccess(code);
+              completeAuth(code, null);
             } else if (error) {
-              console.error('HappyCoins SSO Widget: Authentication error:', error);
-              self.showMessage(messageDiv, 'Authentication failed: ' + error, 'error');
-              self.resetButton(button, config);
-              config.onError(error);
+              completeAuth(null, error);
             } else {
-              console.log('HappyCoins SSO Widget: No code or error in callback');
-              self.showMessage(messageDiv, 'Authentication cancelled', 'warning');
-              self.resetButton(button, config);
+              completeAuth(null, null);
             }
           }
         } catch (error) {
@@ -413,14 +426,8 @@
 
       // Also set a timeout to prevent infinite checking
       setTimeout(function() {
-        if (checkClosed) {
-          clearInterval(checkClosed);
-          if (!popup.closed) {
-            popup.close();
-          }
-          self.resetButton(button, config);
-          self.showMessage(messageDiv, 'Authentication timeout', 'error');
-          config.onError('Authentication timeout');
+        if (!hasCompleted) {
+          completeAuth(null, 'Authentication timeout');
         }
       }, 300000); // 5 minutes timeout
     },
