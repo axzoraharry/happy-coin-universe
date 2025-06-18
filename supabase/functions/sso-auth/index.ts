@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -223,6 +224,27 @@ async function handleAuthorize(req: Request, supabase: any) {
       }
     }
 
+    // Store the SSO request in the database for later retrieval
+    const ssoRequestId = 'sso_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+    
+    const { error: insertError } = await supabase
+      .from('sso_auth_codes')
+      .insert({
+        code: ssoRequestId,
+        user_id: null, // Will be filled when user completes auth
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scope: scope,
+        state: state || null,
+        expires_at: new Date(Date.now() + (10 * 60 * 1000)).toISOString(), // 10 minutes
+        used: false
+      });
+
+    if (insertError) {
+      console.error('Error storing SSO request:', insertError);
+      return new Response('Failed to initialize SSO request', { status: 500 });
+    }
+
     // Create an authorization page that redirects to HappyCoins for authentication
     const authorizationHtml = `
       <!DOCTYPE html>
@@ -350,17 +372,10 @@ async function handleAuthorize(req: Request, supabase: any) {
         
         <script>
           function authorizeApp() {
-            // Create a temporary authorization record to store the request details
-            const tempAuthId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-            
             // Build the return URL to complete the SSO flow after login
             const currentUrl = new URL(window.location.href);
             const returnUrl = currentUrl.origin + currentUrl.pathname.replace('/authorize', '/complete') + 
-              '?temp_auth_id=' + encodeURIComponent(tempAuthId) +
-              '&client_id=' + encodeURIComponent('${clientId}') +
-              '&redirect_uri=' + encodeURIComponent('${redirectUri}') +
-              '&scope=' + encodeURIComponent('${scope}') +
-              '&state=' + encodeURIComponent('${state || ''}');
+              '?sso_request_id=' + encodeURIComponent('${ssoRequestId}');
             
             console.log('Redirecting to HappyCoins with return URL:', returnUrl);
             
@@ -444,33 +459,62 @@ async function handleComplete(req: Request, supabase: any) {
   try {
     const url = new URL(req.url);
     const userId = url.searchParams.get('user_id');
-    const tempAuthId = url.searchParams.get('temp_auth_id');
-    const clientId = url.searchParams.get('client_id');
-    const redirectUri = url.searchParams.get('redirect_uri');
-    const scope = url.searchParams.get('scope');
-    const state = url.searchParams.get('state');
+    const ssoRequestId = url.searchParams.get('sso_request_id');
     
-    console.log('SSO Complete request:', { userId, tempAuthId, clientId, redirectUri, scope, state });
+    console.log('SSO Complete request:', { userId, ssoRequestId });
     
-    if (!tempAuthId || !clientId || !redirectUri || !userId) {
+    if (!ssoRequestId || !userId) {
       console.error('Missing required parameters for completion');
       return new Response('Missing required parameters', { status: 400 });
     }
     
-    // Generate authorization code
+    // Get the stored SSO request
+    const { data: ssoRequest, error: ssoError } = await supabase
+      .from('sso_auth_codes')
+      .select('*')
+      .eq('code', ssoRequestId)
+      .eq('used', false)
+      .single();
+    
+    if (ssoError || !ssoRequest) {
+      console.error('SSO request not found or already used:', ssoRequestId, ssoError);
+      return new Response('Invalid or expired SSO request', { status: 400 });
+    }
+    
+    // Check if request is expired
+    if (new Date(ssoRequest.expires_at) < new Date()) {
+      console.error('SSO request expired:', ssoRequestId);
+      return new Response('SSO request has expired', { status: 400 });
+    }
+    
+    // Generate new authorization code for the actual OAuth flow
     const authCode = 'ac_' + Date.now() + '_' + Math.random().toString(36).substring(2);
     const expiresAt = new Date(Date.now() + (10 * 60 * 1000)); // 10 minutes
     
-    // Store the authorization code in the database
+    // Update the SSO request with user info and mark as used
+    const { error: updateError } = await supabase
+      .from('sso_auth_codes')
+      .update({
+        user_id: userId,
+        used: true
+      })
+      .eq('code', ssoRequestId);
+    
+    if (updateError) {
+      console.error('Error updating SSO request:', updateError);
+      return new Response('Failed to complete SSO request', { status: 500 });
+    }
+    
+    // Create a new authorization code entry for the OAuth token exchange
     const { error: insertError } = await supabase
       .from('sso_auth_codes')
       .insert({
         code: authCode,
         user_id: userId,
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        scope: scope || 'profile email',
-        state: state || null,
+        client_id: ssoRequest.client_id,
+        redirect_uri: ssoRequest.redirect_uri,
+        scope: ssoRequest.scope || 'profile email',
+        state: ssoRequest.state,
         expires_at: expiresAt.toISOString(),
         used: false
       });
@@ -481,10 +525,10 @@ async function handleComplete(req: Request, supabase: any) {
     }
     
     // Build the final redirect URL to the application's redirect_uri
-    const finalRedirectUrl = new URL(redirectUri);
+    const finalRedirectUrl = new URL(ssoRequest.redirect_uri);
     finalRedirectUrl.searchParams.set('code', authCode);
-    if (state) {
-      finalRedirectUrl.searchParams.set('state', state);
+    if (ssoRequest.state) {
+      finalRedirectUrl.searchParams.set('state', ssoRequest.state);
     }
     
     console.log('SSO Complete: Redirecting to application redirect_uri:', finalRedirectUrl.toString());
