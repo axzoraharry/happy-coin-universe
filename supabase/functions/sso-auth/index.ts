@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -177,7 +178,8 @@ async function handleAuthorize(req: Request, supabase: any) {
       }
     }
 
-    // Create an authorization page that redirects to HappyCoins login
+    // Create an authorization page that provides a proper login interface
+    const baseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const authorizationHtml = `
       <!DOCTYPE html>
       <html>
@@ -274,16 +276,16 @@ async function handleAuthorize(req: Request, supabase: any) {
           <div class="subtitle">Secure Digital Wallet</div>
           
           <div class="app-info">
-            <div class="app-name">${apiKey.application_name}</div>
+            <div class="app-name">${apiKey.application_name || 'Third-party Application'}</div>
             <div class="permissions">Requesting access to: ${scope}</div>
           </div>
           
           <p style="color: #333; margin-bottom: 30px;">
-            "${apiKey.application_name}" wants to connect to your HappyCoins account.
+            "${apiKey.application_name || 'This application'}" wants to connect to your HappyCoins account.
           </p>
           
           <button class="auth-button" onclick="authorizeApp()">
-            Continue to HappyCoins
+            Continue to HappyCoins Login
           </button>
           
           <a href="${redirectUri}?error=access_denied&state=${state || ''}" class="cancel-button">
@@ -297,17 +299,17 @@ async function handleAuthorize(req: Request, supabase: any) {
         
         <script>
           function authorizeApp() {
-            // Store authorization request details
+            // Store authorization request details in sessionStorage
             sessionStorage.setItem('sso_auth_request', JSON.stringify({
               client_id: '${clientId}',
               redirect_uri: '${redirectUri}',
               scope: '${scope}',
               state: '${state || ''}',
-              app_name: '${apiKey.application_name}'
+              app_name: '${apiKey.application_name || 'Application'}'
             }));
             
-            // Redirect to HappyCoins main page where user can sign in
-            window.location.href = '${Deno.env.get('SUPABASE_URL')}/?sso_auth=true';
+            // Redirect to the actual HappyCoins application for authentication
+            window.location.href = '${baseUrl}/?sso_auth=true&return_to=' + encodeURIComponent(window.location.href);
           }
         </script>
       </body>

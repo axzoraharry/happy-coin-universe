@@ -218,23 +218,26 @@
             <span class="hc-sso-widget-badge">SSO</span>
           </div>
 
-          <div id="hc-sso-status" class="hc-sso-widget-status loading">
-            <svg class="hc-sso-spin" style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 12a9 9 0 11-6.219-8.56"/>
+          <div id="hc-sso-status" class="hc-sso-widget-status auth-required">
+            <svg style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m21,14-2.5-2.5-2.5,2.5"/>
+              <path d="M12 16c-4 0-8-4-8-8s4-8 8-8c1.5 0 3 .5 4 1"/>
             </svg>
-            Checking authentication status...
+            Authentication required
           </div>
 
-          <button class="hc-sso-widget-button" id="hc-sso-button" disabled>
+          <button class="hc-sso-widget-button auth-required" id="hc-sso-button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
               <polyline points="10,17 15,12 10,7"/>
               <line x1="15" y1="12" x2="3" y2="12"/>
             </svg>
-            Loading...
+            Sign In to HappyCoins
           </button>
 
-          <div id="hc-sso-message" class="hc-sso-widget-message" style="display: none;"></div>
+          <div id="hc-sso-message" class="hc-sso-widget-message warning" style="display: block;">
+            You must sign in to your HappyCoins account to use SSO authentication
+          </div>
         </div>
       `;
     },
@@ -249,97 +252,9 @@
         return;
       }
 
-      // Check authentication status first
-      this.checkAuthenticationStatus(button, statusDiv, messageDiv, config);
-
       button.addEventListener('click', function() {
-        const isAuthRequired = button.classList.contains('auth-required');
-        if (isAuthRequired) {
-          HappyCoinsSSOWidget.redirectToLogin();
-        } else {
-          HappyCoinsSSOWidget.initiateAuth(button, messageDiv, config);
-        }
+        HappyCoinsSSOWidget.initiateAuth(button, messageDiv, config);
       });
-    },
-
-    checkAuthenticationStatus: function(button, statusDiv, messageDiv, config) {
-      // For embedded widgets, we need to check if user is authenticated with HappyCoins
-      // This is a simplified check - in a real implementation, you'd verify with your auth system
-      const baseUrl = this.getSupabaseUrl();
-      
-      // Try to check authentication by making a request to userinfo endpoint
-      // This is not a perfect solution for embedded widgets, but demonstrates the security principle
-      fetch(baseUrl + '/functions/v1/sso-auth/userinfo', {
-        method: 'GET',
-        headers: {
-          'Authorization': 'Bearer ' + (localStorage.getItem('supabase.auth.token') || ''),
-          'Content-Type': 'application/json'
-        }
-      }).then(response => {
-        if (response.ok) {
-          // User is authenticated
-          this.updateAuthenticatedState(button, statusDiv, messageDiv);
-        } else {
-          // User needs to authenticate
-          this.updateAuthRequiredState(button, statusDiv, messageDiv);
-        }
-      }).catch(error => {
-        console.log('Auth check failed, assuming authentication required:', error);
-        this.updateAuthRequiredState(button, statusDiv, messageDiv);
-      });
-    },
-
-    updateAuthenticatedState: function(button, statusDiv, messageDiv) {
-      statusDiv.className = 'hc-sso-widget-status authenticated';
-      statusDiv.innerHTML = `
-        <svg style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 12l2 2 4-4"/>
-          <circle cx="12" cy="12" r="10"/>
-        </svg>
-        Authenticated with HappyCoins
-      `;
-      
-      button.disabled = false;
-      button.classList.remove('auth-required');
-      button.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-          <polyline points="10,17 15,12 10,7"/>
-          <line x1="15" y1="12" x2="3" y2="12"/>
-        </svg>
-        Authorize Application
-      `;
-    },
-
-    updateAuthRequiredState: function(button, statusDiv, messageDiv) {
-      statusDiv.className = 'hc-sso-widget-status auth-required';
-      statusDiv.innerHTML = `
-        <svg style="width: 16px; height: 16px; display: inline-block; margin-right: 8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="m21,14-2.5-2.5-2.5,2.5"/>
-          <path d="M12 16c-4 0-8-4-8-8s4-8 8-8c1.5 0 3 .5 4 1"/>
-        </svg>
-        Authentication required
-      `;
-      
-      button.disabled = false;
-      button.classList.add('auth-required');
-      button.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-          <polyline points="10,17 15,12 10,7"/>
-          <line x1="15" y1="12" x2="3" y2="12"/>
-        </svg>
-        Sign In to HappyCoins
-      `;
-      
-      this.showMessage(messageDiv, 'You must sign in to your HappyCoins account to use SSO authentication', 'warning');
-    },
-
-    redirectToLogin: function() {
-      // Redirect to HappyCoins login page
-      // In a real implementation, this would be the actual HappyCoins login URL
-      const loginUrl = this.getSupabaseUrl();
-      window.open(loginUrl, '_blank');
     },
 
     checkForAuthCallback: function(config) {
@@ -413,13 +328,6 @@
     },
 
     getSupabaseUrl: function() {
-      if (typeof window !== 'undefined') {
-        const currentOrigin = window.location.origin;
-        if (currentOrigin.includes('happycoins') || currentOrigin.includes('supabase')) {
-          return currentOrigin;
-        }
-        return 'https://zygpupmeradizrachnqj.supabase.co';
-      }
       return 'https://zygpupmeradizrachnqj.supabase.co';
     },
 
@@ -441,13 +349,14 @@
       if (!button) return;
       
       button.disabled = false;
+      button.className = 'hc-sso-widget-button auth-required';
       button.innerHTML = `
         <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
           <polyline points="10,17 15,12 10,7"/>
           <line x1="15" y1="12" x2="3" y2="12"/>
         </svg>
-        ${config.compact ? 'Sign In' : 'Sign In with HappyCoins'}
+        Sign In to HappyCoins
       `;
     }
   };
