@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, LogIn, CheckCircle, XCircle, Shield, AlertTriangle } from 'lucide-react';
+import { Loader2, LogIn, CheckCircle, XCircle, Shield, AlertTriangle, User } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SSOWidgetProps {
   clientId: string;
@@ -28,13 +28,49 @@ export function SSOWidget({
   compact = false,
   appName = 'Application'
 }: SSOWidgetProps) {
-  const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error' | 'unauthenticated'>('idle');
   const [message, setMessage] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const getSupabaseUrl = () => {
-    return 'https://zygpupmeradizrachnqj.supabase.co';
-  };
+  useEffect(() => {
+    // Check authentication status
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+        if (!user) {
+          setStatus('unauthenticated');
+          setMessage('Please log in to your HappyCoins account first');
+        }
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+        setStatus('unauthenticated');
+        setMessage('Please log in to your HappyCoins account first');
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+      if (session?.user) {
+        if (status === 'unauthenticated') {
+          setStatus('idle');
+          setMessage('');
+        }
+      } else {
+        setStatus('unauthenticated');
+        setMessage('Please log in to your HappyCoins account first');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [status]);
 
   useEffect(() => {
     // Check for auth callback on component mount
@@ -64,7 +100,17 @@ export function SSOWidget({
     }
   }, [state, onSuccess, onError]);
 
+  const getSupabaseUrl = () => {
+    return 'https://zygpupmeradizrachnqj.supabase.co';
+  };
+
   const handleSignIn = async () => {
+    if (!user) {
+      setStatus('unauthenticated');
+      setMessage('Please log in to your HappyCoins account first');
+      return;
+    }
+
     if (!clientId || !redirectUri) {
       setStatus('error');
       setMessage('Missing required configuration');
@@ -74,7 +120,7 @@ export function SSOWidget({
 
     setProcessing(true);
     setStatus('processing');
-    setMessage('Opening HappyCoins authentication...');
+    setMessage('Redirecting to authorization...');
 
     try {
       const params = new URLSearchParams({
@@ -91,82 +137,23 @@ export function SSOWidget({
       const supabaseUrl = getSupabaseUrl();
       const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}`;
       
-      console.log('SSO Widget: Opening authorization window:', authUrl);
+      console.log('SSO Widget: Redirecting to authorization:', authUrl);
       
-      // Open authorization in a popup window with specific features for better HTML rendering
-      const authWindow = window.open(
-        authUrl,
-        'happycoins-auth',
-        'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,menubar=no,toolbar=no'
-      );
-
-      if (!authWindow) {
-        throw new Error('Popup blocked - please allow popups for this site');
-      }
-
-      // Focus the popup window
-      authWindow.focus();
-
-      // Monitor the popup window
-      const checkClosed = setInterval(() => {
-        if (authWindow.closed) {
-          clearInterval(checkClosed);
-          setProcessing(false);
-          setStatus('idle');
-          setMessage('');
-        }
-      }, 1000);
-
-      // Listen for messages from the popup window
-      const messageListener = (event: MessageEvent) => {
-        // Allow messages from the Supabase domain and our own domain
-        if (event.origin !== supabaseUrl && event.origin !== window.location.origin) {
-          return;
-        }
-
-        if (event.data.type === 'HAPPYCOINS_AUTH_SUCCESS') {
-          clearInterval(checkClosed);
-          authWindow.close();
-          window.removeEventListener('message', messageListener);
-          
-          setStatus('success');
-          setMessage('Authentication successful!');
-          setProcessing(false);
-          onSuccess?.(event.data.code);
-        } else if (event.data.type === 'HAPPYCOINS_AUTH_ERROR') {
-          clearInterval(checkClosed);
-          authWindow.close();
-          window.removeEventListener('message', messageListener);
-          
-          setStatus('error');
-          setMessage(event.data.error);
-          setProcessing(false);
-          onError?.(event.data.error);
-        }
-      };
-
-      window.addEventListener('message', messageListener);
-
-      // Cleanup after 5 minutes
-      setTimeout(() => {
-        if (!authWindow.closed) {
-          authWindow.close();
-          clearInterval(checkClosed);
-          window.removeEventListener('message', messageListener);
-          setProcessing(false);
-          setStatus('error');
-          setMessage('Authentication timed out');
-          onError?.('Authentication timed out');
-        }
-      }, 300000);
+      // Direct redirect to authorization page
+      window.location.href = authUrl;
 
     } catch (error) {
       console.error('SSO request failed:', error);
       setStatus('error');
-      setMessage('Failed to open authentication window: ' + (error as Error).message);
+      setMessage('Failed to initiate authorization: ' + (error as Error).message);
       setProcessing(false);
       onError?.('Failed to initiate authentication');
     }
+  };
+
+  const handleLoginPrompt = () => {
+    // Redirect to login page or show login modal
+    window.location.href = '/';
   };
 
   const getStatusIcon = () => {
@@ -177,6 +164,8 @@ export function SSOWidget({
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'error':
         return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'unauthenticated':
+        return <User className="h-4 w-4 text-orange-600" />;
       default:
         return <LogIn className="h-4 w-4" />;
     }
@@ -185,6 +174,17 @@ export function SSOWidget({
   const themeClasses = theme === 'dark' 
     ? 'bg-gray-900 text-white border-gray-700' 
     : 'bg-white text-gray-900 border-gray-200';
+
+  if (checkingAuth) {
+    return (
+      <div className={`p-4 rounded-lg border ${themeClasses} max-w-sm`}>
+        <div className="flex items-center justify-center space-x-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Checking authentication...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (compact) {
     return (
@@ -198,21 +198,33 @@ export function SSOWidget({
             <Badge variant="outline">SSO</Badge>
           </div>
           
-          <Button
-            onClick={handleSignIn}
-            disabled={processing || status === 'success'}
-            className="w-full"
-          >
-            {getStatusIcon()}
-            <span className="ml-2">
-              {processing ? 'Opening...' : status === 'success' ? 'Signed In' : 'Sign In'}
-            </span>
-          </Button>
+          {status === 'unauthenticated' ? (
+            <Button
+              onClick={handleLoginPrompt}
+              className="w-full"
+              variant="outline"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Log in to HappyCoins
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSignIn}
+              disabled={processing || status === 'success'}
+              className="w-full"
+            >
+              {getStatusIcon()}
+              <span className="ml-2">
+                {processing ? 'Redirecting...' : status === 'success' ? 'Authorized' : 'Authorize'}
+              </span>
+            </Button>
+          )}
           
           {message && (
             <p className={`text-xs ${
               status === 'error' ? 'text-red-600' : 
               status === 'success' ? 'text-green-600' : 
+              status === 'unauthenticated' ? 'text-orange-600' :
               'text-gray-600'
             }`}>
               {message}
@@ -241,27 +253,54 @@ export function SSOWidget({
             <span>Permissions:</span>
             <Badge variant="outline">{scope}</Badge>
           </div>
+          {user && (
+            <div className="flex justify-between">
+              <span>Logged in as:</span>
+              <span className="font-medium text-sm">{user.email}</span>
+            </div>
+          )}
         </div>
 
-        <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
-          <p className="text-sm text-blue-800">
-            <strong>Secure Authentication:</strong> Sign in using your HappyCoins wallet credentials. 
-            Your login information is encrypted and secure.
-          </p>
-        </div>
+        {status !== 'unauthenticated' && (
+          <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
+            <p className="text-sm text-blue-800">
+              <strong>Secure Authentication:</strong> Authorize this application to access your HappyCoins account. 
+              Your credentials remain secure.
+            </p>
+          </div>
+        )}
 
-        <Button
-          onClick={handleSignIn}
-          disabled={processing || status === 'success'}
-          className="w-full"
-        >
-          {getStatusIcon()}
-          <span className="ml-2">
-            {processing ? 'Opening Authentication...' : status === 'success' ? 'Authentication Complete' : 'Authorize with HappyCoins'}
-          </span>
-        </Button>
+        {status === 'unauthenticated' ? (
+          <div className="space-y-3">
+            <div className="border rounded-lg p-3 bg-orange-50 border-orange-200">
+              <p className="text-sm text-orange-800">
+                <strong>Authentication Required:</strong> You need to be logged in to your HappyCoins account 
+                before you can authorize this application.
+              </p>
+            </div>
+            <Button
+              onClick={handleLoginPrompt}
+              className="w-full"
+              variant="outline"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Log in to HappyCoins
+            </Button>
+          </div>
+        ) : (
+          <Button
+            onClick={handleSignIn}
+            disabled={processing || status === 'success'}
+            className="w-full"
+          >
+            {getStatusIcon()}
+            <span className="ml-2">
+              {processing ? 'Redirecting to Authorization...' : status === 'success' ? 'Authorization Complete' : 'Authorize with HappyCoins'}
+            </span>
+          </Button>
+        )}
 
-        {message && (
+        {message && status !== 'unauthenticated' && (
           <div className={`p-3 rounded text-sm ${
             status === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
             status === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
