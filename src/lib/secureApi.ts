@@ -72,8 +72,8 @@ export class SecureApiClient {
 
     if (error) throw new Error(error.message);
     
-    // Type assertion for the response
-    const result = data as TransferResponse;
+    // Safely cast the response by first going through unknown
+    const result = data as unknown as TransferResponse;
     if (!result?.success) throw new Error(result?.error || 'Transfer failed');
 
     return result;
@@ -105,8 +105,8 @@ export class SecureApiClient {
 
     if (error) throw error;
     
-    // Type assertion for the response
-    return data as PaymentResponse;
+    // Safely cast the response by first going through unknown
+    return data as unknown as PaymentResponse;
   }
 
   async validateApiKey(apiKey: string): Promise<boolean> {
