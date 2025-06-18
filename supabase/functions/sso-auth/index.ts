@@ -224,7 +224,6 @@ async function handleAuthorize(req: Request, supabase: any) {
     }
 
     // Create an authorization page that provides a proper login interface
-    const baseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const authorizationHtml = `
       <!DOCTYPE html>
       <html lang="en">
@@ -360,8 +359,18 @@ async function handleAuthorize(req: Request, supabase: any) {
               app_name: '${apiKey.application_name || 'Application'}'
             }));
             
-            // Redirect to the actual HappyCoins application for authentication
-            window.location.href = '${baseUrl}/?sso_auth=true&return_to=' + encodeURIComponent(window.location.href);
+            // Build the return URL to complete the SSO flow after login
+            const returnUrl = window.location.origin + window.location.pathname.replace('/authorize', '/complete') + 
+              '?sso_request=' + encodeURIComponent(JSON.stringify({
+                client_id: '${clientId}',
+                redirect_uri: '${redirectUri}',
+                scope: '${scope}',
+                state: '${state || ''}'
+              }));
+            
+            // Redirect to the HappyCoins application for authentication
+            const happyCoinsUrl = 'https://happy-wallet.axzoragroup.com/?sso_auth=true&return_to=' + encodeURIComponent(returnUrl);
+            window.location.href = happyCoinsUrl;
           }
           
           function cancelAuth() {
