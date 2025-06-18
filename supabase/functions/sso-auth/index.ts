@@ -71,8 +71,9 @@ async function handleAuthorize(req: Request, supabase: any) {
     const redirectUri = url.searchParams.get('redirect_uri');
     const scope = url.searchParams.get('scope') || 'profile email';
     const state = url.searchParams.get('state');
+    const accessTokenFromUrl = url.searchParams.get('access_token');
 
-    console.log('SSO Authorize request:', { clientId, redirectUri, scope, state });
+    console.log('SSO Authorize request:', { clientId, redirectUri, scope, state, hasUrlToken: !!accessTokenFromUrl });
 
     if (!clientId || !redirectUri) {
       return new Response(
@@ -81,27 +82,47 @@ async function handleAuthorize(req: Request, supabase: any) {
       );
     }
 
-    // Get auth token from request headers
+    // Get auth token from request headers or URL parameter
+    let token = null;
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('No valid authorization header found');
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (accessTokenFromUrl) {
+      token = accessTokenFromUrl;
     }
 
-    const token = authHeader.substring(7);
+    if (!token) {
+      console.error('No valid authorization token found');
+      
+      // Redirect to login page with return URL
+      const loginUrl = `${Deno.env.get('SUPABASE_URL') || 'https://zygpupmeradizrachnqj.supabase.co'}/?return_to=${encodeURIComponent(req.url)}`;
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': loginUrl
+        }
+      });
+    }
 
     // Verify the user is authenticated by checking the token
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
       console.error('Invalid user token:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired authentication token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      
+      // Redirect to login page
+      const loginUrl = `${Deno.env.get('SUPABASE_URL') || 'https://zygpupmeradizrachnqj.supabase.co'}/`;
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': loginUrl
+        }
+      });
     }
 
     console.log('Authenticated user:', user.id);

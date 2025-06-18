@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +33,7 @@ export function SSOWidget({
   const [processing, setProcessing] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const getSupabaseUrl = () => {
     return 'https://zygpupmeradizrachnqj.supabase.co';
@@ -43,18 +43,24 @@ export function SSOWidget({
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const { data: { user, session }, error } = await supabase.auth.getUser();
         if (error) throw error;
         
         setUser(user);
+        setAccessToken(session?.access_token || null);
+        
         if (!user) {
           setStatus('auth_required');
           setMessage('Please sign in to your HappyCoins account to continue');
+        } else {
+          setStatus('idle');
+          setMessage('');
         }
       } catch (error) {
         console.error('Auth check failed:', error);
         setStatus('auth_required');
         setMessage('Authentication required');
+        setAccessToken(null);
       } finally {
         setIsCheckingAuth(false);
       }
@@ -65,6 +71,8 @@ export function SSOWidget({
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
+      setAccessToken(session?.access_token || null);
+      
       if (session?.user) {
         setStatus('idle');
         setMessage('');
@@ -113,9 +121,10 @@ export function SSOWidget({
   };
 
   const handleSignIn = async () => {
-    if (!user) {
+    if (!user || !accessToken) {
       setStatus('auth_required');
       setMessage('Please sign in to your HappyCoins account first');
+      handleSignInRedirect();
       return;
     }
 
@@ -146,7 +155,49 @@ export function SSOWidget({
       const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}`;
       
       console.log('SSO Widget: Redirecting to:', authUrl);
-      window.location.href = authUrl;
+      console.log('SSO Widget: Using access token:', accessToken ? 'Present' : 'Missing');
+      
+      // Create a form to submit with authorization header
+      const form = document.createElement('form');
+      form.method = 'GET';
+      form.action = authUrl;
+      
+      // Add authorization as a header by using a hidden iframe approach
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      
+      // Make the request with proper authorization header
+      fetch(authUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        redirect: 'manual'
+      }).then(response => {
+        if (response.type === 'opaqueredirect' || response.status === 302) {
+          // Handle redirect manually
+          window.location.href = authUrl + `&token=${encodeURIComponent(accessToken)}`;
+        } else if (response.status === 401) {
+          setStatus('auth_required');
+          setMessage('Authentication expired. Please sign in again.');
+          setProcessing(false);
+          handleSignInRedirect();
+        } else {
+          return response.text().then(text => {
+            console.error('Unexpected response:', response.status, text);
+            setStatus('error');
+            setMessage('Authentication failed');
+            setProcessing(false);
+          });
+        }
+      }).catch(error => {
+        console.error('SSO request failed:', error);
+        // Fallback: redirect with token in URL (less secure but functional)
+        const urlWithToken = `${authUrl}&access_token=${encodeURIComponent(accessToken)}`;
+        window.location.href = urlWithToken;
+      });
 
     } catch (error) {
       setStatus('error');
