@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   transferRequestSchema, 
@@ -10,6 +9,7 @@ import {
   logSecurityEvent,
   validateInput
 } from './validation';
+import { securityMonitor } from './securityMonitor';
 
 interface SecureTransferOptions {
   recipientEmail: string;
@@ -39,6 +39,16 @@ export class SecureApiClient {
   }
 
   async secureTransfer(options: SecureTransferOptions): Promise<TransferResponse> {
+    // Record security event
+    securityMonitor.recordSecurityEvent({
+      eventType: 'transfer_attempt',
+      severity: 'low',
+      details: { 
+        recipientEmail: options.recipientEmail, 
+        amount: options.amount 
+      }
+    });
+
     logSecurityEvent('transfer_attempt', { 
       recipientEmail: options.recipientEmail, 
       amount: options.amount 
@@ -47,12 +57,24 @@ export class SecureApiClient {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      securityMonitor.recordSecurityEvent({
+        eventType: 'transfer_auth_failed',
+        severity: 'medium',
+        details: { error: authError?.message },
+        userId: user?.id
+      });
       logSecurityEvent('transfer_auth_failed', { error: authError?.message });
       throw new Error('Authentication required');
     }
 
     // Rate limiting check
     if (isRateLimited(`transfer_${user.id}`, 5, 300000)) { // 5 transfers per 5 minutes
+      securityMonitor.recordSecurityEvent({
+        eventType: 'transfer_rate_limited',
+        severity: 'high',
+        details: { userId: user.id },
+        userId: user.id
+      });
       logSecurityEvent('transfer_rate_limited', { userId: user.id });
       throw new Error('Rate limit exceeded. Please wait before making another transfer.');
     }
@@ -75,6 +97,16 @@ export class SecureApiClient {
         throw new Error('Invalid transfer amount');
       }
 
+      // Detect unusual transfer amounts
+      if (validatedData.amount > 5000) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'unusual_transfer_amount',
+          severity: 'medium',
+          details: { amount: validatedData.amount, recipientEmail: validatedData.recipientEmail },
+          userId: user.id
+        });
+      }
+
       // Find recipient user
       const { data: recipientProfile, error: recipientError } = await supabase
         .from('profiles')
@@ -83,11 +115,23 @@ export class SecureApiClient {
         .single();
 
       if (recipientError || !recipientProfile) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'transfer_recipient_not_found',
+          severity: 'low',
+          details: { email: validatedData.recipientEmail },
+          userId: user.id
+        });
         logSecurityEvent('transfer_recipient_not_found', { email: validatedData.recipientEmail });
         throw new Error('Recipient not found');
       }
 
       if (recipientProfile.id === user.id) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'transfer_self_attempt',
+          severity: 'medium',
+          details: { userId: user.id },
+          userId: user.id
+        });
         logSecurityEvent('transfer_self_attempt', { userId: user.id });
         throw new Error('Cannot transfer to yourself');
       }
@@ -102,6 +146,12 @@ export class SecureApiClient {
       });
 
       if (error) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'transfer_db_error',
+          severity: 'high',
+          details: { error: error.message },
+          userId: user.id
+        });
         logSecurityEvent('transfer_db_error', { error: error.message });
         throw new Error(error.message);
       }
@@ -109,9 +159,26 @@ export class SecureApiClient {
       // Safely cast the response
       const result = data as unknown as TransferResponse;
       if (!result?.success) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'transfer_failed',
+          severity: 'medium',
+          details: { error: result?.error },
+          userId: user.id
+        });
         logSecurityEvent('transfer_failed', { error: result?.error });
         throw new Error(result?.error || 'Transfer failed');
       }
+
+      securityMonitor.recordSecurityEvent({
+        eventType: 'transfer_success',
+        severity: 'low',
+        details: { 
+          referenceId: result.reference_id,
+          pinVerified: result.pin_verified,
+          amount: validatedData.amount
+        },
+        userId: user.id
+      });
 
       logSecurityEvent('transfer_success', { 
         referenceId: result.reference_id,
@@ -120,12 +187,28 @@ export class SecureApiClient {
 
       return result;
     } catch (validationError: any) {
+      securityMonitor.recordSecurityEvent({
+        eventType: 'transfer_validation_error',
+        severity: 'low',
+        details: { error: validationError.message },
+        userId: user?.id
+      });
       logSecurityEvent('transfer_validation_error', { error: validationError.message });
       throw validationError;
     }
   }
 
   async secureExternalPayment(options: SecurePaymentOptions): Promise<PaymentResponse> {
+    securityMonitor.recordSecurityEvent({
+      eventType: 'payment_attempt',
+      severity: 'low',
+      details: { 
+        orderId: options.external_order_id,
+        userEmail: options.user_email,
+        amount: options.amount 
+      }
+    });
+
     logSecurityEvent('payment_attempt', { 
       orderId: options.external_order_id,
       userEmail: options.user_email,
@@ -145,12 +228,22 @@ export class SecureApiClient {
 
       // API key validation
       if (!validateInput.apiKey(options.apiKey)) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'payment_invalid_api_key',
+          severity: 'high',
+          details: { apiKey: options.apiKey.substring(0, 10) + '...' }
+        });
         logSecurityEvent('payment_invalid_api_key', { apiKey: options.apiKey.substring(0, 10) + '...' });
         throw new Error('Invalid API key format');
       }
 
       // Rate limiting
       if (isRateLimited(`payment_${validatedData.user_email}`, 10, 60000)) { // 10 payments per minute
+        securityMonitor.recordSecurityEvent({
+          eventType: 'payment_rate_limited',
+          severity: 'high',
+          details: { userEmail: validatedData.user_email }
+        });
         logSecurityEvent('payment_rate_limited', { userEmail: validatedData.user_email });
         throw new Error('Rate limit exceeded for payment requests');
       }
@@ -164,6 +257,11 @@ export class SecureApiClient {
       });
 
       if (error) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'payment_edge_function_error',
+          severity: 'high',
+          details: { error: error.message }
+        });
         logSecurityEvent('payment_edge_function_error', { error: error.message });
         throw error;
       }
@@ -172,16 +270,34 @@ export class SecureApiClient {
       const result = data as unknown as PaymentResponse;
       
       if (result?.success) {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'payment_success',
+          severity: 'low',
+          details: { 
+            paymentRequestId: result.payment_request_id,
+            transactionId: result.transaction_id 
+          }
+        });
         logSecurityEvent('payment_success', { 
           paymentRequestId: result.payment_request_id,
           transactionId: result.transaction_id 
         });
       } else {
+        securityMonitor.recordSecurityEvent({
+          eventType: 'payment_failed',
+          severity: 'medium',
+          details: { error: result?.error }
+        });
         logSecurityEvent('payment_failed', { error: result?.error });
       }
 
       return result;
     } catch (validationError: any) {
+      securityMonitor.recordSecurityEvent({
+        eventType: 'payment_validation_error',
+        severity: 'low',
+        details: { error: validationError.message }
+      });
       logSecurityEvent('payment_validation_error', { error: validationError.message });
       throw validationError;
     }
@@ -198,6 +314,15 @@ export class SecureApiClient {
       });
       
       const isValid = data === true;
+      securityMonitor.recordSecurityEvent({
+        eventType: 'api_key_validation',
+        severity: 'low',
+        details: { 
+          apiKey: apiKey.substring(0, 10) + '...', 
+          isValid 
+        }
+      });
+      
       logSecurityEvent('api_key_validation', { 
         apiKey: apiKey.substring(0, 10) + '...', 
         isValid 
@@ -205,6 +330,14 @@ export class SecureApiClient {
       
       return isValid;
     } catch (error) {
+      securityMonitor.recordSecurityEvent({
+        eventType: 'api_key_validation_error',
+        severity: 'medium',
+        details: { 
+          apiKey: apiKey.substring(0, 10) + '...', 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        }
+      });
       logSecurityEvent('api_key_validation_error', { 
         apiKey: apiKey.substring(0, 10) + '...', 
         error: error instanceof Error ? error.message : 'Unknown error' 

@@ -14,6 +14,7 @@ import { DailyLoginBonus } from '@/components/offers/DailyLoginBonus';
 import { CoinExchange } from '@/components/coins/CoinExchange';
 import { PurchaseCoins } from '@/components/coins/PurchaseCoins';
 import { SSOGenerator } from '@/components/embed/SSOGenerator';
+import { RealTimeSecurityDashboard } from '@/components/security/RealTimeSecurityDashboard';
 import { useToast } from '@/hooks/use-toast';
 
 interface ReferralResponse {
@@ -158,6 +159,18 @@ const Index = () => {
                 <TransactionsList />
               </div>
             </div>
+          </div>
+        );
+      case 'security':
+        return (
+          <div className="space-y-8">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Security Center</h1>
+              <p className="text-muted-foreground">
+                Advanced security monitoring, threat detection, and account protection.
+              </p>
+            </div>
+            <RealTimeSecurityDashboard />
           </div>
         );
       case 'coins':
