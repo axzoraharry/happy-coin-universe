@@ -1,10 +1,10 @@
 
-import { WalletActions } from '../wallet/WalletActions';
+import { TransferForm } from './TransferForm';
 
 export function TransfersPage() {
   return (
     <div className="space-y-6">
-      <WalletActions />
+      <TransferForm />
     </div>
   );
 }
