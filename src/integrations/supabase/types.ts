@@ -81,6 +81,179 @@ export type Database = {
         }
         Relationships: []
       }
+      happy_auto_users: {
+        Row: {
+          created_at: string
+          id: number
+          preferences: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          preferences?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          preferences?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      happy_paisa_purchases: {
+        Row: {
+          amount_happy_paisa: number
+          amount_usd: number
+          created_at: string
+          exchange_rate: number
+          id: string
+          status: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount_happy_paisa: number
+          amount_usd: number
+          created_at?: string
+          exchange_rate?: number
+          id?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount_happy_paisa?: number
+          amount_usd?: number
+          created_at?: string
+          exchange_rate?: number
+          id?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      happy_paisa_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json | null
+          recipient_id: string | null
+          reference_id: string | null
+          status: string
+          transaction_type: string
+          user_id: string | null
+          wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          recipient_id?: string | null
+          reference_id?: string | null
+          status?: string
+          transaction_type: string
+          user_id?: string | null
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          recipient_id?: string | null
+          reference_id?: string | null
+          status?: string
+          transaction_type?: string
+          user_id?: string | null
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "happy_paisa_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "happy_paisa_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      happy_paisa_wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          id: string
+          total_purchased: number
+          total_spent: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          id?: string
+          total_purchased?: number
+          total_spent?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: string
+          total_purchased?: number
+          total_spent?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      network_data: {
+        Row: {
+          created_at: string | null
+          data: Json
+          id: string
+          name: string
+          segment: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data: Json
+          id?: string
+          name: string
+          segment?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          id?: string
+          name?: string
+          segment?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -589,6 +762,36 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          active_segment: string | null
+          created_at: string | null
+          id: string
+          preferred_layout: string | null
+          theme: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          active_segment?: string | null
+          created_at?: string | null
+          id?: string
+          preferred_layout?: string | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          active_segment?: string | null
+          created_at?: string | null
+          id?: string
+          preferred_layout?: string | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
@@ -765,6 +968,16 @@ export type Database = {
         }
         Returns: Json
       }
+      process_happy_paisa_purchase: {
+        Args: {
+          p_user_id: string
+          p_stripe_session_id: string
+          p_amount_usd: number
+          p_amount_happy_paisa: number
+          p_exchange_rate: number
+        }
+        Returns: Json
+      }
       process_referral: {
         Args: { p_referred_user_id: string; p_referral_code: string }
         Returns: Json
@@ -809,6 +1022,28 @@ export type Database = {
       set_secure_transaction_pin: {
         Args: { p_user_id: string; p_pin: string }
         Returns: Json
+      }
+      spend_happy_paisa: {
+        Args: {
+          p_user_id: string
+          p_amount: number
+          p_description: string
+          p_reference_id?: string
+        }
+        Returns: Json
+      }
+      transfer_happy_paisa: {
+        Args: {
+          p_sender_id: string
+          p_recipient_email: string
+          p_amount: number
+          p_description?: string
+        }
+        Returns: Json
+      }
+      update_user_preferences: {
+        Args: { new_preferences: Json }
+        Returns: undefined
       }
       validate_api_key_format: {
         Args: { p_api_key: string }

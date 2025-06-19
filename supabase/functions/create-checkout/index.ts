@@ -28,6 +28,8 @@ serve(async (req) => {
     const { amount, paymentMethod = 'card' } = await req.json();
     if (!amount || amount <= 0) throw new Error("Invalid amount");
 
+    console.log('Creating checkout for:', user.email, 'amount:', amount, 'HC');
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
@@ -42,9 +44,9 @@ serve(async (req) => {
     const amountInINR = amount * 1000;
 
     // Configure payment method types based on selection
-    // Note: 'upi' is not a valid Stripe payment method type
-    // For UPI-like functionality, we use 'card' but can add UPI-specific handling later
     const paymentMethodTypes = paymentMethod === 'upi' ? ['card'] : ['card'];
+
+    console.log('Creating Stripe session with amount:', amountInINR, 'INR for', amount, 'HC');
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -64,14 +66,16 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      success_url: `${req.headers.get("origin")}/coins?success=true`,
-      cancel_url: `${req.headers.get("origin")}/coins?canceled=true`,
+      success_url: `${req.headers.get("origin")}/?success=true`,
+      cancel_url: `${req.headers.get("origin")}/?canceled=true`,
       metadata: {
         user_id: user.id,
         happy_coins: amount.toString(),
         payment_method: paymentMethod,
       },
     });
+
+    console.log('Stripe session created:', session.id);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

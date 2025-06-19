@@ -6,18 +6,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Coins, Smartphone } from 'lucide-react';
+import { CreditCard, Coins, Smartphone, RefreshCw } from 'lucide-react';
 import { AccountStatusGuard } from '../common/AccountStatusGuard';
 import { useAccountStatus } from '@/hooks/useAccountStatus';
 
 export function PurchaseCoins() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi'>('card');
   const { toast } = useToast();
   const { isActive, showDeactivatedAccountError } = useAccountStatus();
 
-  const predefinedAmounts = [1, 5, 10, 25, 50, 100]; // Changed to smaller values for INR
+  const predefinedAmounts = [1, 5, 10, 25, 50, 100];
 
   const handlePurchase = async (purchaseAmount: number, selectedPaymentMethod: 'card' | 'upi' = paymentMethod) => {
     if (!isActive) {
@@ -47,6 +48,35 @@ export function PurchaseCoins() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRecoverPayments = async () => {
+    setRecovering(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('recover-failed-payment');
+
+      if (error) throw error;
+
+      toast({
+        title: "Recovery Check Complete",
+        description: data.message,
+        variant: data.recovered_coins > 0 ? "default" : "destructive",
+      });
+
+      if (data.recovered_coins > 0) {
+        // Refresh the page to show updated balance
+        setTimeout(() => window.location.reload(), 2000);
+      }
+    } catch (error: any) {
+      console.error('Recovery error:', error);
+      toast({
+        title: "Recovery Failed",
+        description: error.message || "Failed to check for missing payments",
+        variant: "destructive",
+      });
+    } finally {
+      setRecovering(false);
     }
   };
 
@@ -81,6 +111,30 @@ export function PurchaseCoins() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Recovery Button */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium text-yellow-800">Payment Issue?</h4>
+                <p className="text-sm text-yellow-700">If you paid but didn't receive coins, click to recover them.</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRecoverPayments}
+                disabled={recovering}
+                className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+              >
+                {recovering ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Recover Coins
+              </Button>
+            </div>
+          </div>
+
           {/* Payment Method Selection */}
           <div>
             <Label className="text-sm font-medium mb-3 block">Payment Method</Label>
@@ -153,6 +207,7 @@ export function PurchaseCoins() {
             <p>• Instant delivery to your wallet</p>
             <p>• 1000 INR = 1 Happy Coin</p>
             <p>• {paymentMethod === 'upi' ? 'Pay using UPI apps like GPay, PhonePe, Paytm' : 'Pay with any debit/credit card'}</p>
+            <p>• If payment fails to credit, use the "Recover Coins" button above</p>
           </div>
         </CardContent>
       </Card>

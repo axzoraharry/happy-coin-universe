@@ -33,10 +33,14 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
+  console.log('Received webhook event:', receivedEvent.type);
+
   if (receivedEvent.type === "checkout.session.completed") {
     const session = receivedEvent.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.user_id;
     const happyCoins = parseInt(session.metadata?.happy_coins || "0");
+
+    console.log('Processing payment for user:', userId, 'coins:', happyCoins);
 
     if (userId && happyCoins > 0) {
       try {
@@ -47,11 +51,16 @@ serve(async (req) => {
           .eq('user_id', userId)
           .single();
 
-        if (walletError) throw walletError;
+        if (walletError) {
+          console.error('Wallet error:', walletError);
+          throw walletError;
+        }
+
+        console.log('Current wallet balance:', wallet.balance);
 
         // Update wallet balance
         const newBalance = parseFloat(wallet.balance.toString()) + happyCoins;
-        await supabaseClient
+        const { error: updateError } = await supabaseClient
           .from('wallets')
           .update({ 
             balance: newBalance,
@@ -59,21 +68,35 @@ serve(async (req) => {
           })
           .eq('id', wallet.id);
 
+        if (updateError) {
+          console.error('Balance update error:', updateError);
+          throw updateError;
+        }
+
+        console.log('Updated balance to:', newBalance);
+
         // Create transaction record
-        await supabaseClient
+        const { error: transactionError } = await supabaseClient
           .from('transactions')
           .insert({
             wallet_id: wallet.id,
             user_id: userId,
             transaction_type: 'credit',
             amount: happyCoins,
-            description: `Purchase of ${happyCoins} Happy Coins (${happyCoins * 1000} INR)`,
+            description: `Purchase of ${happyCoins} Happy Coins (₹${happyCoins * 1000})`,
             reference_id: session.id,
             status: 'completed'
           });
 
+        if (transactionError) {
+          console.error('Transaction record error:', transactionError);
+          throw transactionError;
+        }
+
+        console.log('Transaction record created');
+
         // Create notification
-        await supabaseClient
+        const { error: notificationError } = await supabaseClient
           .from('notifications')
           .insert({
             user_id: userId,
@@ -82,10 +105,18 @@ serve(async (req) => {
             type: 'success'
           });
 
-        console.log(`Successfully processed payment for user ${userId}: ${happyCoins} HC (${happyCoins * 1000} INR)`);
+        if (notificationError) {
+          console.error('Notification error:', notificationError);
+          // Don't throw here as it's not critical
+        }
+
+        console.log(`Successfully processed payment for user ${userId}: ${happyCoins} HC (₹${happyCoins * 1000})`);
       } catch (error) {
         console.error('Error processing payment:', error);
+        return new Response(JSON.stringify({ error: 'Payment processing failed' }), { status: 500 });
       }
+    } else {
+      console.log('Missing user_id or happy_coins in session metadata');
     }
   }
 
