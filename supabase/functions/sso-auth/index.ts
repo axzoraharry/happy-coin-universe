@@ -331,7 +331,6 @@ function generateAccessToken(): string {
 
 function createAuthRequiredPage(redirectUri: string, state: string | undefined, appName: string = 'Application'): string {
   const loginUrl = 'https://happy-wallet.axzoragroup.com/';
-  const currentUrl = new URL(window.location.href);
   
   return `
 <!DOCTYPE html>
