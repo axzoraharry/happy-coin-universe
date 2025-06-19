@@ -1,13 +1,11 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Enhanced CORS headers to handle CSP and iframe restrictions
+// Updated CORS headers - removed X-Frame-Options since we're using direct redirects
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'X-Frame-Options': 'SAMEORIGIN',
   'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin'
@@ -86,7 +84,7 @@ serve(async (req) => {
       // Verify API key exists and is active - using api_key field instead of key_hash
       const { data: apiKey, error: apiKeyError } = await supabase
         .from('api_keys')
-        .select('id, application_name, user_id, is_active')
+        .select('id, application_name, created_by, is_active')
         .eq('api_key', authRequest.client_id)
         .eq('is_active', true)
         .single();
