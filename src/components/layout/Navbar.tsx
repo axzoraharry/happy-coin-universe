@@ -1,4 +1,6 @@
+
 import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Home,
   ArrowLeftRight,
@@ -9,8 +11,7 @@ import {
   User,
   Settings,
   MoreHorizontal,
-  ChevronDown,
-  Bot
+  ChevronDown
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -73,18 +74,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
             >
               <Coins className="h-4 w-4 inline mr-2" />
               Coins & Rewards
-            </button>
-
-            <button
-              onClick={() => onPageChange('ai-assistant')}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                currentPage === 'ai-assistant'
-                  ? 'text-primary bg-primary/10'
-                  : 'text-gray-600 hover:text-primary'
-              }`}
-            >
-              <Bot className="h-4 w-4 inline mr-2" />
-              AI Assistant
             </button>
 
             <DropdownMenu>
@@ -235,21 +224,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
             >
               <Coins className="h-4 w-4 inline mr-2" />
               Coins & Rewards
-            </button>
-
-            <button
-              onClick={() => {
-                onPageChange('ai-assistant');
-                setMobileMenuOpen(false);
-              }}
-              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
-                currentPage === 'ai-assistant'
-                  ? 'text-primary bg-primary/10'
-                  : 'text-gray-600 hover:text-primary'
-              }`}
-            >
-              <Bot className="h-4 w-4 inline mr-2" />
-              AI Assistant
             </button>
 
             <button
