@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,35 +78,71 @@ export function SSOWidget({
   }, [status]);
 
   useEffect(() => {
-    // Check for auth callback on component mount
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const error = urlParams.get('error');
-    const returnedState = urlParams.get('state');
-
-    if (code) {
-      if (state && returnedState !== state) {
-        setStatus('error');
-        setMessage('Invalid state parameter');
-        onError?.('Invalid state parameter');
+    // Listen for messages from popup window
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
         return;
       }
 
-      setStatus('success');
-      setMessage('Authentication successful!');
-      onSuccess?.(code);
-      
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (error) {
-      setStatus('error');
-      setMessage(error);
-      onError?.(error);
-    }
+      if (event.data.type === 'SSO_AUTH_SUCCESS') {
+        const { code, returnedState } = event.data;
+        
+        if (state && returnedState !== state) {
+          setStatus('error');
+          setMessage('Invalid state parameter');
+          onError?.('Invalid state parameter');
+          return;
+        }
+
+        setStatus('success');
+        setMessage('Authentication successful!');
+        setProcessing(false);
+        onSuccess?.(code);
+      } else if (event.data.type === 'SSO_AUTH_ERROR') {
+        setStatus('error');
+        setMessage(event.data.error);
+        setProcessing(false);
+        onError?.(event.data.error);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, [state, onSuccess, onError]);
 
   const getSupabaseUrl = () => {
     return 'https://zygpupmeradizrachnqj.supabase.co';
+  };
+
+  const openAuthPopup = (authUrl: string) => {
+    const popup = window.open(
+      authUrl,
+      'sso-auth',
+      'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+    );
+
+    if (!popup) {
+      setStatus('error');
+      setMessage('Popup blocked. Please allow popups for this site.');
+      setProcessing(false);
+      onError?.('Popup blocked');
+      return;
+    }
+
+    // Monitor popup for closure
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        if (status === 'processing') {
+          setStatus('error');
+          setMessage('Authentication was cancelled');
+          setProcessing(false);
+          onError?.('Authentication cancelled');
+        }
+      }
+    }, 1000);
+
+    return popup;
   };
 
   const handleSignIn = async () => {
@@ -126,14 +161,16 @@ export function SSOWidget({
 
     setProcessing(true);
     setStatus('processing');
-    setMessage('Redirecting to authorization...');
+    setMessage('Opening authorization popup...');
 
     try {
       const params = new URLSearchParams({
         client_id: clientId,
-        redirect_uri: redirectUri,
+        redirect_uri: window.location.origin + '/sso-callback',
         scope: scope,
         response_type: 'code',
+        popup: 'true',
+        original_redirect_uri: redirectUri,
       });
 
       if (state) {
@@ -141,16 +178,14 @@ export function SSOWidget({
       }
 
       const supabaseUrl = getSupabaseUrl();
-      const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}`;
+      const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}&access_token=${encodeURIComponent(session.access_token)}`;
       
-      console.log('SSO Widget: Redirecting to authorization with session token');
+      console.log('SSO Widget: Opening authorization popup');
       
-      // For CORS compliance, we'll redirect directly but pass the access token as a URL parameter
-      // The server will check for this token in the URL if no Authorization header is present
-      const authUrlWithToken = `${authUrl}&access_token=${encodeURIComponent(session.access_token)}`;
-      
-      // Direct redirect to avoid CORS issues
-      window.location.href = authUrlWithToken;
+      const popup = openAuthPopup(authUrl);
+      if (!popup) return;
+
+      setMessage('Complete authorization in the popup window...');
 
     } catch (error) {
       console.error('SSO request failed:', error);
@@ -162,8 +197,18 @@ export function SSOWidget({
   };
 
   const handleLoginPrompt = () => {
-    // Redirect to login page
-    window.location.href = '/';
+    // Open login in popup as well
+    const popup = window.open(
+      '/',
+      'happycoins-login',
+      'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+    );
+
+    if (!popup) {
+      setStatus('error');
+      setMessage('Popup blocked. Please allow popups for this site.');
+      return;
+    }
   };
 
   const getStatusIcon = () => {
@@ -225,7 +270,7 @@ export function SSOWidget({
             >
               {getStatusIcon()}
               <span className="ml-2">
-                {processing ? 'Redirecting...' : status === 'success' ? 'Authorized' : 'Authorize'}
+                {processing ? 'Opening popup...' : status === 'success' ? 'Authorized' : 'Authorize'}
               </span>
             </Button>
           )}
@@ -274,7 +319,7 @@ export function SSOWidget({
         {status !== 'unauthenticated' && (
           <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
             <p className="text-sm text-blue-800">
-              <strong>Secure Authentication:</strong> Authorize this application to access your HappyCoins account. 
+              <strong>Secure Authentication:</strong> A popup window will open for secure authorization. 
               Your credentials remain secure.
             </p>
           </div>
@@ -305,7 +350,7 @@ export function SSOWidget({
           >
             {getStatusIcon()}
             <span className="ml-2">
-              {processing ? 'Redirecting to Authorization...' : status === 'success' ? 'Authorization Complete' : 'Authorize with HappyCoins'}
+              {processing ? 'Opening Authorization Popup...' : status === 'success' ? 'Authorization Complete' : 'Authorize with HappyCoins'}
             </span>
           </Button>
         )}

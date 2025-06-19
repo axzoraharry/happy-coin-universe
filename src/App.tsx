@@ -1,45 +1,27 @@
 
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import Index from "@/pages/Index";
-import NotFound from "@/pages/NotFound";
-import CoinsPage from "@/pages/CoinsPage";
-import APIPage from "@/pages/APIPage";
-import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { navItems } from "./nav-items";
+import { SSOCallback } from "./components/SSOCallback";
 
 const queryClient = new QueryClient();
 
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <Index />,
-  },
-  {
-    path: "/coins",
-    element: <CoinsPage />,
-  },
-  {
-    path: "/api",
-    element: <APIPage />,
-  },
-  {
-    path: "/reset-password",
-    element: <ResetPasswordPage />,
-  },
-  {
-    path: "*",
-    element: <NotFound />,
-  }
-]);
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
       <Toaster />
-    </QueryClientProvider>
-  );
-}
+      <BrowserRouter>
+        <Routes>
+          <Route path="/sso-callback" element={<SSOCallback />} />
+          {navItems.map(({ to, page }) => (
+            <Route key={to} path={to} element={page} />
+          ))}
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;

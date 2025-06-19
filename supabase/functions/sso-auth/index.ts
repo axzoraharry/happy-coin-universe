@@ -1,5 +1,3 @@
-
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -99,11 +97,17 @@ serve(async (req) => {
         state: params.state
       };
 
+      // Check if this is a popup request
+      const isPopup = params.popup === 'true';
+      const originalRedirectUri = params.original_redirect_uri || authRequest.redirect_uri;
+
       console.log('SSO Authorize request:', {
         clientId: authRequest.client_id,
         redirectUri: authRequest.redirect_uri,
         scope: authRequest.scope,
-        state: authRequest.state
+        state: authRequest.state,
+        isPopup: isPopup,
+        originalRedirectUri: originalRedirectUri
       });
 
       // Validate required parameters
@@ -174,7 +178,7 @@ serve(async (req) => {
       if (!user) {
         console.log('No authenticated user found - showing login page');
         return new Response(
-          createInteractiveAuthPage(authRequest, apiKey.application_name),
+          createInteractiveAuthPage(authRequest, apiKey.application_name, isPopup),
           { 
             status: 200, 
             headers: htmlHeaders
@@ -206,13 +210,13 @@ serve(async (req) => {
       const authCode = generateAuthCode();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Store authorization code
+      // Store authorization code with original redirect URI
       const { error: storeError } = await supabase
         .from('sso_auth_codes')
         .insert({
           code: authCode,
           api_key_id: apiKey.id,
-          redirect_uri: authRequest.redirect_uri,
+          redirect_uri: originalRedirectUri, // Use original redirect URI
           scope: authRequest.scope,
           state: authRequest.state,
           expires_at: expiresAt.toISOString()
@@ -230,21 +234,31 @@ serve(async (req) => {
       }
 
       // Build redirect URL with authorization code
-      const redirectUrl = new URL(authRequest.redirect_uri);
-      redirectUrl.searchParams.set('code', authCode);
-      if (authRequest.state) {
-        redirectUrl.searchParams.set('state', authRequest.state);
+      if (isPopup) {
+        // For popup mode, return a page that posts message to parent window
+        const html = createPopupCallbackPage(authCode, authRequest.state || '');
+        return new Response(html, {
+          status: 200,
+          headers: htmlHeaders
+        });
+      } else {
+        // Original redirect behavior
+        const redirectUrl = new URL(originalRedirectUri);
+        redirectUrl.searchParams.set('code', authCode);
+        if (authRequest.state) {
+          redirectUrl.searchParams.set('state', authRequest.state);
+        }
+
+        console.log('Authorization successful for authenticated user, redirecting to:', redirectUrl.toString());
+
+        // Return HTML page that performs the redirect
+        const html = createRedirectPage(redirectUrl.toString(), apiKey.application_name);
+        
+        return new Response(html, {
+          status: 200,
+          headers: htmlHeaders
+        });
       }
-
-      console.log('Authorization successful for authenticated user, redirecting to:', redirectUrl.toString());
-
-      // Return HTML page that performs the redirect
-      const html = createRedirectPage(redirectUrl.toString(), apiKey.application_name);
-      
-      return new Response(html, {
-        status: 200,
-        headers: htmlHeaders
-      });
     }
 
     // Handle token exchange
@@ -380,7 +394,7 @@ function generateAccessToken(): string {
     .join('');
 }
 
-function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: string = 'Application'): string {
+function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: string = 'Application', isPopup: boolean = false): string {
   const loginUrl = 'https://happy-wallet.axzoragroup.com/';
   const currentAuthUrl = `https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/authorize?` + 
     new URLSearchParams({
@@ -388,6 +402,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
       redirect_uri: authRequest.redirect_uri,
       scope: authRequest.scope || 'profile email',
       response_type: authRequest.response_type,
+      ...(isPopup ? { popup: 'true' } : {}),
       ...(authRequest.state ? { state: authRequest.state } : {})
     }).toString();
   
@@ -488,7 +503,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
         </div>
         
         <div id="auth-buttons">
-            <a href="${loginUrl}" class="button" target="_top">
+            <a href="${loginUrl}" class="button" ${isPopup ? '' : 'target="_top"'}>
                 Log in to HappyCoins
             </a>
             <button onclick="checkAuth()" class="button secondary">
@@ -508,6 +523,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
     
     <script>
         const authUrl = '${currentAuthUrl}';
+        const isPopup = ${isPopup};
         
         async function checkAuth() {
             const buttons = document.getElementById('auth-buttons');
@@ -545,11 +561,11 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                     }
                 }
                 
-                // Try to access parent window storage if in iframe
-                if (window.parent !== window) {
+                // Try to access parent window storage if in popup
+                if (window.opener && !isPopup) {
                     try {
                         for (const key of localKeys) {
-                            const parentData = window.parent.localStorage.getItem(key) || window.parent.sessionStorage.getItem(key);
+                            const parentData = window.opener.localStorage.getItem(key) || window.opener.sessionStorage.getItem(key);
                             if (parentData) {
                                 if (parentData.startsWith('{')) {
                                     const parsed = JSON.parse(parentData);
@@ -563,16 +579,6 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                         }
                     } catch (e) {
                         // Cross-origin restrictions - ignore
-                    }
-                }
-                
-                // Check URL fragment for access token (OAuth redirect)
-                const hash = window.location.hash;
-                if (hash && hash.includes('access_token=')) {
-                    const params = new URLSearchParams(hash.substring(1));
-                    const token = params.get('access_token');
-                    if (token) {
-                        possibleTokens.push(token);
                     }
                 }
                 
@@ -593,12 +599,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                                 const authData = await response.json();
                                 if (authData.authenticated) {
                                     console.log('Valid token found, redirecting...');
-                                    // Use window.top for iframe compatibility
-                                    if (window.top) {
-                                        window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
-                                    } else {
-                                        window.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
-                                    }
+                                    window.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
                                     return;
                                 }
                             }
@@ -619,26 +620,84 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             const infoText = document.querySelector('.info-text');
             infoText.innerHTML = '<strong style="color: #fbbf24;">No valid authentication found.</strong><br>Please log in to HappyCoins first, then try again.';
         }
-        
-        // Auto-check if coming from login page
-        window.addEventListener('load', function() {
-            if (document.referrer.includes('happy-wallet.axzoragroup.com')) {
-                setTimeout(checkAuth, 1000);
-            }
-        });
-        
-        // Listen for messages from parent window (for embedded scenarios)
-        window.addEventListener('message', function(event) {
-            if (event.origin === 'https://happy-wallet.axzoragroup.com') {
-                if (event.data.type === 'AUTH_SUCCESS' && event.data.accessToken) {
-                    if (window.top) {
-                        window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
-                    } else {
-                        window.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
-                    }
-                }
-            }
-        });
+    </script>
+</body>
+</html>`;
+}
+
+function createPopupCallbackPage(authCode: string, state: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HappyCoins Authorization Complete</title>
+</head>
+<body>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 400px;
+        }
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+        .message {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <div class="container">
+        <div class="logo">🪙 HappyCoins</div>
+        <div class="message">Authorization successful!</div>
+        <div class="spinner"></div>
+        <div>Completing authentication...</div>
+    </div>
+    
+    <script>
+        // Send success message to parent window
+        if (window.opener) {
+            window.opener.postMessage({
+                type: 'SSO_AUTH_SUCCESS',
+                code: '${authCode}',
+                returnedState: '${state}'
+            }, window.location.origin);
+            
+            // Close popup after a short delay
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        } else {
+            // Fallback for non-popup scenario
+            window.location.href = '/';
+        }
     </script>
 </body>
 </html>`;
@@ -780,4 +839,3 @@ function createErrorPage(errorMessage: string): string {
 </body>
 </html>`;
 }
-
