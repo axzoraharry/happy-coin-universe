@@ -26,7 +26,7 @@ interface Transaction {
   reference_id: string | null;
 }
 
-const TRANSACTIONS_PER_PAGE = 5;
+const TRANSACTIONS_PER_PAGE = 10;
 
 export function TransactionsList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -188,7 +188,7 @@ export function TransactionsList() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
+            {[...Array(10)].map((_, i) => (
               <div key={i} className="animate-pulse flex items-center space-x-4 p-4 border rounded-lg">
                 <div className="h-10 w-10 bg-muted rounded-full"></div>
                 <div className="flex-1 space-y-2">
@@ -220,7 +220,7 @@ export function TransactionsList() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] pr-4">
+        <ScrollArea className="h-[600px] pr-4">
           <div className="space-y-3">
             {transactions.length === 0 ? (
               <div className="text-center py-12">
