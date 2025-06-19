@@ -14,6 +14,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Create checkout function called");
+    
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -23,101 +25,66 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
 
-    const { amount, paymentMethod = 'card' } = await req.json();
-    if (!amount || amount <= 0) throw new Error("Invalid amount");
+    if (!user?.email) {
+      throw new Error("User not authenticated");
+    }
 
-    console.log('Creating checkout for:', user.email, 'amount:', amount, 'HC');
+    console.log("Creating checkout for:", user.email, "ID:", user.id);
+
+    const { amount, paymentMethod } = await req.json();
+    console.log("Amount:", amount, "Payment method:", paymentMethod);
+
+    if (!amount || amount <= 0) {
+      throw new Error("Invalid amount");
+    }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
-    // Ensure user has a wallet before creating checkout
-    const supabaseService = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
-
-    // Check if wallet exists, create if not
-    const { data: existingWallet, error: walletCheckError } = await supabaseService
-      .from('wallets')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletCheckError && walletCheckError.code === 'PGRST116') {
-      console.log('Creating wallet for user:', user.id);
-      const { error: createWalletError } = await supabaseService
-        .from('wallets')
-        .insert({
-          user_id: user.id,
-          balance: 0,
-          currency: 'USD'
-        });
-        
-      if (createWalletError) {
-        console.error('Failed to create wallet:', createWalletError);
-        throw createWalletError;
-      }
-    }
-
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    }
-
-    // Convert Happy Coins to INR (1 HC = 1000 INR)
-    const amountInINR = amount * 1000;
-
-    // Configure payment method types based on selection
-    const paymentMethodTypes = paymentMethod === 'upi' ? ['card'] : ['card'];
-
-    console.log('Creating Stripe session with amount:', amountInINR, 'INR for', amount, 'HC');
+    // Convert amount to cents (1 HC = 1000 INR = 1000 * 100 = 100000 paise)
+    const amountInCents = amount * 100000;
+    console.log("Creating Stripe session with amount:", amountInCents, "INR for", amount, "HC");
 
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      customer_email: customerId ? undefined : user.email,
-      payment_method_types: paymentMethodTypes,
+      payment_method_types: paymentMethod === 'upi' ? ['card'] : ['card'], // UPI not directly supported in test mode
       line_items: [
         {
           price_data: {
             currency: "inr",
-            product_data: { 
+            product_data: {
               name: `${amount} Happy Coins`,
-              description: paymentMethod === 'upi' ? 'Payment via UPI method' : 'Payment via Card'
+              description: `Purchase ${amount} Happy Coins for your wallet`,
             },
-            unit_amount: amountInINR * 100, // Convert to paise (INR cents)
+            unit_amount: amountInCents,
           },
           quantity: 1,
         },
       ],
       mode: "payment",
-      success_url: `${req.headers.get("origin")}/?success=true`,
-      cancel_url: `${req.headers.get("origin")}/?canceled=true`,
+      success_url: `${req.headers.get("origin") || "http://localhost:3000"}/?success=true`,
+      cancel_url: `${req.headers.get("origin") || "http://localhost:3000"}/?canceled=true`,
       metadata: {
         user_id: user.id,
+        user_email: user.email,
         happy_coins: amount.toString(),
-        payment_method: paymentMethod,
-        user_email: user.email // Adding email for easier debugging
+        payment_method: paymentMethod || 'card',
       },
     });
 
-    console.log('Stripe session created:', session.id);
-    console.log('Session metadata:', session.metadata);
+    console.log("Stripe session created:", session.id);
+    console.log("Session metadata:", session.metadata);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (error: any) {
-    console.error('Stripe checkout error:', error);
+  } catch (error) {
+    console.error("Create checkout error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 400,
     });
   }
 });
