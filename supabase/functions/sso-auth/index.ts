@@ -2,13 +2,15 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// CORS headers that allow iframe embedding
+// Enhanced CORS headers to handle CSP and iframe restrictions
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'X-Frame-Options': 'ALLOWALL', // Allow iframe embedding
-  'Content-Security-Policy': "frame-ancestors *;", // Allow embedding in any frame
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';",
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin'
 }
 
 interface AuthorizeRequest {
@@ -43,7 +45,6 @@ serve(async (req) => {
       // Handle authorization request
       const params = Object.fromEntries(url.searchParams.entries());
       console.log('URL params:', params);
-      console.log('Headers:', Object.fromEntries(req.headers.entries()));
 
       const authRequest: AuthorizeRequest = {
         client_id: params.client_id || '',
@@ -74,7 +75,7 @@ serve(async (req) => {
       // Validate API key format
       if (!authRequest.client_id.startsWith('ak_')) {
         return new Response(
-          createErrorPage('Invalid client_id format'),
+          createErrorPage('Invalid client_id format. API keys must start with "ak_"'),
           { 
             status: 400, 
             headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
@@ -82,24 +83,26 @@ serve(async (req) => {
         );
       }
 
-      // Verify API key exists and is active
+      // Verify API key exists and is active - using api_key field instead of key_hash
       const { data: apiKey, error: apiKeyError } = await supabase
         .from('api_keys')
-        .select('id, name, user_id, is_active')
-        .eq('key_hash', authRequest.client_id)
+        .select('id, application_name, user_id, is_active')
+        .eq('api_key', authRequest.client_id)
         .eq('is_active', true)
         .single();
 
       if (apiKeyError || !apiKey) {
-        console.error('Invalid API key:', authRequest.client_id);
+        console.error('Invalid API key:', authRequest.client_id, 'Error:', apiKeyError?.message);
         return new Response(
-          createErrorPage('Invalid or inactive API key'),
+          createErrorPage('Invalid or inactive API key. Please check your client_id and ensure the API key is active.'),
           { 
             status: 403, 
             headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
           }
         );
       }
+
+      console.log('Valid API key found:', { id: apiKey.id, application_name: apiKey.application_name });
 
       // Generate authorization code
       const authCode = generateAuthCode();
@@ -120,7 +123,7 @@ serve(async (req) => {
       if (storeError) {
         console.error('Failed to store auth code:', storeError);
         return new Response(
-          createErrorPage('Failed to generate authorization code'),
+          createErrorPage('Failed to generate authorization code. Please try again.'),
           { 
             status: 500, 
             headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
@@ -135,9 +138,10 @@ serve(async (req) => {
         redirectUrl.searchParams.set('state', authRequest.state);
       }
 
+      console.log('Authorization successful, redirecting to:', redirectUrl.toString());
+
       // Return HTML page that performs the redirect
-      // This avoids iframe issues by using a full page redirect
-      const html = createRedirectPage(redirectUrl.toString(), authRequest.redirect_uri);
+      const html = createRedirectPage(redirectUrl.toString(), apiKey.application_name);
       
       return new Response(html, {
         status: 200,
@@ -174,15 +178,15 @@ serve(async (req) => {
           api_keys!inner (
             id,
             user_id,
-            name,
-            key_hash
+            application_name,
+            api_key
           )
         `)
         .eq('code', code)
         .eq('redirect_uri', redirect_uri)
         .single();
 
-      if (codeError || !authCodeData || authCodeData.api_keys.key_hash !== client_id) {
+      if (codeError || !authCodeData || authCodeData.api_keys.api_key !== client_id) {
         return new Response(
           JSON.stringify({ error: 'Invalid authorization code' }),
           { 
@@ -278,7 +282,7 @@ function generateAccessToken(): string {
     .join('');
 }
 
-function createRedirectPage(redirectUrl: string, originalRedirectUri: string): string {
+function createRedirectPage(redirectUrl: string, appName: string = 'Application'): string {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -286,6 +290,9 @@ function createRedirectPage(redirectUrl: string, originalRedirectUri: string): s
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins Authorization</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+</head>
+<body>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
@@ -330,14 +337,17 @@ function createRedirectPage(redirectUrl: string, originalRedirectUri: string): s
             opacity: 0.7;
             margin-top: 1rem;
         }
+        .app-name {
+            color: #fbbf24;
+            font-weight: 600;
+        }
     </style>
-</head>
-<body>
+    
     <div class="container">
         <div class="logo">🪙 HappyCoins</div>
         <div class="message">Authorization successful!</div>
         <div class="spinner"></div>
-        <div>Redirecting you back to the application...</div>
+        <div>Redirecting you back to <span class="app-name">${appName}</span>...</div>
         <div class="redirect-info">
             If you are not redirected automatically, 
             <a href="${redirectUrl}" style="color: white; text-decoration: underline;">click here</a>
@@ -346,22 +356,9 @@ function createRedirectPage(redirectUrl: string, originalRedirectUri: string): s
     
     <script>
         // Immediate redirect
-        window.location.href = '${redirectUrl}';
-        
-        // Fallback redirect after 2 seconds
         setTimeout(function() {
             window.location.href = '${redirectUrl}';
-        }, 2000);
-        
-        // If in iframe, try to redirect parent window
-        if (window.parent !== window.self) {
-            try {
-                window.parent.location.href = '${redirectUrl}';
-            } catch (e) {
-                // Cross-origin restriction, fallback to current window
-                window.location.href = '${redirectUrl}';
-            }
-        }
+        }, 1000);
     </script>
 </body>
 </html>`;
@@ -375,6 +372,9 @@ function createErrorPage(errorMessage: string): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins Authorization Error</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+</head>
+<body>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
@@ -404,14 +404,21 @@ function createErrorPage(errorMessage: string): string {
             font-size: 1.1rem;
             margin-bottom: 2rem;
         }
+        .details {
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+        }
     </style>
-</head>
-<body>
+    
     <div class="container">
         <div class="logo">🪙 HappyCoins</div>
         <div class="error-icon">⚠️</div>
         <div class="message">Authorization Error</div>
-        <div>${errorMessage}</div>
+        <div class="details">${errorMessage}</div>
+        <div>Please check your configuration and try again.</div>
     </div>
 </body>
 </html>`;

@@ -47,19 +47,37 @@
         .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .setup-section {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .setup-section h3 {
+            color: #1565c0;
+            margin-top: 0;
+        }
+        .step {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🪙 HappyCoins SSO Integration Test</h1>
         
-        <div class="info status">
-            <strong>Test Instructions:</strong>
+        <div class="setup-section">
+            <h3>⚙️ Setup Instructions</h3>
+            <div class="warning status">
+                <strong>Important:</strong> The current test configuration uses a dummy API key that will fail. Follow these steps to test with a real API key:
+            </div>
             <ol>
-                <li>Make sure you have a valid API key created in your HappyCoins account</li>
-                <li>Update the clientId below with your actual API key</li>
-                <li>Update the redirectUri to match your application's callback URL</li>
-                <li>Click the SSO widget to test the authentication flow</li>
+                <li class="step"><strong>Create an API Key:</strong> Log into your HappyCoins account and create an API key in the API Management section</li>
+                <li class="step"><strong>Update the clientId:</strong> Replace 'REPLACE_WITH_YOUR_API_KEY' below with your actual API key (starts with 'ak_')</li>
+                <li class="step"><strong>Set Redirect URI:</strong> Make sure your API key allows this page's URL as a redirect URI</li>
+                <li class="step"><strong>Test the Widget:</strong> Click the SSO widget button to test the authentication flow</li>
             </ol>
         </div>
 
@@ -69,38 +87,56 @@
         </div>
 
         <div class="code-block">
-            <strong>Configuration:</strong><br>
-            Client ID: test-client-123<br>
-            Redirect URI: https://example.com/callback<br>
+            <strong>Current Configuration:</strong><br>
+            Client ID: REPLACE_WITH_YOUR_API_KEY (⚠️ Replace with your actual API key)<br>
+            Redirect URI: <span id="current-url"></span><br>
             Scope: profile email<br>
             Theme: light
         </div>
 
         <div id="status-messages"></div>
+        
+        <div class="setup-section">
+            <h3>🔧 Integration Notes</h3>
+            <ul>
+                <li>API keys must start with 'ak_' and be active in your HappyCoins account</li>
+                <li>The redirect URI must match exactly what's configured for your API key</li>
+                <li>This widget now uses direct redirects instead of popups to avoid CSP issues</li>
+                <li>All authentication happens securely on the HappyCoins domain</li>
+            </ul>
+        </div>
     </div>
 
-    <!-- Load the SSO Widget -->
-    <script src="https://zygpupmeradizrachnqj.supabase.co/storage/v1/object/public/public/embed/sso-widget.js"></script>
+    <!-- Load the SSO Widget from the local embed file -->
+    <script src="/embed/sso-widget.js"></script>
     
     <script>
+        // Update current URL display
+        document.getElementById('current-url').textContent = window.location.href;
+        
         // Configuration for the SSO widget
         const ssoConfig = {
-            clientId: 'test-client-123', // Replace with your actual API key
-            redirectUri: window.location.origin + window.location.pathname, // This page
+            clientId: 'REPLACE_WITH_YOUR_API_KEY', // ⚠️ Replace with your actual API key
+            redirectUri: window.location.href, // This page
             scope: 'profile email',
-            appName: 'Test Application',
+            appName: 'SSO Test Application',
             theme: 'light',
             compact: false,
             onSuccess: function(authCode) {
-                addStatusMessage('Success! Authorization code received: ' + authCode, 'success');
+                addStatusMessage('✅ Success! Authorization code received: ' + authCode, 'success');
                 console.log('SSO Success - Auth Code:', authCode);
                 
-                // You would typically exchange this code for an access token
-                // using your backend server and the /token endpoint
+                // In a real application, you would send this code to your backend
+                // to exchange it for an access token using the /token endpoint
+                addStatusMessage('💡 Next step: Exchange this code for an access token on your backend server', 'info');
             },
             onError: function(error) {
-                addStatusMessage('SSO Error: ' + error, 'error');
+                addStatusMessage('❌ SSO Error: ' + error, 'error');
                 console.error('SSO Error:', error);
+                
+                if (error.includes('Invalid or inactive API key')) {
+                    addStatusMessage('🔑 Please replace "REPLACE_WITH_YOUR_API_KEY" with your actual API key from HappyCoins', 'warning');
+                }
             }
         };
 
@@ -111,25 +147,33 @@
             messageDiv.className = type + ' status';
             messageDiv.innerHTML = '<strong>' + new Date().toLocaleTimeString() + ':</strong> ' + message;
             statusDiv.appendChild(messageDiv);
+            
+            // Scroll to the new message
+            messageDiv.scrollIntoView({ behavior: 'smooth' });
         }
 
         // Initialize the SSO widget when the page loads
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                addStatusMessage('Initializing HappyCoins SSO Widget...', 'info');
+                addStatusMessage('🔄 Initializing HappyCoins SSO Widget...', 'info');
                 
                 // Check if the widget library loaded
                 if (typeof HappyCoinsSSOWidget === 'undefined') {
-                    addStatusMessage('Failed to load SSO widget library', 'error');
+                    addStatusMessage('❌ Failed to load SSO widget library', 'error');
                     return;
                 }
 
                 // Render the widget
                 HappyCoinsSSOWidget.render('happycoins-sso-widget', ssoConfig);
-                addStatusMessage('SSO Widget initialized successfully', 'success');
+                addStatusMessage('✅ SSO Widget initialized successfully', 'success');
+                
+                // Check if using dummy API key
+                if (ssoConfig.clientId === 'REPLACE_WITH_YOUR_API_KEY') {
+                    addStatusMessage('⚠️ Using dummy API key - please replace with your actual API key to test', 'warning');
+                }
                 
             } catch (error) {
-                addStatusMessage('Error initializing widget: ' + error.message, 'error');
+                addStatusMessage('❌ Error initializing widget: ' + error.message, 'error');
                 console.error('Widget initialization error:', error);
             }
         });
@@ -142,12 +186,12 @@
             const state = urlParams.get('state');
 
             if (code) {
-                addStatusMessage('Authorization callback received with code: ' + code, 'success');
+                addStatusMessage('✅ Authorization callback received with code: ' + code, 'success');
                 if (ssoConfig.onSuccess) {
                     ssoConfig.onSuccess(code);
                 }
             } else if (error) {
-                addStatusMessage('Authorization callback received with error: ' + error, 'error');
+                addStatusMessage('❌ Authorization callback received with error: ' + error, 'error');
                 if (ssoConfig.onError) {
                     ssoConfig.onError(error);
                 }
