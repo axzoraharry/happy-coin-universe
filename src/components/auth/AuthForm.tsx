@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { PasswordResetForm } from './PasswordResetForm';
 
 interface ReferralResponse {
   success?: boolean;
@@ -19,6 +20,7 @@ interface AuthFormProps {
 
 export function AuthForm({ onBackToLanding }: AuthFormProps) {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -165,8 +167,24 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
 
   const switchMode = () => {
     setIsSignUp(!isSignUp);
+    setShowPasswordReset(false);
     resetForm();
   };
+
+  const handleForgotPassword = () => {
+    setShowPasswordReset(true);
+    setIsSignUp(false);
+  };
+
+  const handleBackToAuth = () => {
+    setShowPasswordReset(false);
+    setIsSignUp(false);
+  };
+
+  // Show password reset form
+  if (showPasswordReset) {
+    return <PasswordResetForm onBackToAuth={handleBackToAuth} />;
+  }
 
   if (needsConfirmation) {
     return (
@@ -297,6 +315,18 @@ export function AuthForm({ onBackToLanding }: AuthFormProps) {
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </Button>
           </div>
+          
+          {!isSignUp && (
+            <div className="text-center">
+              <Button
+                variant="link"
+                onClick={handleForgotPassword}
+                className="text-sm text-muted-foreground"
+              >
+                Forgot your password?
+              </Button>
+            </div>
+          )}
           
           {onBackToLanding ? (
             <div className="w-full">

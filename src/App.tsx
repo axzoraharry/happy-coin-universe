@@ -6,6 +6,7 @@ import Index from "@/pages/Index";
 import NotFound from "@/pages/NotFound";
 import CoinsPage from "@/pages/CoinsPage";
 import APIPage from "@/pages/APIPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,10 @@ const router = createBrowserRouter([
   {
     path: "/api",
     element: <APIPage />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPasswordPage />,
   },
   {
     path: "*",
