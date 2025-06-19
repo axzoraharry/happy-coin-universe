@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Lock, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { AccountStatusGuard } from '../common/AccountStatusGuard';
 import { useAccountStatus } from '@/hooks/useAccountStatus';
+import { TransactionPinReset } from './TransactionPinReset';
 
 interface PinResponse {
   success?: boolean;
@@ -22,6 +23,7 @@ export function TransactionPinSetup() {
   const [loading, setLoading] = useState(false);
   const [checkingPin, setCheckingPin] = useState(true);
   const [hasPin, setHasPin] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
   const { toast } = useToast();
   const { isActive, showDeactivatedAccountError } = useAccountStatus();
 
@@ -34,7 +36,6 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if user has a transaction PIN by querying the transaction_pins table directly
       const { data, error } = await supabase
         .from('transaction_pins')
         .select('id')
@@ -85,7 +86,6 @@ export function TransactionPinSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Call the database function directly
       const { data, error } = await supabase.rpc('set_secure_transaction_pin' as any, {
         p_user_id: user.id,
         p_pin: pin
@@ -118,6 +118,15 @@ export function TransactionPinSetup() {
     }
   };
 
+  const handleResetComplete = () => {
+    setShowResetForm(false);
+    checkExistingPin(); // Refresh PIN status
+    toast({
+      title: "PIN Reset Complete",
+      description: "Your transaction PIN has been successfully reset",
+    });
+  };
+
   if (checkingPin) {
     return (
       <Card>
@@ -127,6 +136,17 @@ export function TransactionPinSetup() {
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (showResetForm) {
+    return (
+      <div className="space-y-4">
+        <TransactionPinReset
+          onResetComplete={handleResetComplete}
+          onCancel={() => setShowResetForm(false)}
+        />
+      </div>
     );
   }
 
@@ -142,9 +162,23 @@ export function TransactionPinSetup() {
             Your transaction PIN is set up and securing your transfers
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground">
             Your transfers are protected with a secure 4-digit PIN. You'll be prompted to enter it when making transfers.
+          </div>
+          
+          <div className="pt-2 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowResetForm(true)}
+              className="w-full text-orange-600 border-orange-200 hover:bg-orange-50"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Forgot PIN? Reset PIN
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              You'll need your account password to reset your PIN
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -195,7 +229,7 @@ export function TransactionPinSetup() {
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <div>
                 Your PIN will be securely encrypted and used to verify transfers. 
-                Make sure to remember it as it cannot be recovered.
+                If you forget your PIN, you can reset it using your account password.
               </div>
             </div>
 
