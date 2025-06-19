@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Pagination, 
   PaginationContent, 
@@ -26,18 +27,24 @@ interface Transaction {
   reference_id: string | null;
 }
 
-const TRANSACTIONS_PER_PAGE = 10;
+const PAGE_SIZE_OPTIONS = [
+  { value: '5', label: '5 per page' },
+  { value: '10', label: '10 per page' },
+  { value: '25', label: '25 per page' },
+  { value: '50', label: '50 per page' },
+];
 
 export function TransactionsList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTransactions();
-  }, [currentPage]);
+  }, [currentPage, recordsPerPage]);
 
   const fetchTransactions = async () => {
     try {
@@ -53,8 +60,8 @@ export function TransactionsList() {
       setTotalTransactions(count || 0);
 
       // Get paginated transactions
-      const from = (currentPage - 1) * TRANSACTIONS_PER_PAGE;
-      const to = from + TRANSACTIONS_PER_PAGE - 1;
+      const from = (currentPage - 1) * recordsPerPage;
+      const to = from + recordsPerPage - 1;
 
       const { data, error } = await supabase
         .from('transactions')
@@ -77,13 +84,20 @@ export function TransactionsList() {
     }
   };
 
-  const totalPages = Math.ceil(totalTransactions / TRANSACTIONS_PER_PAGE);
+  const totalPages = Math.ceil(totalTransactions / recordsPerPage);
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
       setLoading(true);
     }
+  };
+
+  const handleRecordsPerPageChange = (value: string) => {
+    const newRecordsPerPage = parseInt(value);
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1); // Reset to first page when changing page size
+    setLoading(true);
   };
 
   const getTransactionIcon = (type: string) => {
@@ -188,7 +202,7 @@ export function TransactionsList() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[...Array(10)].map((_, i) => (
+            {[...Array(recordsPerPage)].map((_, i) => (
               <div key={i} className="animate-pulse flex items-center space-x-4 p-4 border rounded-lg">
                 <div className="h-10 w-10 bg-muted rounded-full"></div>
                 <div className="flex-1 space-y-2">
@@ -212,11 +226,25 @@ export function TransactionsList() {
         </CardTitle>
         <CardDescription className="text-muted-foreground flex items-center justify-between">
           <span>Your latest wallet activity and transfers</span>
-          {totalTransactions > 0 && (
-            <span className="text-sm">
-              Showing {((currentPage - 1) * TRANSACTIONS_PER_PAGE) + 1}-{Math.min(currentPage * TRANSACTIONS_PER_PAGE, totalTransactions)} of {totalTransactions}
-            </span>
-          )}
+          <div className="flex items-center gap-4">
+            {totalTransactions > 0 && (
+              <span className="text-sm">
+                Showing {((currentPage - 1) * recordsPerPage) + 1}-{Math.min(currentPage * recordsPerPage, totalTransactions)} of {totalTransactions}
+              </span>
+            )}
+            <Select value={recordsPerPage.toString()} onValueChange={handleRecordsPerPageChange}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardDescription>
       </CardHeader>
       <CardContent>
