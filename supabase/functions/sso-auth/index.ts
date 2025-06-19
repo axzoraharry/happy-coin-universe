@@ -1,4 +1,5 @@
 
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -15,7 +16,8 @@ const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, must-revalidate',
   'Pragma': 'no-cache',
-  'Expires': '0'
+  'Expires': '0',
+  ...corsHeaders
   // Removed X-Frame-Options to allow iframe embedding for SSO
 }
 
@@ -643,14 +645,12 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
 }
 
 function createRedirectPage(redirectUrl: string, appName: string = 'Application'): string {
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins Authorization</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
 </head>
 <body>
     <style>
@@ -724,14 +724,12 @@ function createRedirectPage(redirectUrl: string, appName: string = 'Application'
 }
 
 function createErrorPage(errorMessage: string): string {
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins Authorization Error</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
 </head>
 <body>
     <style>
@@ -782,3 +780,4 @@ function createErrorPage(errorMessage: string): string {
 </body>
 </html>`;
 }
+
