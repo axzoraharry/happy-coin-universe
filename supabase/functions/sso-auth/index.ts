@@ -515,27 +515,27 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             checking.classList.remove('hidden');
             
             try {
-                // Check multiple storage locations for tokens
-                const possibleTokens = [
-                    sessionStorage.getItem('sb-access-token'),
-                    localStorage.getItem('sb-access-token'),
-                    sessionStorage.getItem('supabase.auth.token'),
-                    localStorage.getItem('supabase.auth.token')
+                // Enhanced token detection - check parent window storage for iframe scenarios
+                let possibleTokens = [];
+                
+                // Check current window storage
+                const localKeys = [
+                    'sb-zygpupmeradizrachnqj-auth-token',
+                    'supabase.auth.token',
+                    'sb-access-token'
                 ];
                 
-                // Also check for full session objects
-                const sessionKeys = [
-                    'sb-' + 'zygpupmeradizrachnqj' + '-auth-token',
-                    'supabase.auth.session'
-                ];
-                
-                for (const key of sessionKeys) {
+                for (const key of localKeys) {
                     try {
                         const sessionData = localStorage.getItem(key) || sessionStorage.getItem(key);
                         if (sessionData) {
-                            const parsed = JSON.parse(sessionData);
-                            if (parsed.access_token) {
-                                possibleTokens.push(parsed.access_token);
+                            if (sessionData.startsWith('{')) {
+                                const parsed = JSON.parse(sessionData);
+                                if (parsed.access_token) {
+                                    possibleTokens.push(parsed.access_token);
+                                }
+                            } else if (sessionData.length > 20) {
+                                possibleTokens.push(sessionData);
                             }
                         }
                     } catch (e) {
@@ -543,24 +543,24 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                     }
                 }
                 
-                for (const token of possibleTokens) {
-                    if (token) {
-                        const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/check-auth', {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': 'Bearer ' + token,
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const authData = await response.json();
-                            if (authData.authenticated) {
-                                // Use _top instead of current window for iframe compatibility
-                                window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
-                                return;
+                // Try to access parent window storage if in iframe
+                if (window.parent !== window) {
+                    try {
+                        for (const key of localKeys) {
+                            const parentData = window.parent.localStorage.getItem(key) || window.parent.sessionStorage.getItem(key);
+                            if (parentData) {
+                                if (parentData.startsWith('{')) {
+                                    const parsed = JSON.parse(parentData);
+                                    if (parsed.access_token) {
+                                        possibleTokens.push(parsed.access_token);
+                                    }
+                                } else if (parentData.length > 20) {
+                                    possibleTokens.push(parentData);
+                                }
                             }
                         }
+                    } catch (e) {
+                        // Cross-origin restrictions - ignore
                     }
                 }
                 
@@ -570,8 +570,39 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                     const params = new URLSearchParams(hash.substring(1));
                     const token = params.get('access_token');
                     if (token) {
-                        window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
-                        return;
+                        possibleTokens.push(token);
+                    }
+                }
+                
+                console.log('Found', possibleTokens.length, 'potential tokens');
+                
+                for (const token of possibleTokens) {
+                    if (token && token.length > 20) {
+                        try {
+                            const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/check-auth', {
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': 'Bearer ' + token,
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const authData = await response.json();
+                                if (authData.authenticated) {
+                                    console.log('Valid token found, redirecting...');
+                                    // Use window.top for iframe compatibility
+                                    if (window.top) {
+                                        window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
+                                    } else {
+                                        window.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
+                                    }
+                                    return;
+                                }
+                            }
+                        } catch (fetchError) {
+                            console.log('Token validation failed:', fetchError);
+                        }
                     }
                 }
                 
@@ -581,7 +612,10 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             
             buttons.classList.remove('hidden');
             checking.classList.add('hidden');
-            alert('Please log in to HappyCoins first, then try again.');
+            
+            // Instead of alert, show a better message
+            const infoText = document.querySelector('.info-text');
+            infoText.innerHTML = '<strong style="color: #fbbf24;">No valid authentication found.</strong><br>Please log in to HappyCoins first, then try again.';
         }
         
         // Auto-check if coming from login page
@@ -595,7 +629,11 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
         window.addEventListener('message', function(event) {
             if (event.origin === 'https://happy-wallet.axzoragroup.com') {
                 if (event.data.type === 'AUTH_SUCCESS' && event.data.accessToken) {
-                    window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
+                    if (window.top) {
+                        window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
+                    } else {
+                        window.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
+                    }
                 }
             }
         });
