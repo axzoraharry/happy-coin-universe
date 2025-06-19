@@ -1,743 +1,418 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// CORS headers that allow iframe embedding
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-};
+  'X-Frame-Options': 'ALLOWALL', // Allow iframe embedding
+  'Content-Security-Policy': "frame-ancestors *;", // Allow embedding in any frame
+}
 
-interface SSORequest {
-  redirect_uri: string;
+interface AuthorizeRequest {
   client_id: string;
+  redirect_uri: string;
   scope?: string;
+  response_type: string;
   state?: string;
 }
 
-interface SSOTokenRequest {
-  code: string;
-  client_id: string;
-  client_secret: string;
-  redirect_uri: string;
-}
-
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const url = new URL(req.url);
+  console.log(`SSO Auth: ${req.method} ${url.pathname}`);
+
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Create Supabase client with service role key for database access
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
-
   try {
-    const url = new URL(req.url);
-    const path = url.pathname;
-
-    console.log(`SSO Auth: ${req.method} ${path}`);
-    console.log('Headers:', Object.fromEntries(req.headers.entries()));
-    console.log('URL params:', Object.fromEntries(url.searchParams.entries()));
-
-    if (path.endsWith('/authorize')) {
-      return await handleAuthorize(req, supabaseClient);
-    } else if (path.endsWith('/token')) {
-      return await handleToken(req, supabaseClient);
-    } else if (path.endsWith('/userinfo')) {
-      return await handleUserInfo(req, supabaseClient);
-    } else if (path.endsWith('/callback')) {
-      return await handleCallback(req, supabaseClient);
-    } else if (path.endsWith('/complete')) {
-      return await handleComplete(req, supabaseClient);
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration');
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Invalid endpoint' }),
-      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (url.pathname === '/sso-auth/authorize' && req.method === 'GET') {
+      // Handle authorization request
+      const params = Object.fromEntries(url.searchParams.entries());
+      console.log('URL params:', params);
+      console.log('Headers:', Object.fromEntries(req.headers.entries()));
+
+      const authRequest: AuthorizeRequest = {
+        client_id: params.client_id || '',
+        redirect_uri: params.redirect_uri || '',
+        scope: params.scope || 'profile email',
+        response_type: params.response_type || 'code',
+        state: params.state
+      };
+
+      console.log('SSO Authorize request:', {
+        clientId: authRequest.client_id,
+        redirectUri: authRequest.redirect_uri,
+        scope: authRequest.scope,
+        state: authRequest.state
+      });
+
+      // Validate required parameters
+      if (!authRequest.client_id || !authRequest.redirect_uri) {
+        return new Response(
+          createErrorPage('Missing required parameters: client_id and redirect_uri are required'),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+          }
+        );
+      }
+
+      // Validate API key format
+      if (!authRequest.client_id.startsWith('ak_')) {
+        return new Response(
+          createErrorPage('Invalid client_id format'),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+          }
+        );
+      }
+
+      // Verify API key exists and is active
+      const { data: apiKey, error: apiKeyError } = await supabase
+        .from('api_keys')
+        .select('id, name, user_id, is_active')
+        .eq('key_hash', authRequest.client_id)
+        .eq('is_active', true)
+        .single();
+
+      if (apiKeyError || !apiKey) {
+        console.error('Invalid API key:', authRequest.client_id);
+        return new Response(
+          createErrorPage('Invalid or inactive API key'),
+          { 
+            status: 403, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+          }
+        );
+      }
+
+      // Generate authorization code
+      const authCode = generateAuthCode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Store authorization code
+      const { error: storeError } = await supabase
+        .from('sso_auth_codes')
+        .insert({
+          code: authCode,
+          api_key_id: apiKey.id,
+          redirect_uri: authRequest.redirect_uri,
+          scope: authRequest.scope,
+          state: authRequest.state,
+          expires_at: expiresAt.toISOString()
+        });
+
+      if (storeError) {
+        console.error('Failed to store auth code:', storeError);
+        return new Response(
+          createErrorPage('Failed to generate authorization code'),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+          }
+        );
+      }
+
+      // Build redirect URL with authorization code
+      const redirectUrl = new URL(authRequest.redirect_uri);
+      redirectUrl.searchParams.set('code', authCode);
+      if (authRequest.state) {
+        redirectUrl.searchParams.set('state', authRequest.state);
+      }
+
+      // Return HTML page that performs the redirect
+      // This avoids iframe issues by using a full page redirect
+      const html = createRedirectPage(redirectUrl.toString(), authRequest.redirect_uri);
+      
+      return new Response(html, {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+      });
+    }
+
+    // Handle token exchange
+    if (url.pathname === '/sso-auth/token' && req.method === 'POST') {
+      const body = await req.json();
+      
+      const { code, client_id, redirect_uri } = body;
+      
+      if (!code || !client_id || !redirect_uri) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required parameters' }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Verify and consume authorization code
+      const { data: authCodeData, error: codeError } = await supabase
+        .from('sso_auth_codes')
+        .select(`
+          id,
+          api_key_id,
+          redirect_uri,
+          scope,
+          expires_at,
+          used_at,
+          api_keys!inner (
+            id,
+            user_id,
+            name,
+            key_hash
+          )
+        `)
+        .eq('code', code)
+        .eq('redirect_uri', redirect_uri)
+        .single();
+
+      if (codeError || !authCodeData || authCodeData.api_keys.key_hash !== client_id) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid authorization code' }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Check if code is expired or already used
+      if (authCodeData.used_at || new Date(authCodeData.expires_at) < new Date()) {
+        return new Response(
+          JSON.stringify({ error: 'Authorization code expired or already used' }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Mark code as used
+      await supabase
+        .from('sso_auth_codes')
+        .update({ used_at: new Date().toISOString() })
+        .eq('id', authCodeData.id);
+
+      // Generate access token
+      const accessToken = generateAccessToken();
+      const tokenExpiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+
+      // Store access token
+      await supabase
+        .from('sso_access_tokens')
+        .insert({
+          token: accessToken,
+          api_key_id: authCodeData.api_key_id,
+          scope: authCodeData.scope,
+          expires_at: tokenExpiresAt.toISOString()
+        });
+
+      // Get user profile for the response
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('id', authCodeData.api_keys.user_id)
+        .single();
+
+      return new Response(
+        JSON.stringify({
+          access_token: accessToken,
+          token_type: 'Bearer',
+          expires_in: 3600,
+          scope: authCodeData.scope,
+          user: profile ? {
+            id: profile.id,
+            name: profile.full_name,
+            email: profile.email
+          } : null
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    return new Response('Not Found', { 
+      status: 404, 
+      headers: corsHeaders 
+    });
 
   } catch (error) {
-    console.error('SSO Auth Error:', error);
+    console.error('SSO Auth error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Internal server error' }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
 
-async function handleAuthorize(req: Request, supabase: any) {
-  try {
-    const url = new URL(req.url);
-    const clientId = url.searchParams.get('client_id');
-    const redirectUri = url.searchParams.get('redirect_uri');
-    const scope = url.searchParams.get('scope') || 'profile email';
-    const state = url.searchParams.get('state');
+function generateAuthCode(): string {
+  return 'ac_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
+    .map(b => b.toString(36))
+    .join('');
+}
 
-    console.log('SSO Authorize request:', { clientId, redirectUri, scope, state });
+function generateAccessToken(): string {
+  return 'at_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => b.toString(36))
+    .join('');
+}
 
-    if (!clientId || !redirectUri) {
-      console.error('Missing required parameters:', { clientId: !!clientId, redirectUri: !!redirectUri });
-      
-      const errorHtml = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Invalid Request - HappyCoins SSO</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
-            .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
-            .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
-            .retry-button { 
-              background: #007bff; color: white; padding: 12px 24px; 
-              text-decoration: none; border-radius: 5px; display: inline-block;
-              font-weight: bold; border: none; cursor: pointer;
-            }
-            .retry-button:hover { background: #0056b3; }
-          </style>
-        </head>
-        <body>
-          <div class="error-container">
-            <h1 class="error-title">Invalid Request</h1>
-            <p class="error-message">Missing required parameters: client_id and redirect_uri</p>
-            <button onclick="window.history.back()" class="retry-button">Go Back</button>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      return new Response(errorHtml, {
-        status: 400,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-    }
-
-    // Verify API key/client_id exists and is active
-    const { data: apiKey, error: apiKeyError } = await supabase
-      .from('api_keys')
-      .select('*')
-      .eq('api_key', clientId)
-      .eq('is_active', true)
-      .single();
-
-    if (apiKeyError || !apiKey) {
-      console.error('Invalid client_id:', clientId, apiKeyError);
-      
-      const errorHtml = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Invalid Client - HappyCoins SSO</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
-            .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
-            .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
-            .retry-button { 
-              background: #007bff; color: white; padding: 12px 24px; 
-              text-decoration: none; border-radius: 5px; display: inline-block;
-              font-weight: bold; border: none; cursor: pointer;
-            }
-            .retry-button:hover { background: #0056b3; }
-          </style>
-        </head>
-        <body>
-          <div class="error-container">
-            <h1 class="error-title">Invalid Application</h1>
-            <p class="error-message">The application you're trying to connect to is not authorized or has been disabled. Please contact the application provider.</p>
-            <button onclick="window.history.back()" class="retry-button">Go Back</button>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      return new Response(errorHtml, {
-        status: 401,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-    }
-
-    // Check if redirect_uri is allowed
-    if (apiKey.allowed_domains && apiKey.allowed_domains.length > 0) {
-      const isAllowed = apiKey.allowed_domains.some((domain: string) => 
-        redirectUri.startsWith(domain));
-      
-      if (!isAllowed) {
-        console.error('Invalid redirect_uri:', redirectUri, 'Allowed domains:', apiKey.allowed_domains);
-        
-        const errorHtml = `
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Invalid Redirect - HappyCoins SSO</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
-              .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-              .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
-              .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
-              .retry-button { 
-                background: #007bff; color: white; padding: 12px 24px; 
-                text-decoration: none; border-radius: 5px; display: inline-block;
-                font-weight: bold; border: none; cursor: pointer;
-              }
-              .retry-button:hover { background: #0056b3; }
-            </style>
-          </head>
-          <body>
-            <div class="error-container">
-              <h1 class="error-title">Invalid Redirect URL</h1>
-              <p class="error-message">The redirect URL is not authorized for this application. Please contact the application provider.</p>
-              <button onclick="window.history.back()" class="retry-button">Go Back</button>
-            </div>
-          </body>
-          </html>
-        `;
-        
-        return new Response(errorHtml, {
-          status: 400,
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        });
-      }
-    }
-
-    // Store the SSO request in the database for later retrieval
-    const ssoRequestId = 'sso_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-    
-    const { error: insertError } = await supabase
-      .from('sso_auth_codes')
-      .insert({
-        code: ssoRequestId,
-        user_id: null, // Will be filled when user completes auth
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        scope: scope,
-        state: state || null,
-        expires_at: new Date(Date.now() + (10 * 60 * 1000)).toISOString(), // 10 minutes
-        used: false
-      });
-
-    if (insertError) {
-      console.error('Error storing SSO request:', insertError);
-      return new Response('Failed to initialize SSO request', { status: 500 });
-    }
-
-    // Create an authorization page that redirects to HappyCoins for authentication
-    const authorizationHtml = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Authorize with HappyCoins</title>
-        <style>
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            padding: 20px; 
-            text-align: center; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+function createRedirectPage(redirectUrl: string, originalRedirectUri: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HappyCoins Authorization</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             min-height: 100vh;
             margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-sizing: border-box;
-          }
-          .auth-container { 
-            max-width: 400px; 
-            width: 100%;
-            background: white; 
-            padding: 40px; 
-            border-radius: 15px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            box-sizing: border-box;
-          }
-          .logo { 
-            font-size: 32px; 
-            font-weight: bold; 
-            color: #333; 
-            margin-bottom: 10px;
-          }
-          .subtitle { 
-            color: #666; 
-            margin-bottom: 30px; 
-            font-size: 16px;
-          }
-          .app-info {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-          }
-          .app-name {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-          }
-          .permissions {
-            color: #666;
-            font-size: 14px;
-          }
-          .auth-button { 
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white; 
-            padding: 15px 30px; 
-            text-decoration: none; 
-            border-radius: 25px; 
-            display: inline-block;
-            font-weight: bold;
-            font-size: 16px;
-            transition: transform 0.2s;
-            border: none;
-            cursor: pointer;
-            width: 100%;
-            box-sizing: border-box;
-          }
-          .auth-button:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-          }
-          .cancel-button {
-            background: #6c757d;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 20px;
-            display: inline-block;
-            margin-top: 15px;
-            font-size: 14px;
-            border: none;
-            cursor: pointer;
-          }
-          .cancel-button:hover {
-            background: #5a6268;
-          }
-          .security-note {
-            font-size: 12px;
-            color: #999;
-            margin-top: 20px;
-            line-height: 1.4;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="auth-container">
-          <div class="logo">🪙 HappyCoins</div>
-          <div class="subtitle">Secure Digital Wallet</div>
-          
-          <div class="app-info">
-            <div class="app-name">${apiKey.application_name || 'Third-party Application'}</div>
-            <div class="permissions">Requesting access to: ${scope}</div>
-          </div>
-          
-          <p style="color: #333; margin-bottom: 30px;">
-            "${apiKey.application_name || 'This application'}" wants to connect to your HappyCoins account.
-          </p>
-          
-          <button class="auth-button" onclick="authorizeApp()">
-            Continue to HappyCoins Login
-          </button>
-          
-          <button class="cancel-button" onclick="cancelAuth()">
-            Cancel
-          </button>
-          
-          <div class="security-note">
-            You will be redirected to HappyCoins to sign in. After signing in, you'll be brought back to authorize this application.
-          </div>
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 400px;
+        }
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+        .message {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .redirect-info {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🪙 HappyCoins</div>
+        <div class="message">Authorization successful!</div>
+        <div class="spinner"></div>
+        <div>Redirecting you back to the application...</div>
+        <div class="redirect-info">
+            If you are not redirected automatically, 
+            <a href="${redirectUrl}" style="color: white; text-decoration: underline;">click here</a>
         </div>
+    </div>
+    
+    <script>
+        // Immediate redirect
+        window.location.href = '${redirectUrl}';
         
-        <script>
-          function authorizeApp() {
-            // Build the return URL to complete the SSO flow after login
-            const currentUrl = new URL(window.location.href);
-            const returnUrl = currentUrl.origin + currentUrl.pathname.replace('/authorize', '/complete') + 
-              '?sso_request_id=' + encodeURIComponent('${ssoRequestId}');
-            
-            console.log('Redirecting to HappyCoins with return URL:', returnUrl);
-            
-            // Redirect to the HappyCoins application for authentication
-            const happyCoinsUrl = 'https://happy-wallet.axzoragroup.com/?sso_auth=true&return_to=' + encodeURIComponent(returnUrl);
-            window.location.href = happyCoinsUrl;
-          }
-          
-          function cancelAuth() {
-            const redirectUrl = '${redirectUri}?error=access_denied' + (${state ? `'&state=${state}'` : `''`});
-            window.location.href = redirectUrl;
-          }
-          
-          // Handle potential communication with parent window
-          window.addEventListener('load', function() {
-            console.log('Authorization page loaded successfully');
-          });
-        </script>
-      </body>
-      </html>
-    `;
-
-    return new Response(authorizationHtml, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'X-Frame-Options': 'SAMEORIGIN',
-        'X-Content-Type-Options': 'nosniff'
-      }
-    });
-
-  } catch (error) {
-    console.error('Error in handleAuthorize:', error);
-    
-    const errorHtml = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Error - HappyCoins SSO</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 40px; text-align: center; background: #f5f5f5; margin: 0; }
-          .error-container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-          .error-title { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
-          .error-message { margin-bottom: 30px; color: #666; line-height: 1.5; }
-          .retry-button { 
-            background: #007bff; color: white; padding: 12px 24px; 
-            text-decoration: none; border-radius: 5px; display: inline-block;
-            font-weight: bold; border: none; cursor: pointer;
-          }
-          .retry-button:hover { background: #0056b3; }
-        </style>
-      </head>
-      <body>
-        <div class="error-container">
-          <h1 class="error-title">Authorization Error</h1>
-          <p class="error-message">An error occurred during authorization. Please try again.</p>
-          <button onclick="window.history.back()" class="retry-button">Go Back</button>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    return new Response(errorHtml, {
-      status: 500,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
-  }
+        // Fallback redirect after 2 seconds
+        setTimeout(function() {
+            window.location.href = '${redirectUrl}';
+        }, 2000);
+        
+        // If in iframe, try to redirect parent window
+        if (window.parent !== window.self) {
+            try {
+                window.parent.location.href = '${redirectUrl}';
+            } catch (e) {
+                // Cross-origin restriction, fallback to current window
+                window.location.href = '${redirectUrl}';
+            }
+        }
+    </script>
+</body>
+</html>`;
 }
 
-async function handleComplete(req: Request, supabase: any) {
-  try {
-    const url = new URL(req.url);
-    const userId = url.searchParams.get('user_id');
-    const ssoRequestId = url.searchParams.get('sso_request_id');
-    
-    console.log('SSO Complete request:', { userId, ssoRequestId });
-    
-    if (!ssoRequestId || !userId) {
-      console.error('Missing required parameters for completion');
-      return new Response('Missing required parameters', { status: 400 });
-    }
-    
-    // Get the stored SSO request
-    const { data: ssoRequest, error: ssoError } = await supabase
-      .from('sso_auth_codes')
-      .select('*')
-      .eq('code', ssoRequestId)
-      .eq('used', false)
-      .single();
-    
-    if (ssoError || !ssoRequest) {
-      console.error('SSO request not found or already used:', ssoRequestId, ssoError);
-      return new Response('Invalid or expired SSO request', { status: 400 });
-    }
-    
-    // Check if request is expired
-    if (new Date(ssoRequest.expires_at) < new Date()) {
-      console.error('SSO request expired:', ssoRequestId);
-      return new Response('SSO request has expired', { status: 400 });
-    }
-    
-    // Generate new authorization code for the actual OAuth flow
-    const authCode = 'ac_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-    const expiresAt = new Date(Date.now() + (10 * 60 * 1000)); // 10 minutes
-    
-    // Update the SSO request with user info and mark as used
-    const { error: updateError } = await supabase
-      .from('sso_auth_codes')
-      .update({
-        user_id: userId,
-        used: true
-      })
-      .eq('code', ssoRequestId);
-    
-    if (updateError) {
-      console.error('Error updating SSO request:', updateError);
-      return new Response('Failed to complete SSO request', { status: 500 });
-    }
-    
-    // Create a new authorization code entry for the OAuth token exchange
-    const { error: insertError } = await supabase
-      .from('sso_auth_codes')
-      .insert({
-        code: authCode,
-        user_id: userId,
-        client_id: ssoRequest.client_id,
-        redirect_uri: ssoRequest.redirect_uri,
-        scope: ssoRequest.scope || 'profile email',
-        state: ssoRequest.state,
-        expires_at: expiresAt.toISOString(),
-        used: false
-      });
-    
-    if (insertError) {
-      console.error('Error storing authorization code:', insertError);
-      return new Response('Failed to generate authorization code', { status: 500 });
-    }
-    
-    // Build the final redirect URL to the application's redirect_uri
-    const finalRedirectUrl = new URL(ssoRequest.redirect_uri);
-    finalRedirectUrl.searchParams.set('code', authCode);
-    if (ssoRequest.state) {
-      finalRedirectUrl.searchParams.set('state', ssoRequest.state);
-    }
-    
-    console.log('SSO Complete: Redirecting to application redirect_uri:', finalRedirectUrl.toString());
-    
-    // Direct redirect to the application's redirect_uri
-    return new Response(null, {
-      status: 302,
-      headers: {
-        'Location': finalRedirectUrl.toString(),
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error in handleComplete:', error);
-    return new Response('Internal server error', { status: 500 });
-  }
-}
-
-async function handleCallback(req: Request, supabase: any) {
-  const url = new URL(req.url);
-  const authCode = url.searchParams.get('code');
-  const redirectUri = url.searchParams.get('redirect_uri');
-  const state = url.searchParams.get('state');
-
-  console.log('SSO Callback:', { authCode, redirectUri, state });
-
-  if (!authCode || !redirectUri) {
-    return new Response(
-      'Missing required parameters',
-      { status: 400, headers: corsHeaders }
-    );
-  }
-
-  // This endpoint should not be used anymore since we're doing direct redirects
-  // But keeping it for backward compatibility
-  const finalRedirectUrl = new URL(redirectUri);
-  finalRedirectUrl.searchParams.set('code', authCode);
-  if (state) {
-    finalRedirectUrl.searchParams.set('state', state);
-  }
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      ...corsHeaders,
-      'Location': finalRedirectUrl.toString()
-    }
-  });
-}
-
-async function handleToken(req: Request, supabase: any) {
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  const body: SSOTokenRequest = await req.json();
-  const { code, client_id, client_secret, redirect_uri } = body;
-
-  console.log('Token request:', { code, client_id, redirect_uri });
-
-  if (!code || !client_id || !client_secret || !redirect_uri) {
-    return new Response(
-      JSON.stringify({ error: 'Missing required parameters' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Verify client credentials
-  const { data: apiKey, error: apiError } = await supabase
-    .from('api_keys')
-    .select('*')
-    .eq('api_key', client_id)
-    .eq('secret_key', client_secret)
-    .eq('is_active', true)
-    .single();
-
-  if (apiError || !apiKey) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid client credentials' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Get and verify authorization code
-  const { data: authCodeData, error: codeError } = await supabase
-    .from('sso_auth_codes')
-    .select('*')
-    .eq('code', code)
-    .eq('client_id', client_id)
-    .eq('redirect_uri', redirect_uri)
-    .eq('used', false)
-    .single();
-
-  if (codeError || !authCodeData) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid authorization code' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Check if code is expired
-  if (new Date(authCodeData.expires_at) < new Date()) {
-    return new Response(
-      JSON.stringify({ error: 'Authorization code expired' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Verify the user_id exists (should be set during authorize)
-  if (!authCodeData.user_id) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid authorization code - no user associated' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Mark code as used
-  await supabase
-    .from('sso_auth_codes')
-    .update({ used: true })
-    .eq('code', code);
-
-  // Generate access token
-  const accessToken = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
-
-  // Store access token with the real user ID
-  await supabase.from('sso_access_tokens').insert({
-    token: accessToken,
-    user_id: authCodeData.user_id,
-    client_id: client_id,
-    scope: authCodeData.scope,
-    expires_at: expiresAt.toISOString()
-  });
-
-  return new Response(
-    JSON.stringify({
-      access_token: accessToken,
-      token_type: 'Bearer',
-      expires_in: 3600,
-      scope: authCodeData.scope
-    }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
-}
-
-async function handleUserInfo(req: Request, supabase: any) {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return new Response(
-      JSON.stringify({ error: 'Missing or invalid authorization header' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  const accessToken = authHeader.substring(7);
-
-  // Verify access token
-  const { data: tokenData, error } = await supabase
-    .from('sso_access_tokens')
-    .select('*, profiles(*)')
-    .eq('token', accessToken)
-    .eq('revoked', false)
-    .single();
-
-  if (error || !tokenData) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid access token' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Check if token is expired
-  if (new Date(tokenData.expires_at) < new Date()) {
-    return new Response(
-      JSON.stringify({ error: 'Access token expired' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  const profile = tokenData.profiles;
-  const userInfo: any = {
-    sub: profile?.id || tokenData.user_id,
-    email: profile?.email || 'unknown@happycoins.com',
-    name: profile?.full_name || 'HappyCoins User',
-    preferred_username: profile?.full_name || 'HappyCoins User'
-  };
-
-  // Include additional fields based on scope
-  if (tokenData.scope.includes('wallet')) {
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', profile?.id || tokenData.user_id)
-      .single();
-    
-    if (wallet) {
-      userInfo.wallet_balance = wallet.balance;
-    }
-  }
-
-  return new Response(
-    JSON.stringify(userInfo),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+function createErrorPage(errorMessage: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HappyCoins Authorization Error</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 400px;
+        }
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+        .error-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .message {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🪙 HappyCoins</div>
+        <div class="error-icon">⚠️</div>
+        <div class="message">Authorization Error</div>
+        <div>${errorMessage}</div>
+    </div>
+</body>
+</html>`;
 }

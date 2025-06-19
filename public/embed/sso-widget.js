@@ -2,7 +2,7 @@
 (function() {
   'use strict';
 
-  // HappyCoins SSO Widget with direct redirect (no popup)
+  // HappyCoins SSO Widget with popup window approach to avoid X-Frame-Options issues
   window.HappyCoinsSSOWidget = {
     render: function(containerId, config) {
       console.log('HappyCoins SSO Widget: Attempting to render in container:', containerId);
@@ -28,6 +28,7 @@
         appName: 'Application',
         theme: 'light',
         compact: false,
+        usePopup: true, // Use popup by default to avoid iframe issues
         onSuccess: function(code) { console.log('SSO Success:', code); },
         onError: function(error) { console.error('SSO Error:', error); }
       }, config);
@@ -200,7 +201,7 @@
           </div>
 
           <div class="hc-sso-widget-info">
-            <strong>Secure Authentication:</strong> Sign in using your HappyCoins wallet credentials. Your login information is encrypted and secure.
+            <strong>Secure Authentication:</strong> Sign in using your HappyCoins wallet credentials. A secure popup window will open for authentication.
           </div>
 
           <button class="hc-sso-widget-button" id="hc-sso-button">
@@ -260,17 +261,17 @@
     },
 
     initiateAuth: function(button, messageDiv, config) {
-      console.log('HappyCoins SSO Widget: Initiating authentication with direct redirect');
+      console.log('HappyCoins SSO Widget: Initiating authentication with popup window');
       
       button.disabled = true;
       button.innerHTML = `
         <svg class="hc-sso-spin" style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12a9 9 0 11-6.219-8.56"/>
         </svg>
-        Redirecting...
+        Opening popup...
       `;
 
-      this.showMessage(messageDiv, 'Redirecting to HappyCoins authentication...', 'info');
+      this.showMessage(messageDiv, 'Opening secure authentication popup...', 'info');
 
       try {
         const params = new URLSearchParams({
@@ -287,19 +288,96 @@
         const baseUrl = this.getSupabaseUrl();
         const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString();
         
-        console.log('HappyCoins SSO Widget: Redirecting to authorization:', authUrl);
-        
-        // Use direct window location redirect - no popups
-        setTimeout(() => {
-          window.location.href = authUrl;
-        }, 500);
+        console.log('HappyCoins SSO Widget: Opening popup for authorization:', authUrl);
+
+        // Open popup window to avoid X-Frame-Options issues
+        const popup = window.open(
+          authUrl,
+          'happycoins-sso',
+          'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+        );
+
+        if (!popup) {
+          throw new Error('Popup blocked. Please allow popups for this site.');
+        }
+
+        // Monitor popup for completion
+        this.monitorPopup(popup, config, button, messageDiv);
 
       } catch (error) {
         console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);
-        this.showMessage(messageDiv, 'Failed to initiate authentication: ' + error.message, 'error');
+        this.showMessage(messageDiv, 'Failed to open authentication popup: ' + error.message, 'error');
         this.resetButton(button, config);
         config.onError('Failed to initiate authentication: ' + error.message);
       }
+    },
+
+    monitorPopup: function(popup, config, button, messageDiv) {
+      const checkPopup = () => {
+        try {
+          if (popup.closed) {
+            console.log('HappyCoins SSO Widget: Popup was closed');
+            this.showMessage(messageDiv, 'Authentication popup was closed', 'error');
+            this.resetButton(button, config);
+            config.onError('Authentication cancelled');
+            return;
+          }
+
+          // Try to read the popup URL to detect successful redirect
+          try {
+            const popupUrl = popup.location.href;
+            const urlParams = new URLSearchParams(new URL(popupUrl).search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            const returnedState = urlParams.get('state');
+
+            if (code || error) {
+              popup.close();
+              
+              if (error) {
+                console.error('HappyCoins SSO Widget: Authentication error from popup:', error);
+                this.showMessage(messageDiv, 'Authentication failed: ' + error, 'error');
+                this.resetButton(button, config);
+                config.onError(error);
+                return;
+              }
+
+              if (config.state && returnedState !== config.state) {
+                console.error('HappyCoins SSO Widget: Invalid state parameter from popup');
+                this.showMessage(messageDiv, 'Invalid state parameter', 'error');
+                this.resetButton(button, config);
+                config.onError('Invalid state parameter');
+                return;
+              }
+
+              console.log('HappyCoins SSO Widget: Authentication successful from popup');
+              this.showMessage(messageDiv, 'Authentication successful!', 'success');
+              button.innerHTML = `
+                <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+                Authorized
+              `;
+              config.onSuccess(code);
+              return;
+            }
+          } catch (e) {
+            // Cross-origin error is expected while popup is on different domain
+            // Continue checking
+          }
+
+          // Continue monitoring
+          setTimeout(checkPopup, 1000);
+        } catch (error) {
+          console.error('HappyCoins SSO Widget: Error monitoring popup:', error);
+          this.showMessage(messageDiv, 'Error monitoring authentication popup', 'error');
+          this.resetButton(button, config);
+          config.onError('Error monitoring authentication');
+        }
+      };
+
+      // Start monitoring
+      setTimeout(checkPopup, 1000);
     },
 
     getSupabaseUrl: function() {
@@ -312,7 +390,8 @@
       }
       
       if (messageDiv) {
-        messageDiv.style.display = text ? 'block' : 'none';
+        messageDiv.style.display = text ? '
+        ' : 'none';
         messageDiv.textContent = text;
         messageDiv.className = `hc-sso-widget-message ${type}`;
       } else {
@@ -351,7 +430,8 @@
         state: element.getAttribute('data-state'),
         appName: element.getAttribute('data-app-name') || 'Application',
         theme: element.getAttribute('data-theme') || 'light',
-        compact: element.getAttribute('data-compact') === 'true'
+        compact: element.getAttribute('data-compact') === 'true',
+        usePopup: element.getAttribute('data-use-popup') !== 'false' // Default to true
       };
       
       if (config.clientId && config.redirectUri) {
