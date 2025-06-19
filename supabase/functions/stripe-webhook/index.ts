@@ -88,9 +88,26 @@ serve(async (req) => {
     }
 
     try {
+      // Check if this payment has already been processed
+      const { data: existingTransaction, error: transactionCheckError } = await supabaseClient
+        .from('transactions')
+        .select('id')
+        .eq('reference_id', session.id)
+        .single();
+
+      if (existingTransaction) {
+        console.log('Payment already processed:', session.id);
+        return new Response(JSON.stringify({ 
+          received: true, 
+          message: 'Payment already processed',
+          transaction_id: existingTransaction.id 
+        }), { status: 200 });
+      }
+
       // Get user's wallet
       console.log('Looking for wallet for user:', userId);
-      const { data: wallet, error: walletError } = await supabaseClient
+      let wallet;
+      const { data: walletData, error: walletError } = await supabaseClient
         .from('wallets')
         .select('*')
         .eq('user_id', userId)
@@ -118,10 +135,12 @@ serve(async (req) => {
           }
           
           console.log('New wallet created:', newWallet.id);
-          const wallet = newWallet;
+          wallet = newWallet;
         } else {
           throw walletError;
         }
+      } else {
+        wallet = walletData;
       }
 
       console.log('Current wallet balance:', wallet.balance);

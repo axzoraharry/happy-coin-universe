@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard, Coins, Smartphone, RefreshCw } from 'lucide-react';
+import { CreditCard, Coins, Smartphone, RefreshCw, AlertCircle } from 'lucide-react';
 import { AccountStatusGuard } from '../common/AccountStatusGuard';
 import { useAccountStatus } from '@/hooks/useAccountStatus';
 
@@ -28,6 +28,8 @@ export function PurchaseCoins() {
 
     setLoading(true);
     try {
+      console.log('Creating checkout session for amount:', purchaseAmount);
+      
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
           amount: purchaseAmount,
@@ -35,7 +37,22 @@ export function PurchaseCoins() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Checkout creation error:', error);
+        throw error;
+      }
+
+      if (!data?.url) {
+        throw new Error('No checkout URL received');
+      }
+
+      console.log('Checkout session created, opening:', data.url);
+      
+      // Show success message
+      toast({
+        title: "Payment Session Created",
+        description: "Opening Stripe checkout. Complete your payment to receive Happy Coins.",
+      });
 
       // Open Stripe checkout in a new tab
       window.open(data.url, '_blank');
@@ -54,9 +71,16 @@ export function PurchaseCoins() {
   const handleRecoverPayments = async () => {
     setRecovering(true);
     try {
+      console.log('Attempting to recover failed payments...');
+      
       const { data, error } = await supabase.functions.invoke('recover-failed-payment');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Recovery error:', error);
+        throw error;
+      }
+
+      console.log('Recovery result:', data);
 
       toast({
         title: "Recovery Check Complete",
@@ -95,6 +119,16 @@ export function PurchaseCoins() {
       });
       return;
     }
+    
+    if (customAmount > 1000) {
+      toast({
+        title: "Amount Too Large",
+        description: "Maximum purchase amount is 1000 HC",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     handlePurchase(customAmount);
   };
 
@@ -114,9 +148,12 @@ export function PurchaseCoins() {
           {/* Recovery Button */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-medium text-yellow-800">Payment Issue?</h4>
-                <p className="text-sm text-yellow-700">If you paid but didn't receive coins, click to recover them.</p>
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-yellow-800">Payment Issue?</h4>
+                  <p className="text-sm text-yellow-700">If you paid but didn't receive coins, click to recover them.</p>
+                </div>
               </div>
               <Button
                 variant="outline"
@@ -188,6 +225,7 @@ export function PurchaseCoins() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 min="1"
+                max="1000"
                 step="1"
                 className="flex-1"
               />
@@ -196,8 +234,14 @@ export function PurchaseCoins() {
                 disabled={loading || !amount}
                 className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
               >
-                {paymentMethod === 'upi' ? <Smartphone className="h-4 w-4 mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
-                Buy
+                {loading ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : paymentMethod === 'upi' ? (
+                  <Smartphone className="h-4 w-4 mr-2" />
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-2" />
+                )}
+                {loading ? 'Processing...' : 'Buy'}
               </Button>
             </div>
           </div>
@@ -208,6 +252,7 @@ export function PurchaseCoins() {
             <p>• 1000 INR = 1 Happy Coin</p>
             <p>• {paymentMethod === 'upi' ? 'Pay using UPI apps like GPay, PhonePe, Paytm' : 'Pay with any debit/credit card'}</p>
             <p>• If payment fails to credit, use the "Recover Coins" button above</p>
+            <p>• Maximum purchase: 1000 HC per transaction</p>
           </div>
         </CardContent>
       </Card>
