@@ -1,7 +1,8 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Updated CORS headers with a more permissive CSP for auth checks
+// Updated CORS headers - specific origin handling for auth checks
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -10,6 +11,14 @@ const corsHeaders = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin'
 }
+
+// CORS headers for authenticated requests (specific origin)
+const getAuthCorsHeaders = (origin: string) => ({
+  'Access-Control-Allow-Origin': origin || 'https://happy-wallet.axzoragroup.com',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
+})
 
 interface AuthorizeRequest {
   client_id: string;
@@ -25,6 +34,11 @@ serve(async (req) => {
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    const origin = req.headers.get('Origin');
+    if (url.pathname === '/sso-auth/check-auth') {
+      // For auth check endpoint, use specific origin headers
+      return new Response(null, { headers: getAuthCorsHeaders(origin) });
+    }
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -38,6 +52,44 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // New endpoint to check authentication status
+    if (url.pathname === '/sso-auth/check-auth' && req.method === 'GET') {
+      const origin = req.headers.get('Origin');
+      const authHeader = req.headers.get('Authorization');
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ authenticated: false }), {
+          status: 200,
+          headers: { ...getAuthCorsHeaders(origin), 'Content-Type': 'application/json' }
+        });
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      
+      if (error || !user) {
+        return new Response(JSON.stringify({ authenticated: false }), {
+          status: 200,
+          headers: { ...getAuthCorsHeaders(origin), 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Check if user profile is active
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('id, is_active, full_name, email')
+        .eq('id', user.id)
+        .single();
+
+      return new Response(JSON.stringify({ 
+        authenticated: true, 
+        user: userProfile || { id: user.id, email: user.email }
+      }), {
+        status: 200,
+        headers: { ...getAuthCorsHeaders(origin), 'Content-Type': 'application/json' }
+      });
+    }
 
     if (url.pathname === '/sso-auth/authorize' && req.method === 'GET') {
       // Handle authorization request
@@ -102,11 +154,8 @@ serve(async (req) => {
 
       console.log('Valid API key found:', { id: apiKey.id, application_name: apiKey.application_name });
 
-      // Check for session in multiple ways to handle cross-tab authentication
+      // Check for session from Authorization header
       let user = null;
-      let profile = null;
-      
-      // First, try to get user from Authorization header
       const authHeader = req.headers.get('Authorization');
       if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.replace('Bearer ', '');
@@ -117,19 +166,8 @@ serve(async (req) => {
           console.log('User authenticated via header:', user.id);
         }
       }
-      
-      // If no user from header, check for session cookies or other auth methods
-      if (!user) {
-        // Try to get session from cookies (this handles cross-tab scenarios)
-        const cookieHeader = req.headers.get('Cookie');
-        if (cookieHeader) {
-          // Parse session from cookies - this is a simplified approach
-          // In a real implementation, you'd parse the actual Supabase session cookies
-          console.log('Checking for session in cookies...');
-        }
-      }
 
-      // If still no authenticated user, return login required page
+      // If no authenticated user, return login required page
       if (!user) {
         console.log('No authenticated user found - showing login page');
         return new Response(
@@ -469,6 +507,9 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
     </div>
     
     <script>
+        // Store auth params for later use
+        const authUrl = '${currentAuthUrl}';
+        
         async function checkAuth() {
             const buttons = document.getElementById('auth-buttons');
             const checking = document.getElementById('checking');
@@ -477,22 +518,41 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             checking.classList.remove('hidden');
             
             try {
-                // Try to get the current session from HappyCoins
-                const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/auth/v1/user', {
-                    credentials: 'include',
-                    headers: {
-                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczMDkwMDMsImV4cCI6MjA2Mjg4NTAwM30.u6cJkMkw17DSmapGl3dgG7NPOh5--PPnRHr8ZWy6WXo'
-                    }
-                });
+                // Check if we have session storage with access token
+                const accessToken = sessionStorage.getItem('sb-access-token') || 
+                                   localStorage.getItem('sb-access-token');
                 
-                if (response.ok) {
-                    const userData = await response.json();
-                    if (userData && userData.id) {
-                        // User is authenticated, redirect to auth endpoint with session
-                        window.location.href = '${currentAuthUrl}';
+                if (accessToken) {
+                    // Use our custom auth check endpoint that handles CORS properly
+                    const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/check-auth', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ' + accessToken,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const authData = await response.json();
+                        if (authData.authenticated) {
+                            // User is authenticated, redirect with the auth token
+                            window.location.href = authUrl + '&access_token=' + accessToken;
+                            return;
+                        }
+                    }
+                }
+                
+                // Try to get access token from URL hash (typical after OAuth redirect)
+                const hash = window.location.hash;
+                if (hash && hash.includes('access_token=')) {
+                    const params = new URLSearchParams(hash.substring(1));
+                    const token = params.get('access_token');
+                    if (token) {
+                        window.location.href = authUrl + '&access_token=' + token;
                         return;
                     }
                 }
+                
             } catch (error) {
                 console.log('Auth check failed:', error);
             }
@@ -503,37 +563,22 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             alert('Please log in to HappyCoins first, then try again.');
         }
         
-        // Auto-check authentication every few seconds
-        let checkCount = 0;
-        const autoCheck = setInterval(() => {
-            checkCount++;
-            if (checkCount > 20) { // Stop after 20 attempts (1 minute)
-                clearInterval(autoCheck);
-                return;
+        // Auto-check for authentication when the page loads
+        window.addEventListener('load', function() {
+            // Check if this is a redirect from the HappyCoins login
+            if (document.referrer.includes('happy-wallet.axzoragroup.com')) {
+                setTimeout(checkAuth, 1000);
             }
-            
-            fetch('https://zygpupmeradizrachnqj.supabase.co/auth/v1/user', {
-                credentials: 'include',
-                headers: {
-                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczMDkwMDMsImV4cCI6MjA2Mjg4NTAwM30.u6cJkMkw17DSmapGl3dgG7NPOh5--PPnRHr8ZWy6WXo'
+        });
+        
+        // Listen for messages from popup windows (login flow)
+        window.addEventListener('message', function(event) {
+            if (event.origin === 'https://happy-wallet.axzoragroup.com') {
+                if (event.data.type === 'AUTH_SUCCESS' && event.data.accessToken) {
+                    window.location.href = authUrl + '&access_token=' + event.data.accessToken;
                 }
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                }
-                throw new Error('Not authenticated');
-            })
-            .then(userData => {
-                if (userData && userData.id) {
-                    clearInterval(autoCheck);
-                    window.location.href = '${currentAuthUrl}';
-                }
-            })
-            .catch(() => {
-                // Still not authenticated, continue checking
-            });
-        }, 3000); // Check every 3 seconds
+            }
+        });
     </script>
 </body>
 </html>`;

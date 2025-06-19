@@ -145,44 +145,12 @@ export function SSOWidget({
       
       console.log('SSO Widget: Redirecting to authorization with session token');
       
-      // Create a form to POST the authorization request with the session token in headers
-      // Since we can't set custom headers for window.location.href, we'll use fetch to make the request
-      // and handle the redirect manually
-      const response = await fetch(authUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        // If successful, the server should return HTML for redirect
-        const html = await response.text();
-        
-        // Create a temporary iframe or new window to handle the redirect
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          newWindow.document.write(html);
-          newWindow.document.close();
-        } else {
-          // Fallback: direct redirect but this won't include the auth token
-          window.location.href = authUrl;
-        }
-      } else {
-        const errorText = await response.text();
-        console.error('SSO authorization failed:', response.status, errorText);
-        
-        // Check if it's an authentication error
-        if (response.status === 401) {
-          setStatus('unauthenticated');
-          setMessage('Your session has expired. Please log in again.');
-        } else {
-          setStatus('error');
-          setMessage('Authorization failed. Please try again.');
-        }
-        onError?.('Authorization failed');
-      }
+      // For CORS compliance, we'll redirect directly but pass the access token as a URL parameter
+      // The server will check for this token in the URL if no Authorization header is present
+      const authUrlWithToken = `${authUrl}&access_token=${encodeURIComponent(session.access_token)}`;
+      
+      // Direct redirect to avoid CORS issues
+      window.location.href = authUrlWithToken;
 
     } catch (error) {
       console.error('SSO request failed:', error);

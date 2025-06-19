@@ -2,7 +2,7 @@
 (function() {
   'use strict';
 
-  // HappyCoins SSO Widget - Updated to handle CSP and iframe restrictions
+  // HappyCoins SSO Widget - Updated to handle CORS restrictions
   window.HappyCoinsSSOWidget = {
     render: function(containerId, config) {
       console.log('HappyCoins SSO Widget: Attempting to render in container:', containerId);
@@ -28,7 +28,6 @@
         appName: 'Application',
         theme: 'light',
         compact: false,
-        usePopup: false, // Default to full redirect to avoid iframe issues
         onSuccess: function(code) { console.log('SSO Success:', code); },
         onError: function(error) { console.error('SSO Error:', error); }
       }, config);
@@ -318,7 +317,7 @@
         
         console.log('HappyCoins SSO Widget: Redirecting to authorization:', authUrl);
 
-        // Use direct redirect to avoid iframe and CSP issues
+        // Use direct redirect - the server will handle authentication checking
         window.location.href = authUrl;
 
       } catch (error) {
@@ -374,8 +373,7 @@
         state: element.getAttribute('data-state'),
         appName: element.getAttribute('data-app-name') || 'Application',
         theme: element.getAttribute('data-theme') || 'light',
-        compact: element.getAttribute('data-compact') === 'true',
-        usePopup: element.getAttribute('data-use-popup') === 'true'
+        compact: element.getAttribute('data-compact') === 'true'
       };
       
       if (config.clientId && config.redirectUri) {
