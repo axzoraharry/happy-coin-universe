@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -19,6 +18,12 @@ const getAuthCorsHeaders = (origin: string) => ({
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Credentials': 'true',
 })
+
+// HTML headers with proper Content-Type
+const htmlHeaders = {
+  ...corsHeaders,
+  'Content-Type': 'text/html; charset=utf-8'
+}
 
 interface AuthorizeRequest {
   client_id: string;
@@ -117,7 +122,7 @@ serve(async (req) => {
           createErrorPage('Missing required parameters: client_id and redirect_uri are required'),
           { 
             status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+            headers: htmlHeaders
           }
         );
       }
@@ -128,7 +133,7 @@ serve(async (req) => {
           createErrorPage('Invalid client_id format. API keys must start with "ak_"'),
           { 
             status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+            headers: htmlHeaders
           }
         );
       }
@@ -147,7 +152,7 @@ serve(async (req) => {
           createErrorPage('Invalid or inactive API key. Please check your client_id and ensure the API key is active.'),
           { 
             status: 403, 
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+            headers: htmlHeaders
           }
         );
       }
@@ -174,7 +179,7 @@ serve(async (req) => {
           createInteractiveAuthPage(authRequest, apiKey.application_name),
           { 
             status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+            headers: htmlHeaders
           }
         );
       }
@@ -194,7 +199,7 @@ serve(async (req) => {
           createErrorPage('User account not found or deactivated. Please ensure your HappyCoins account is active.'),
           { 
             status: 403, 
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+            headers: htmlHeaders
           }
         );
       }
@@ -221,7 +226,7 @@ serve(async (req) => {
           createErrorPage('Failed to generate authorization code. Please try again.'),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+            headers: htmlHeaders
           }
         );
       }
@@ -240,7 +245,7 @@ serve(async (req) => {
       
       return new Response(html, {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+        headers: htmlHeaders
       });
     }
 
