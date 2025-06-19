@@ -15,6 +15,7 @@ import { CoinExchange } from '@/components/coins/CoinExchange';
 import { PurchaseCoins } from '@/components/coins/PurchaseCoins';
 import { SSOGenerator } from '@/components/embed/SSOGenerator';
 import { RealTimeSecurityDashboard } from '@/components/security/RealTimeSecurityDashboard';
+import { GoogleAIAssistant } from '@/components/ai/GoogleAIAssistant';
 import { useToast } from '@/hooks/use-toast';
 
 interface ReferralResponse {
@@ -155,10 +156,25 @@ const Index = () => {
             <WalletDashboard />
             <div className="grid gap-6 lg:grid-cols-2">
               <WalletActions />
-              <div>
+              <div className="space-y-6">
                 <TransactionsList />
               </div>
             </div>
+            <div>
+              <GoogleAIAssistant />
+            </div>
+          </div>
+        );
+      case 'ai-assistant':
+        return (
+          <div className="space-y-8">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">AI Assistant</h1>
+              <p className="text-muted-foreground">
+                Get intelligent help with your Happy Coins wallet powered by Google AI.
+              </p>
+            </div>
+            <GoogleAIAssistant />
           </div>
         );
       case 'security':
@@ -225,9 +241,12 @@ const Index = () => {
             <WalletDashboard />
             <div className="grid gap-6 lg:grid-cols-2">
               <WalletActions />
-              <div>
+              <div className="space-y-6">
                 <TransactionsList />
               </div>
+            </div>
+            <div>
+              <GoogleAIAssistant />
             </div>
           </div>
         );

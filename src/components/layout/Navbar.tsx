@@ -1,14 +1,23 @@
 import { useState } from 'react';
-import { Wallet, Home, Coins, Send, Bell, Gift, Code, Shield, MoreHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import {
+  Home,
+  ArrowLeftRight,
+  Coins,
+  Bell,
+  Gift,
+  Shield,
+  User,
+  Settings,
+  MoreHorizontal,
+  ChevronDown,
+  Bot
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface NavbarProps {
   currentPage: string;
@@ -16,232 +25,320 @@ interface NavbarProps {
 }
 
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { toast } = useToast();
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast({
-          title: "Error",
-          description: "Failed to sign out. Please try again.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Signed out",
-          description: "You have been successfully signed out.",
-        });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred during sign out.",
-        variant: "destructive",
-      });
-    }
-  };
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <nav className="bg-white shadow-lg border-b">
+    <nav className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-8">
-            <div className="flex items-center space-x-2">
-              <Wallet className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">HappyCoins</span>
-            </div>
-            
-            <div className="hidden md:flex space-x-6">
-              <Button
-                variant={currentPage === 'dashboard' ? 'default' : 'ghost'}
-                onClick={() => onPageChange('dashboard')}
-                className="flex items-center space-x-2"
-              >
-                <Home className="h-4 w-4" />
-                <span>Dashboard</span>
-              </Button>
-              
-              <Button
-                variant={currentPage === 'coins' ? 'default' : 'ghost'}
-                onClick={() => onPageChange('coins')}
-                className="flex items-center space-x-2"
-              >
-                <Coins className="h-4 w-4" />
-                <span>Coins</span>
-              </Button>
-
-              <Button
-                variant={currentPage === 'notifications' ? 'default' : 'ghost'}
-                onClick={() => onPageChange('notifications')}
-                className="flex items-center space-x-2"
-              >
-                <Bell className="h-4 w-4" />
-                <span>Notifications</span>
-              </Button>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2">
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span>More</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => onPageChange('sso')}>
-                    <Shield className="h-4 w-4 mr-2" />
-                    SSO
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onPageChange('offers')}>
-                    <Gift className="h-4 w-4 mr-2" />
-                    Offers
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onPageChange('api')}>
-                    <Code className="h-4 w-4 mr-2" />
-                    API
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            <div className="flex-shrink-0 flex items-center">
+              <Coins className="h-8 w-8 text-primary mr-2" />
+              <span className="font-bold text-xl">Happy Coins</span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="hidden md:flex md:items-center md:space-x-8">
+            <button
+              onClick={() => onPageChange('dashboard')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentPage === 'dashboard'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Home className="h-4 w-4 inline mr-2" />
+              Dashboard
+            </button>
+
+            <button
+              onClick={() => onPageChange('transfers')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentPage === 'transfers'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <ArrowLeftRight className="h-4 w-4 inline mr-2" />
+              Transfers
+            </button>
+
+            <button
+              onClick={() => onPageChange('coins')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentPage === 'coins'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Coins className="h-4 w-4 inline mr-2" />
+              Coins & Rewards
+            </button>
+
+            <button
+              onClick={() => onPageChange('ai-assistant')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentPage === 'ai-assistant'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Bot className="h-4 w-4 inline mr-2" />
+              AI Assistant
+            </button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200">
-                  <div className="flex h-full w-full items-center justify-center rounded-full bg-blue-100 text-blue-600 font-medium text-sm">
-                    U
-                  </div>
-                </Button>
+                <button className="flex items-center space-x-1 text-gray-600 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span>More</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => onPageChange('profile')}>
-                  Profile
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => onPageChange('security')}>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Security
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
-                  Logout
+                <DropdownMenuItem onClick={() => onPageChange('offers')}>
+                  <Gift className="h-4 w-4 mr-2" />
+                  Offers
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onPageChange('notifications')}>
+                  <Bell className="h-4 w-4 mr-2" />
+                  Notifications
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onPageChange('sso')}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  SSO & API
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onPageChange('profile')}>
+                  <User className="h-4 w-4 mr-2" />
+                  Profile
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleMobileMenu}
-              className="p-2"
+          <div className="flex items-center md:hidden">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
             >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
+              <span className="sr-only">Open main menu</span>
+              <svg
+                className={`${mobileMenuOpen ? 'hidden' : 'block'} h-6 w-6`}
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+              <svg
+                className={`${mobileMenuOpen ? 'block' : 'hidden'} h-6 w-6`}
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* User dropdown */}
+          <div className="ml-3 relative">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                >
+                  <span className="sr-only">Open user menu</span>
+                  <img
+                    className="h-8 w-8 rounded-full"
+                    src="https://images.unsplash.com/photo-1472099173936-ca5cd87c5383?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+                    alt=""
+                  />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onPageChange('profile')}>
+                  Your Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => supabase.auth.signOut()}>
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
-              <Button
-                variant={currentPage === 'dashboard' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('dashboard');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Home className="h-4 w-4 mr-2" />
-                Dashboard
-              </Button>
-              
-              <Button
-                variant={currentPage === 'coins' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('coins');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Coins className="h-4 w-4 mr-2" />
-                Coins
-              </Button>
-
-              <Button
-                variant={currentPage === 'notifications' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('notifications');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Bell className="h-4 w-4 mr-2" />
-                Notifications
-              </Button>
-
-              <Button
-                variant={currentPage === 'sso' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('sso');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                SSO
-              </Button>
-
-              <Button
-                variant={currentPage === 'offers' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('offers');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Gift className="h-4 w-4 mr-2" />
-                Offers
-              </Button>
-
-              <Button
-                variant={currentPage === 'api' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('api');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                <Code className="h-4 w-4 mr-2" />
-                API
-              </Button>
-
-              <Button
-                variant={currentPage === 'profile' ? 'default' : 'ghost'}
-                onClick={() => {
-                  onPageChange('profile');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full justify-start"
-              >
-                Profile
-              </Button>
-
-              <Button
-                variant="ghost"
-                onClick={handleLogout}
-                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                Logout
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-50">
+            <button
+              onClick={() => {
+                onPageChange('dashboard');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'dashboard'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Home className="h-4 w-4 inline mr-2" />
+              Dashboard
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('transfers');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'transfers'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <ArrowLeftRight className="h-4 w-4 inline mr-2" />
+              Transfers
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('coins');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'coins'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Coins className="h-4 w-4 inline mr-2" />
+              Coins & Rewards
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('ai-assistant');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'ai-assistant'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Bot className="h-4 w-4 inline mr-2" />
+              AI Assistant
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('security');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'security'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Shield className="h-4 w-4 inline mr-2" />
+              Security
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('offers');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'offers'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Gift className="h-4 w-4 inline mr-2" />
+              Offers
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('notifications');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'notifications'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Bell className="h-4 w-4 inline mr-2" />
+              Notifications
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('sso');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'sso'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <Settings className="h-4 w-4 inline mr-2" />
+              SSO & API
+            </button>
+
+            <button
+              onClick={() => {
+                onPageChange('profile');
+                setMobileMenuOpen(false);
+              }}
+              className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors ${
+                currentPage === 'profile'
+                  ? 'text-primary bg-primary/10'
+                  : 'text-gray-600 hover:text-primary'
+              }`}
+            >
+              <User className="h-4 w-4 inline mr-2" />
+              Profile
+            </button>
+
+            <button
+              onClick={() => {
+                supabase.auth.signOut();
+                setMobileMenuOpen(false);
+              }}
+              className="block px-3 py-2 rounded-md text-base font-medium w-full text-left text-gray-600 hover:text-primary transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

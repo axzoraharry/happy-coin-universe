@@ -240,6 +240,96 @@ export type Database = {
         }
         Relationships: []
       }
+      properties: {
+        Row: {
+          address: string
+          agent_id: string | null
+          bathrooms: number
+          bedrooms: number
+          created_at: string | null
+          description: string | null
+          features: string[] | null
+          garage_spaces: number | null
+          has_fireplace: boolean | null
+          has_pool: boolean | null
+          id: string
+          images: string[] | null
+          latitude: number | null
+          listing_date: string | null
+          longitude: number | null
+          lot_size: number | null
+          mls_number: string | null
+          neighborhood: string
+          price: number
+          property_type: string
+          school_district: string | null
+          square_footage: number
+          status: string | null
+          title: string
+          updated_at: string | null
+          updated_kitchen: boolean | null
+          year_built: number | null
+        }
+        Insert: {
+          address: string
+          agent_id?: string | null
+          bathrooms: number
+          bedrooms: number
+          created_at?: string | null
+          description?: string | null
+          features?: string[] | null
+          garage_spaces?: number | null
+          has_fireplace?: boolean | null
+          has_pool?: boolean | null
+          id?: string
+          images?: string[] | null
+          latitude?: number | null
+          listing_date?: string | null
+          longitude?: number | null
+          lot_size?: number | null
+          mls_number?: string | null
+          neighborhood: string
+          price: number
+          property_type: string
+          school_district?: string | null
+          square_footage: number
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          updated_kitchen?: boolean | null
+          year_built?: number | null
+        }
+        Update: {
+          address?: string
+          agent_id?: string | null
+          bathrooms?: number
+          bedrooms?: number
+          created_at?: string | null
+          description?: string | null
+          features?: string[] | null
+          garage_spaces?: number | null
+          has_fireplace?: boolean | null
+          has_pool?: boolean | null
+          id?: string
+          images?: string[] | null
+          latitude?: number | null
+          listing_date?: string | null
+          longitude?: number | null
+          lot_size?: number | null
+          mls_number?: string | null
+          neighborhood?: string
+          price?: number
+          property_type?: string
+          school_district?: string | null
+          square_footage?: number
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          updated_kitchen?: boolean | null
+          year_built?: number | null
+        }
+        Relationships: []
+      }
       rate_limits: {
         Row: {
           created_at: string
