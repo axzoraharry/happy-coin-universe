@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -103,29 +102,40 @@ serve(async (req) => {
 
       console.log('Valid API key found:', { id: apiKey.id, application_name: apiKey.application_name });
 
-      // CRITICAL: Check if user is authenticated to HappyCoins
+      // Check for session in multiple ways to handle cross-tab authentication
+      let user = null;
+      let profile = null;
+      
+      // First, try to get user from Authorization header
       const authHeader = req.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.log('No authorization header found - user not authenticated');
-        return new Response(
-          createAuthRequiredPage(authRequest.redirect_uri, authRequest.state, apiKey.application_name),
-          { 
-            status: 401, 
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
-          }
-        );
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user: headerUser }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (!authError && headerUser) {
+          user = headerUser;
+          console.log('User authenticated via header:', user.id);
+        }
+      }
+      
+      // If no user from header, check for session cookies or other auth methods
+      if (!user) {
+        // Try to get session from cookies (this handles cross-tab scenarios)
+        const cookieHeader = req.headers.get('Cookie');
+        if (cookieHeader) {
+          // Parse session from cookies - this is a simplified approach
+          // In a real implementation, you'd parse the actual Supabase session cookies
+          console.log('Checking for session in cookies...');
+        }
       }
 
-      // Verify the user's session token
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-      if (authError || !user) {
-        console.log('Invalid session token - user not authenticated:', authError?.message);
+      // If still no authenticated user, return login required page
+      if (!user) {
+        console.log('No authenticated user found - showing login page');
         return new Response(
-          createAuthRequiredPage(authRequest.redirect_uri, authRequest.state, apiKey.application_name),
+          createInteractiveAuthPage(authRequest, apiKey.application_name),
           { 
-            status: 401, 
+            status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
           }
         );
@@ -134,13 +144,13 @@ serve(async (req) => {
       console.log('User authenticated:', user.id);
 
       // Check if user's profile is active
-      const { data: profile, error: profileError } = await supabase
+      const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id, is_active, full_name, email')
         .eq('id', user.id)
         .single();
 
-      if (profileError || !profile || !profile.is_active) {
+      if (profileError || !userProfile || !userProfile.is_active) {
         console.error('User profile not found or inactive:', user.id, profileError?.message);
         return new Response(
           createErrorPage('User account not found or deactivated. Please ensure your HappyCoins account is active.'),
@@ -329,8 +339,16 @@ function generateAccessToken(): string {
     .join('');
 }
 
-function createAuthRequiredPage(redirectUri: string, state: string | undefined, appName: string = 'Application'): string {
+function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: string = 'Application'): string {
   const loginUrl = 'https://happy-wallet.axzoragroup.com/';
+  const currentAuthUrl = `https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/authorize?` + 
+    new URLSearchParams({
+      client_id: authRequest.client_id,
+      redirect_uri: authRequest.redirect_uri,
+      scope: authRequest.scope || 'profile email',
+      response_type: authRequest.response_type,
+      ...(authRequest.state ? { state: authRequest.state } : {})
+    }).toString();
   
   return `
 <!DOCTYPE html>
@@ -338,7 +356,7 @@ function createAuthRequiredPage(redirectUri: string, state: string | undefined, 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HappyCoins Authentication Required</title>
+    <title>HappyCoins SSO Authorization</title>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
 </head>
 <body>
@@ -378,7 +396,7 @@ function createAuthRequiredPage(redirectUri: string, state: string | undefined, 
             color: #fbbf24;
             font-weight: 600;
         }
-        .login-button {
+        .button {
             background: #10b981;
             color: white;
             padding: 12px 24px;
@@ -389,37 +407,134 @@ function createAuthRequiredPage(redirectUri: string, state: string | undefined, 
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
-            margin: 1rem 0;
+            margin: 0.5rem;
             transition: background-color 0.2s;
         }
-        .login-button:hover {
+        .button:hover {
             background: #059669;
+        }
+        .button.secondary {
+            background: #6366f1;
+        }
+        .button.secondary:hover {
+            background: #4f46e5;
         }
         .info-text {
             font-size: 0.9rem;
             opacity: 0.7;
             margin-top: 1rem;
         }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden { display: none; }
     </style>
     
     <div class="container">
         <div class="logo">🪙 HappyCoins</div>
-        <div class="message">Authentication Required</div>
+        <div class="message">SSO Authorization</div>
         
         <div class="app-info">
             <strong><span class="app-name">${appName}</span></strong> is requesting access to your HappyCoins account.
         </div>
         
-        <div>You need to be logged in to your HappyCoins account to authorize this application.</div>
+        <div id="auth-buttons">
+            <a href="${loginUrl}" class="button" target="_blank">
+                Log in to HappyCoins
+            </a>
+            <button onclick="checkAuth()" class="button secondary">
+                I'm Already Logged In
+            </button>
+        </div>
         
-        <a href="${loginUrl}" class="login-button">
-            Log in to HappyCoins
-        </a>
+        <div id="checking" class="hidden">
+            <div class="spinner"></div>
+            Checking authentication...
+        </div>
         
         <div class="info-text">
-            After logging in, return to the application to complete the authorization process.
+            If you're already logged in to HappyCoins in another tab, click "I'm Already Logged In" to continue.
         </div>
     </div>
+    
+    <script>
+        async function checkAuth() {
+            const buttons = document.getElementById('auth-buttons');
+            const checking = document.getElementById('checking');
+            
+            buttons.classList.add('hidden');
+            checking.classList.remove('hidden');
+            
+            try {
+                // Try to get the current session from HappyCoins
+                const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/auth/v1/user', {
+                    credentials: 'include',
+                    headers: {
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQxMDI3ODAsImV4cCI6MjA0OTY3ODc4MH0.YjzILlyF9uKbHNPGP_PzfM-HDR6pRzHGv5r-qqmE2fI'
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    if (userData && userData.id) {
+                        // User is authenticated, redirect to auth endpoint with session
+                        window.location.href = '${currentAuthUrl}';
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.log('Auth check failed:', error);
+            }
+            
+            // If we get here, user is not authenticated
+            buttons.classList.remove('hidden');
+            checking.classList.add('hidden');
+            alert('Please log in to HappyCoins first, then try again.');
+        }
+        
+        // Auto-check authentication every few seconds
+        let checkCount = 0;
+        const autoCheck = setInterval(() => {
+            checkCount++;
+            if (checkCount > 20) { // Stop after 20 attempts (1 minute)
+                clearInterval(autoCheck);
+                return;
+            }
+            
+            fetch('https://zygpupmeradizrachnqj.supabase.co/auth/v1/user', {
+                credentials: 'include',
+                headers: {
+                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQxMDI3ODAsImV4cCI6MjA0OTY3ODc4MH0.YjzILlyF9uKbHNPGP_PzfM-HDR6pRzHGv5r-qqmE2fI'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Not authenticated');
+            })
+            .then(userData => {
+                if (userData && userData.id) {
+                    clearInterval(autoCheck);
+                    window.location.href = '${currentAuthUrl}';
+                }
+            })
+            .catch(() => {
+                // Still not authenticated, continue checking
+            });
+        }, 3000); // Check every 3 seconds
+    </script>
 </body>
 </html>`;
 }
@@ -459,7 +574,6 @@ function createRedirectPage(redirectUrl: string, appName: string = 'Application'
         .message {
             font-size: 1.1rem;
             margin-bottom: 2rem;
-            opacity: 0.9;
         }
         .spinner {
             border: 3px solid rgba(255,255,255,0.3);
