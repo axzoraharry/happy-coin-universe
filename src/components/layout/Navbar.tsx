@@ -1,6 +1,7 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Home,
   ArrowLeftRight,
@@ -25,8 +26,47 @@ interface NavbarProps {
   onPageChange: (page: string) => void;
 }
 
+interface Profile {
+  full_name: string | null;
+  email: string;
+}
+
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          // If profile doesn't exist, use user email
+          setProfile({ full_name: null, email: user.email || '' });
+        } else {
+          setProfile({ full_name: data.full_name, email: data.email || user.email || '' });
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  const getInitials = (name: string | null, email: string) => {
+    if (name) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return email.charAt(0).toUpperCase();
+  };
 
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -84,7 +124,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   <ChevronDown className="h-3 w-3" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-48 bg-white shadow-lg border z-50">
                 <DropdownMenuItem onClick={() => onPageChange('security')}>
                   <Shield className="h-4 w-4 mr-2" />
                   Security
@@ -157,14 +197,15 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   className="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 >
                   <span className="sr-only">Open user menu</span>
-                  <img
-                    className="h-8 w-8 rounded-full"
-                    src="https://images.unsplash.com/photo-1472099173936-ca5cd87c5383?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                    alt=""
-                  />
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="" alt="Profile" />
+                    <AvatarFallback className="bg-primary text-white text-sm font-medium">
+                      {profile ? getInitials(profile.full_name, profile.email) : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="bg-white shadow-lg border z-50">
                 <DropdownMenuItem onClick={() => onPageChange('profile')}>
                   Your Profile
                 </DropdownMenuItem>
