@@ -289,7 +289,100 @@
       }
     },
 
-    initiateAuth: function(button, messageDiv, config) {
+    findAuthToken: function() {
+      console.log('HappyCoins SSO Widget: Looking for authentication tokens...');
+      
+      // Check multiple storage locations and key patterns
+      const possibleKeys = [
+        'sb-zygpupmeradizrachnqj-auth-token',
+        'supabase.auth.token',
+        'sb-access-token',
+        'supabase.session'
+      ];
+      
+      for (const key of possibleKeys) {
+        // Check localStorage
+        try {
+          const localData = localStorage.getItem(key);
+          if (localData) {
+            console.log('HappyCoins SSO Widget: Found token in localStorage with key:', key);
+            const parsed = JSON.parse(localData);
+            if (parsed.access_token) {
+              console.log('HappyCoins SSO Widget: Valid access token found');
+              return parsed.access_token;
+            }
+          }
+        } catch (e) {
+          // Not JSON or parsing failed, try as direct token
+          const token = localStorage.getItem(key);
+          if (token && token.length > 20) {
+            console.log('HappyCoins SSO Widget: Direct token found in localStorage');
+            return token;
+          }
+        }
+        
+        // Check sessionStorage
+        try {
+          const sessionData = sessionStorage.getItem(key);
+          if (sessionData) {
+            console.log('HappyCoins SSO Widget: Found token in sessionStorage with key:', key);
+            const parsed = JSON.parse(sessionData);
+            if (parsed.access_token) {
+              console.log('HappyCoins SSO Widget: Valid access token found');
+              return parsed.access_token;
+            }
+          }
+        } catch (e) {
+          // Not JSON or parsing failed, try as direct token
+          const token = sessionStorage.getItem(key);
+          if (token && token.length > 20) {
+            console.log('HappyCoins SSO Widget: Direct token found in sessionStorage');
+            return token;
+          }
+        }
+      }
+      
+      // Check URL hash for access token (OAuth redirect)
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token=')) {
+        const params = new URLSearchParams(hash.substring(1));
+        const token = params.get('access_token');
+        if (token) {
+          console.log('HappyCoins SSO Widget: Token found in URL hash');
+          return token;
+        }
+      }
+      
+      console.log('HappyCoins SSO Widget: No authentication token found');
+      return null;
+    },
+
+    verifyToken: async function(token) {
+      try {
+        console.log('HappyCoins SSO Widget: Verifying token with server...');
+        const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/check-auth', {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const authData = await response.json();
+          console.log('HappyCoins SSO Widget: Token verification result:', authData);
+          return authData.authenticated === true;
+        }
+        
+        console.log('HappyCoins SSO Widget: Token verification failed with status:', response.status);
+        return false;
+      } catch (error) {
+        console.log('HappyCoins SSO Widget: Token verification error:', error);
+        return false;
+      }
+    },
+
+    initiateAuth: async function(button, messageDiv, config) {
       console.log('HappyCoins SSO Widget: Initiating authentication');
       
       button.disabled = true;
@@ -297,10 +390,63 @@
         <svg class="hc-sso-spin" style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12a9 9 0 11-6.219-8.56"/>
         </svg>
-        Redirecting...
+        Checking authentication...
       `;
 
-      this.showMessage(messageDiv, 'Redirecting to HappyCoins for authentication...', 'info');
+      this.showMessage(messageDiv, 'Checking if you are already logged in...', 'info');
+
+      // First, try to find an existing auth token
+      const token = this.findAuthToken();
+      
+      if (token) {
+        console.log('HappyCoins SSO Widget: Found potential auth token, verifying...');
+        const isValid = await this.verifyToken(token);
+        
+        if (isValid) {
+          console.log('HappyCoins SSO Widget: Valid token found, proceeding with authorization');
+          this.showMessage(messageDiv, 'Authentication verified, redirecting to authorization...', 'info');
+          
+          // Proceed directly to authorization with the token
+          try {
+            const params = new URLSearchParams({
+              client_id: config.clientId,
+              redirect_uri: config.redirectUri,
+              scope: config.scope,
+              response_type: 'code',
+            });
+
+            if (config.state) {
+              params.append('state', config.state);
+            }
+
+            const baseUrl = this.getSupabaseUrl();
+            const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString() + '&access_token=' + encodeURIComponent(token);
+            
+            console.log('HappyCoins SSO Widget: Redirecting to authorization with token');
+            window.location.href = authUrl;
+            return;
+
+          } catch (error) {
+            console.error('HappyCoins SSO Widget: Failed to proceed with authorization:', error);
+            this.showMessage(messageDiv, 'Failed to proceed with authorization: ' + error.message, 'error');
+            this.resetButton(button, config);
+            config.onError('Failed to proceed with authorization');
+            return;
+          }
+        }
+      }
+      
+      // No valid token found, redirect to login
+      console.log('HappyCoins SSO Widget: No valid authentication found, redirecting to login');
+      
+      button.innerHTML = `
+        <svg class="hc-sso-spin" style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12a9 9 0 11-6.219-8.56"/>
+        </svg>
+        Redirecting to login...
+      `;
+
+      this.showMessage(messageDiv, 'Redirecting to HappyCoins login...', 'info');
 
       try {
         const params = new URLSearchParams({
@@ -317,7 +463,7 @@
         const baseUrl = this.getSupabaseUrl();
         const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString();
         
-        console.log('HappyCoins SSO Widget: Redirecting to authorization:', authUrl);
+        console.log('HappyCoins SSO Widget: Redirecting to authorization page');
 
         // For embedded widgets, open in new window to avoid iframe restrictions
         if (window.parent !== window) {
