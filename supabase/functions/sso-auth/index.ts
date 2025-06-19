@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -81,7 +82,7 @@ serve(async (req) => {
         );
       }
 
-      // Verify API key exists and is active - using api_key field instead of key_hash
+      // Verify API key exists and is active
       const { data: apiKey, error: apiKeyError } = await supabase
         .from('api_keys')
         .select('id, application_name, created_by, is_active')
@@ -175,7 +176,7 @@ serve(async (req) => {
           used_at,
           api_keys!inner (
             id,
-            user_id,
+            created_by,
             application_name,
             api_key
           )
@@ -229,7 +230,7 @@ serve(async (req) => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('id, full_name, email')
-        .eq('id', authCodeData.api_keys.user_id)
+        .eq('id', authCodeData.api_keys.created_by)
         .single();
 
       return new Response(

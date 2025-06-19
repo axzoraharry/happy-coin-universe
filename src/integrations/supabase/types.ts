@@ -559,40 +559,42 @@ export type Database = {
       }
       sso_access_tokens: {
         Row: {
-          client_id: string
+          api_key_id: string
           created_at: string
           expires_at: string
           id: string
-          revoked: boolean
           scope: string | null
           token: string
-          user_id: string | null
         }
         Insert: {
-          client_id: string
+          api_key_id: string
           created_at?: string
           expires_at: string
           id?: string
-          revoked?: boolean
           scope?: string | null
           token: string
-          user_id?: string | null
         }
         Update: {
-          client_id?: string
+          api_key_id?: string
           created_at?: string
           expires_at?: string
           id?: string
-          revoked?: boolean
           scope?: string | null
           token?: string
-          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sso_access_tokens_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sso_auth_codes: {
         Row: {
-          client_id: string
+          api_key_id: string
           code: string
           created_at: string
           expires_at: string
@@ -600,11 +602,10 @@ export type Database = {
           redirect_uri: string
           scope: string | null
           state: string | null
-          used: boolean
-          user_id: string | null
+          used_at: string | null
         }
         Insert: {
-          client_id: string
+          api_key_id: string
           code: string
           created_at?: string
           expires_at: string
@@ -612,11 +613,10 @@ export type Database = {
           redirect_uri: string
           scope?: string | null
           state?: string | null
-          used?: boolean
-          user_id?: string | null
+          used_at?: string | null
         }
         Update: {
-          client_id?: string
+          api_key_id?: string
           code?: string
           created_at?: string
           expires_at?: string
@@ -624,10 +624,17 @@ export type Database = {
           redirect_uri?: string
           scope?: string | null
           state?: string | null
-          used?: boolean
-          user_id?: string | null
+          used_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sso_auth_codes_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transaction_pins: {
         Row: {
