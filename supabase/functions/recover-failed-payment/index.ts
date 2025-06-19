@@ -32,33 +32,45 @@ serve(async (req) => {
 
     console.log('Checking for failed payments for user:', user.email);
 
-    // Get recent successful payments from Stripe
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    if (customers.data.length === 0) {
-      return new Response(JSON.stringify({ message: 'No Stripe customer found' }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    const customerId = customers.data[0].id;
+    // Get checkout sessions from the last 7 days to be more thorough
+    const sevenDaysAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
     
-    // Get checkout sessions from the last 24 hours
-    const sessions = await stripe.checkout.sessions.list({
-      customer: customerId,
-      created: { gte: Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000) },
-      limit: 10
+    // List all recent sessions for debugging
+    const allSessions = await stripe.checkout.sessions.list({
+      created: { gte: sevenDaysAgo },
+      limit: 100
     });
 
-    const successfulSessions = sessions.data.filter(s => s.payment_status === 'paid');
-    console.log(`Found ${successfulSessions.length} successful sessions`);
+    console.log(`Found ${allSessions.data.length} total sessions in last 7 days`);
+
+    // Filter sessions that match this user's email and are paid
+    const userSessions = allSessions.data.filter(session => {
+      const matchesEmail = session.customer_details?.email === user.email;
+      const isPaid = session.payment_status === 'paid';
+      const hasMetadata = session.metadata?.user_id === user.id;
+      
+      console.log(`Session ${session.id}:`, {
+        customer_email: session.customer_details?.email,
+        payment_status: session.payment_status,
+        user_id_metadata: session.metadata?.user_id,
+        matches_user: matchesEmail || hasMetadata,
+        is_paid: isPaid
+      });
+      
+      return (matchesEmail || hasMetadata) && isPaid;
+    });
+
+    console.log(`Found ${userSessions.length} paid sessions for user`);
 
     let recoveredCoins = 0;
     const recoveredPayments = [];
 
-    for (const session of successfulSessions) {
+    for (const session of userSessions) {
       const happyCoins = parseInt(session.metadata?.happy_coins || "0");
-      if (!happyCoins) continue;
+      if (!happyCoins) {
+        console.log(`Session ${session.id} has no happy_coins metadata`);
+        continue;
+      }
 
       // Check if we already processed this payment
       const { data: existingTransaction } = await supabaseClient
@@ -75,14 +87,31 @@ serve(async (req) => {
 
       console.log('Recovering payment:', session.id, 'for', happyCoins, 'HC');
 
-      // Get user's wallet
-      const { data: wallet, error: walletError } = await supabaseClient
+      // Get or create user's wallet
+      let { data: wallet, error: walletError } = await supabaseClient
         .from('wallets')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (walletError) {
+      if (walletError && walletError.code === 'PGRST116') {
+        // Create wallet if it doesn't exist
+        const { data: newWallet, error: createError } = await supabaseClient
+          .from('wallets')
+          .insert({
+            user_id: user.id,
+            balance: 0,
+            currency: 'USD'
+          })
+          .select()
+          .single();
+          
+        if (createError) {
+          console.error('Failed to create wallet:', createError);
+          continue;
+        }
+        wallet = newWallet;
+      } else if (walletError) {
         console.error('Wallet error:', walletError);
         continue;
       }
@@ -131,9 +160,15 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      message: recoveredCoins > 0 ? `Recovered ${recoveredCoins} Happy Coins` : 'No failed payments found',
+      message: recoveredCoins > 0 ? `Recovered ${recoveredCoins} Happy Coins` : 'No pending payments found',
       recovered_coins: recoveredCoins,
-      recovered_payments: recoveredPayments
+      recovered_payments: recoveredPayments,
+      debug_info: {
+        total_sessions_checked: allSessions.data.length,
+        user_sessions_found: userSessions.length,
+        user_email: user.email,
+        user_id: user.id
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

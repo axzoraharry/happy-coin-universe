@@ -34,6 +34,36 @@ serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
+    // Ensure user has a wallet before creating checkout
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    // Check if wallet exists, create if not
+    const { data: existingWallet, error: walletCheckError } = await supabaseService
+      .from('wallets')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (walletCheckError && walletCheckError.code === 'PGRST116') {
+      console.log('Creating wallet for user:', user.id);
+      const { error: createWalletError } = await supabaseService
+        .from('wallets')
+        .insert({
+          user_id: user.id,
+          balance: 0,
+          currency: 'USD'
+        });
+        
+      if (createWalletError) {
+        console.error('Failed to create wallet:', createWalletError);
+        throw createWalletError;
+      }
+    }
+
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
     if (customers.data.length > 0) {
@@ -72,10 +102,12 @@ serve(async (req) => {
         user_id: user.id,
         happy_coins: amount.toString(),
         payment_method: paymentMethod,
+        user_email: user.email // Adding email for easier debugging
       },
     });
 
     console.log('Stripe session created:', session.id);
+    console.log('Session metadata:', session.metadata);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

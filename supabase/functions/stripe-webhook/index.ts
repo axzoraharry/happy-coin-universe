@@ -34,6 +34,7 @@ serve(async (req) => {
   );
 
   console.log('Received webhook event:', receivedEvent.type);
+  console.log('Event data:', JSON.stringify(receivedEvent.data.object, null, 2));
 
   if (receivedEvent.type === "checkout.session.completed") {
     const session = receivedEvent.data.object as Stripe.Checkout.Session;
@@ -41,6 +42,7 @@ serve(async (req) => {
     const happyCoins = parseInt(session.metadata?.happy_coins || "0");
 
     console.log('Processing payment for user:', userId, 'coins:', happyCoins);
+    console.log('Session metadata:', session.metadata);
 
     if (userId && happyCoins > 0) {
       try {
@@ -53,7 +55,29 @@ serve(async (req) => {
 
         if (walletError) {
           console.error('Wallet error:', walletError);
-          throw walletError;
+          
+          // Try to create wallet if it doesn't exist
+          if (walletError.code === 'PGRST116') {
+            console.log('Creating new wallet for user:', userId);
+            const { data: newWallet, error: createError } = await supabaseClient
+              .from('wallets')
+              .insert({
+                user_id: userId,
+                balance: 0,
+                currency: 'USD'
+              })
+              .select()
+              .single();
+              
+            if (createError) {
+              console.error('Failed to create wallet:', createError);
+              throw createError;
+            }
+            
+            wallet = newWallet;
+          } else {
+            throw walletError;
+          }
         }
 
         console.log('Current wallet balance:', wallet.balance);
@@ -117,6 +141,7 @@ serve(async (req) => {
       }
     } else {
       console.log('Missing user_id or happy_coins in session metadata');
+      console.log('Metadata received:', session.metadata);
     }
   }
 
