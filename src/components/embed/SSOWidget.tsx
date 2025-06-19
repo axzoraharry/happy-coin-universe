@@ -33,15 +33,18 @@ export function SSOWidget({
   const [message, setMessage] = useState('');
   const [processing, setProcessing] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [session, setSession] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
     // Check authentication status
     const checkAuth = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-        if (!user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user || null);
+        
+        if (!session?.user) {
           setStatus('unauthenticated');
           setMessage('Please log in to your HappyCoins account first');
         }
@@ -58,7 +61,9 @@ export function SSOWidget({
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
       setUser(session?.user || null);
+      
       if (session?.user) {
         if (status === 'unauthenticated') {
           setStatus('idle');
@@ -106,7 +111,7 @@ export function SSOWidget({
   };
 
   const handleSignIn = async () => {
-    if (!user) {
+    if (!session?.access_token) {
       setStatus('unauthenticated');
       setMessage('Please log in to your HappyCoins account first');
       return;
@@ -138,10 +143,46 @@ export function SSOWidget({
       const supabaseUrl = getSupabaseUrl();
       const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}`;
       
-      console.log('SSO Widget: Redirecting to authorization:', authUrl);
+      console.log('SSO Widget: Redirecting to authorization with session token');
       
-      // Direct redirect (no popup)
-      window.location.href = authUrl;
+      // Create a form to POST the authorization request with the session token in headers
+      // Since we can't set custom headers for window.location.href, we'll use fetch to make the request
+      // and handle the redirect manually
+      const response = await fetch(authUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        // If successful, the server should return HTML for redirect
+        const html = await response.text();
+        
+        // Create a temporary iframe or new window to handle the redirect
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(html);
+          newWindow.document.close();
+        } else {
+          // Fallback: direct redirect but this won't include the auth token
+          window.location.href = authUrl;
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('SSO authorization failed:', response.status, errorText);
+        
+        // Check if it's an authentication error
+        if (response.status === 401) {
+          setStatus('unauthenticated');
+          setMessage('Your session has expired. Please log in again.');
+        } else {
+          setStatus('error');
+          setMessage('Authorization failed. Please try again.');
+        }
+        onError?.('Authorization failed');
+      }
 
     } catch (error) {
       console.error('SSO request failed:', error);

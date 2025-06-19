@@ -103,6 +103,54 @@ serve(async (req) => {
 
       console.log('Valid API key found:', { id: apiKey.id, application_name: apiKey.application_name });
 
+      // CRITICAL: Check if user is authenticated to HappyCoins
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.log('No authorization header found - user not authenticated');
+        return new Response(
+          createAuthRequiredPage(authRequest.redirect_uri, authRequest.state, apiKey.application_name),
+          { 
+            status: 401, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+          }
+        );
+      }
+
+      // Verify the user's session token
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+      if (authError || !user) {
+        console.log('Invalid session token - user not authenticated:', authError?.message);
+        return new Response(
+          createAuthRequiredPage(authRequest.redirect_uri, authRequest.state, apiKey.application_name),
+          { 
+            status: 401, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+          }
+        );
+      }
+
+      console.log('User authenticated:', user.id);
+
+      // Check if user's profile is active
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, is_active, full_name, email')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile || !profile.is_active) {
+        console.error('User profile not found or inactive:', user.id, profileError?.message);
+        return new Response(
+          createErrorPage('User account not found or deactivated. Please ensure your HappyCoins account is active.'),
+          { 
+            status: 403, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' } 
+          }
+        );
+      }
+
       // Generate authorization code
       const authCode = generateAuthCode();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -137,7 +185,7 @@ serve(async (req) => {
         redirectUrl.searchParams.set('state', authRequest.state);
       }
 
-      console.log('Authorization successful, redirecting to:', redirectUrl.toString());
+      console.log('Authorization successful for authenticated user, redirecting to:', redirectUrl.toString());
 
       // Return HTML page that performs the redirect
       const html = createRedirectPage(redirectUrl.toString(), apiKey.application_name);
@@ -279,6 +327,102 @@ function generateAccessToken(): string {
   return 'at_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
     .map(b => b.toString(36))
     .join('');
+}
+
+function createAuthRequiredPage(redirectUri: string, state: string | undefined, appName: string = 'Application'): string {
+  const loginUrl = 'https://happy-wallet.axzoragroup.com/';
+  const currentUrl = new URL(window.location.href);
+  
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HappyCoins Authentication Required</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+</head>
+<body>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+        .message {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        .app-info {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .app-name {
+            color: #fbbf24;
+            font-weight: 600;
+        }
+        .login-button {
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 1rem 0;
+            transition: background-color 0.2s;
+        }
+        .login-button:hover {
+            background: #059669;
+        }
+        .info-text {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-top: 1rem;
+        }
+    </style>
+    
+    <div class="container">
+        <div class="logo">🪙 HappyCoins</div>
+        <div class="message">Authentication Required</div>
+        
+        <div class="app-info">
+            <strong><span class="app-name">${appName}</span></strong> is requesting access to your HappyCoins account.
+        </div>
+        
+        <div>You need to be logged in to your HappyCoins account to authorize this application.</div>
+        
+        <a href="${loginUrl}" class="login-button">
+            Log in to HappyCoins
+        </a>
+        
+        <div class="info-text">
+            After logging in, return to the application to complete the authorization process.
+        </div>
+    </div>
+</body>
+</html>`;
 }
 
 function createRedirectPage(redirectUrl: string, appName: string = 'Application'): string {
