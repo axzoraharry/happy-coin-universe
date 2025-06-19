@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield } from 'lucide-react';
 import { TransactionPinSetup } from './TransactionPinSetup';
-import { SecureTransferForm } from '../transfers/SecureTransferForm';
+import { TransferForm } from '../transfers/TransferForm';
 
 export function WalletActions() {
   return (
@@ -31,7 +31,7 @@ export function WalletActions() {
             </TabsList>
 
             <TabsContent value="transfer" className="space-y-4">
-              <SecureTransferForm />
+              <TransferForm />
             </TabsContent>
 
             <TabsContent value="security" className="space-y-4">
