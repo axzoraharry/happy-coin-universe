@@ -1,9 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, DollarSign, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, DollarSign, Clock, CheckCircle, XCircle, AlertCircle, Copy } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Transaction {
   id: string;
@@ -128,6 +130,20 @@ export function TransactionsList() {
     }
   };
 
+  const truncateReferenceId = (refId: string | null) => {
+    if (!refId) return null;
+    if (refId.length <= 20) return refId;
+    return `${refId.substring(0, 10)}...${refId.substring(refId.length - 6)}`;
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied!",
+      description: "Reference ID copied to clipboard",
+    });
+  };
+
   if (loading) {
     return (
       <Card className="backdrop-blur-sm bg-gradient-to-r from-card/80 to-card/60 border-border/50 shadow-lg">
@@ -177,38 +193,53 @@ export function TransactionsList() {
             transactions.map((transaction) => (
               <div 
                 key={transaction.id} 
-                className="flex items-center justify-between p-4 border border-border/50 rounded-xl hover:bg-muted/30 transition-all duration-200 hover:shadow-md group"
+                className="flex flex-col gap-3 p-4 border border-border/50 rounded-xl hover:bg-muted/30 transition-all duration-200 hover:shadow-md group"
               >
-                <div className="flex items-center space-x-4">
-                  <div className="p-2 bg-background/50 rounded-lg group-hover:scale-110 transition-transform duration-200">
-                    {getTransactionIcon(transaction.transaction_type)}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-4 flex-1 min-w-0">
+                    <div className="p-2 bg-background/50 rounded-lg group-hover:scale-110 transition-transform duration-200 flex-shrink-0">
+                      {getTransactionIcon(transaction.transaction_type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-foreground">
+                        {formatTransactionType(transaction.transaction_type)}
+                      </h4>
+                      <p className="text-sm text-muted-foreground break-words">
+                        {transaction.description || 'No description'}
+                      </p>
+                      <p className="text-xs text-muted-foreground flex items-center mt-1">
+                        <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
+                        {new Date(transaction.created_at).toLocaleDateString()} at{' '}
+                        {new Date(transaction.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground">
-                      {formatTransactionType(transaction.transaction_type)}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      {transaction.description || 'No description'}
+                  <div className="text-right space-y-2 flex-shrink-0">
+                    <p className={`font-bold text-lg ${getTransactionColor(transaction.transaction_type)}`}>
+                      {(transaction.transaction_type === 'credit' || transaction.transaction_type === 'transfer_in') ? '+' : '-'}
+                      {transaction.amount.toFixed(2)} HC
                     </p>
-                    <p className="text-xs text-muted-foreground flex items-center mt-1">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {new Date(transaction.created_at).toLocaleDateString()} at{' '}
-                      {new Date(transaction.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    {getStatusBadge(transaction.status)}
                   </div>
                 </div>
-                <div className="text-right space-y-1">
-                  <p className={`font-bold text-lg ${getTransactionColor(transaction.transaction_type)}`}>
-                    {(transaction.transaction_type === 'credit' || transaction.transaction_type === 'transfer_in') ? '+' : '-'}
-                    {transaction.amount.toFixed(2)} HC
-                  </p>
-                  {getStatusBadge(transaction.status)}
-                  {transaction.reference_id && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Ref: {transaction.reference_id}
-                    </p>
-                  )}
-                </div>
+                {transaction.reference_id && (
+                  <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                    <div className="flex items-center space-x-2 min-w-0 flex-1">
+                      <span className="text-xs text-muted-foreground flex-shrink-0">Ref:</span>
+                      <code className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded truncate">
+                        {truncateReferenceId(transaction.reference_id)}
+                      </code>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 flex-shrink-0 ml-2"
+                      onClick={() => copyToClipboard(transaction.reference_id!)}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))
           )}
