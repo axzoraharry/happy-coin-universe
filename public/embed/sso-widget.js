@@ -2,7 +2,7 @@
 (function() {
   'use strict';
 
-  // HappyCoins SSO Widget with popup window approach to avoid X-Frame-Options issues
+  // HappyCoins SSO Widget with improved popup handling to avoid sandbox issues
   window.HappyCoinsSSOWidget = {
     render: function(containerId, config) {
       console.log('HappyCoins SSO Widget: Attempting to render in container:', containerId);
@@ -28,7 +28,7 @@
         appName: 'Application',
         theme: 'light',
         compact: false,
-        usePopup: true, // Use popup by default to avoid iframe issues
+        usePopup: true,
         onSuccess: function(code) { console.log('SSO Success:', code); },
         onError: function(error) { console.error('SSO Error:', error); }
       }, config);
@@ -201,7 +201,7 @@
           </div>
 
           <div class="hc-sso-widget-info">
-            <strong>Secure Authentication:</strong> Sign in using your HappyCoins wallet credentials. A secure popup window will open for authentication.
+            <strong>Secure Authentication:</strong> A new window will open for secure authentication with your HappyCoins credentials.
           </div>
 
           <button class="hc-sso-widget-button" id="hc-sso-button">
@@ -261,17 +261,17 @@
     },
 
     initiateAuth: function(button, messageDiv, config) {
-      console.log('HappyCoins SSO Widget: Initiating authentication with popup window');
+      console.log('HappyCoins SSO Widget: Initiating authentication with new window');
       
       button.disabled = true;
       button.innerHTML = `
         <svg class="hc-sso-spin" style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12a9 9 0 11-6.219-8.56"/>
         </svg>
-        Opening popup...
+        Opening authentication...
       `;
 
-      this.showMessage(messageDiv, 'Opening secure authentication popup...', 'info');
+      this.showMessage(messageDiv, 'Opening secure authentication window...', 'info');
 
       try {
         const params = new URLSearchParams({
@@ -288,54 +288,61 @@
         const baseUrl = this.getSupabaseUrl();
         const authUrl = baseUrl + '/functions/v1/sso-auth/authorize?' + params.toString();
         
-        console.log('HappyCoins SSO Widget: Opening popup for authorization:', authUrl);
+        console.log('HappyCoins SSO Widget: Opening new window for authorization:', authUrl);
 
-        // Open popup window to avoid X-Frame-Options issues
-        const popup = window.open(
+        // Open a new window instead of popup to avoid sandbox restrictions
+        const authWindow = window.open(
           authUrl,
           'happycoins-sso',
-          'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+          'width=600,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
         );
 
-        if (!popup) {
-          throw new Error('Popup blocked. Please allow popups for this site.');
+        if (!authWindow) {
+          throw new Error('New window blocked. Please allow popups for this site and try again.');
         }
 
-        // Monitor popup for completion
-        this.monitorPopup(popup, config, button, messageDiv);
+        // Monitor the new window for completion
+        this.monitorAuthWindow(authWindow, config, button, messageDiv);
 
       } catch (error) {
         console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);
-        this.showMessage(messageDiv, 'Failed to open authentication popup: ' + error.message, 'error');
+        this.showMessage(messageDiv, 'Failed to open authentication window: ' + error.message, 'error');
         this.resetButton(button, config);
         config.onError('Failed to initiate authentication: ' + error.message);
       }
     },
 
-    monitorPopup: function(popup, config, button, messageDiv) {
-      const checkPopup = () => {
+    monitorAuthWindow: function(authWindow, config, button, messageDiv) {
+      let checkCount = 0;
+      const maxChecks = 600; // 10 minutes maximum
+      
+      const checkWindow = () => {
+        checkCount++;
+        
         try {
-          if (popup.closed) {
-            console.log('HappyCoins SSO Widget: Popup was closed');
-            this.showMessage(messageDiv, 'Authentication popup was closed', 'error');
+          if (authWindow.closed) {
+            console.log('HappyCoins SSO Widget: Authentication window was closed');
+            this.showMessage(messageDiv, 'Authentication window was closed', 'error');
             this.resetButton(button, config);
             config.onError('Authentication cancelled');
             return;
           }
 
-          // Try to read the popup URL to detect successful redirect
+          // Try to read the window URL to detect successful redirect
           try {
-            const popupUrl = popup.location.href;
-            const urlParams = new URLSearchParams(new URL(popupUrl).search);
-            const code = urlParams.get('code');
-            const error = urlParams.get('error');
-            const returnedState = urlParams.get('state');
+            const windowUrl = authWindow.location.href;
+            
+            // Check if we're back to the redirect URI
+            if (windowUrl && windowUrl.startsWith(config.redirectUri)) {
+              const urlParams = new URLSearchParams(new URL(windowUrl).search);
+              const code = urlParams.get('code');
+              const error = urlParams.get('error');
+              const returnedState = urlParams.get('state');
 
-            if (code || error) {
-              popup.close();
+              authWindow.close();
               
               if (error) {
-                console.error('HappyCoins SSO Widget: Authentication error from popup:', error);
+                console.error('HappyCoins SSO Widget: Authentication error from window:', error);
                 this.showMessage(messageDiv, 'Authentication failed: ' + error, 'error');
                 this.resetButton(button, config);
                 config.onError(error);
@@ -343,41 +350,56 @@
               }
 
               if (config.state && returnedState !== config.state) {
-                console.error('HappyCoins SSO Widget: Invalid state parameter from popup');
+                console.error('HappyCoins SSO Widget: Invalid state parameter from window');
                 this.showMessage(messageDiv, 'Invalid state parameter', 'error');
                 this.resetButton(button, config);
                 config.onError('Invalid state parameter');
                 return;
               }
 
-              console.log('HappyCoins SSO Widget: Authentication successful from popup');
-              this.showMessage(messageDiv, 'Authentication successful!', 'success');
-              button.innerHTML = `
-                <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 6L9 17l-5-5"/>
-                </svg>
-                Authorized
-              `;
-              config.onSuccess(code);
-              return;
+              if (code) {
+                console.log('HappyCoins SSO Widget: Authentication successful from window');
+                this.showMessage(messageDiv, 'Authentication successful!', 'success');
+                button.innerHTML = `
+                  <svg style="margin-right: 8px; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                  Authorized
+                `;
+                config.onSuccess(code);
+                return;
+              }
             }
           } catch (e) {
-            // Cross-origin error is expected while popup is on different domain
+            // Cross-origin error is expected while window is on different domain
             // Continue checking
           }
 
-          // Continue monitoring
-          setTimeout(checkPopup, 1000);
+          // Continue monitoring if not completed and within limits
+          if (checkCount < maxChecks) {
+            setTimeout(checkWindow, 1000);
+          } else {
+            console.error('HappyCoins SSO Widget: Authentication window monitoring timeout');
+            this.showMessage(messageDiv, 'Authentication timeout - please try again', 'error');
+            this.resetButton(button, config);
+            config.onError('Authentication timeout');
+            if (!authWindow.closed) {
+              authWindow.close();
+            }
+          }
         } catch (error) {
-          console.error('HappyCoins SSO Widget: Error monitoring popup:', error);
-          this.showMessage(messageDiv, 'Error monitoring authentication popup', 'error');
+          console.error('HappyCoins SSO Widget: Error monitoring window:', error);
+          this.showMessage(messageDiv, 'Error monitoring authentication window', 'error');
           this.resetButton(button, config);
           config.onError('Error monitoring authentication');
+          if (!authWindow.closed) {
+            authWindow.close();
+          }
         }
       };
 
       // Start monitoring
-      setTimeout(checkPopup, 1000);
+      setTimeout(checkWindow, 1000);
     },
 
     getSupabaseUrl: function() {
@@ -390,8 +412,7 @@
       }
       
       if (messageDiv) {
-        messageDiv.style.display = text ? '
-        ' : 'none';
+        messageDiv.style.display = text ? 'block' : 'none';
         messageDiv.textContent = text;
         messageDiv.className = `hc-sso-widget-message ${type}`;
       } else {
@@ -412,10 +433,6 @@
         </svg>
         Authorize with HappyCoins
       `;
-    },
-
-    generateState: function() {
-      return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     }
   };
 
