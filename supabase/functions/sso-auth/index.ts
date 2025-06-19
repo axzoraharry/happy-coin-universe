@@ -19,10 +19,12 @@ const getAuthCorsHeaders = (origin: string) => ({
   'Access-Control-Allow-Credentials': 'true',
 })
 
-// HTML headers with proper Content-Type
+// HTML headers with proper Content-Type - removed CORS headers that conflict with HTML rendering
 const htmlHeaders = {
-  ...corsHeaders,
-  'Content-Type': 'text/html; charset=utf-8'
+  'Content-Type': 'text/html; charset=utf-8',
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0'
 }
 
 interface AuthorizeRequest {
@@ -159,16 +161,24 @@ serve(async (req) => {
 
       console.log('Valid API key found:', { id: apiKey.id, application_name: apiKey.application_name });
 
-      // Check for session from Authorization header
+      // Check for session from Authorization header OR access_token URL parameter
       let user = null;
       const authHeader = req.headers.get('Authorization');
+      const accessToken = params.access_token;
+      
+      let token = null;
       if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.replace('Bearer ', '');
+        token = authHeader.replace('Bearer ', '');
+      } else if (accessToken) {
+        token = accessToken;
+      }
+      
+      if (token) {
         const { data: { user: headerUser }, error: authError } = await supabase.auth.getUser(token);
         
         if (!authError && headerUser) {
           user = headerUser;
-          console.log('User authenticated via header:', user.id);
+          console.log('User authenticated via token:', user.id);
         }
       }
 
@@ -393,16 +403,12 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
       ...(authRequest.state ? { state: authRequest.state } : {})
     }).toString();
   
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins SSO Authorization</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://zygpupmeradizrachnqj.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://zygpupmeradizrachnqj.supabase.co;">
-</head>
-<body>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
@@ -483,7 +489,8 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
         }
         .hidden { display: none; }
     </style>
-    
+</head>
+<body>
     <div class="container">
         <div class="logo">🪙 HappyCoins</div>
         <div class="message">SSO Authorization</div>
@@ -512,7 +519,6 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
     </div>
     
     <script>
-        // Store auth params for later use
         const authUrl = '${currentAuthUrl}';
         
         async function checkAuth() {
@@ -523,12 +529,10 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             checking.classList.remove('hidden');
             
             try {
-                // Check if we have session storage with access token
                 const accessToken = sessionStorage.getItem('sb-access-token') || 
                                    localStorage.getItem('sb-access-token');
                 
                 if (accessToken) {
-                    // Use our custom auth check endpoint that handles CORS properly
                     const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/check-auth', {
                         method: 'GET',
                         headers: {
@@ -540,20 +544,18 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                     if (response.ok) {
                         const authData = await response.json();
                         if (authData.authenticated) {
-                            // User is authenticated, redirect with the auth token
-                            window.location.href = authUrl + '&access_token=' + accessToken;
+                            window.location.href = authUrl + '&access_token=' + encodeURIComponent(accessToken);
                             return;
                         }
                     }
                 }
                 
-                // Try to get access token from URL hash (typical after OAuth redirect)
                 const hash = window.location.hash;
                 if (hash && hash.includes('access_token=')) {
                     const params = new URLSearchParams(hash.substring(1));
                     const token = params.get('access_token');
                     if (token) {
-                        window.location.href = authUrl + '&access_token=' + token;
+                        window.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
                         return;
                     }
                 }
@@ -562,25 +564,21 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                 console.log('Auth check failed:', error);
             }
             
-            // If we get here, user is not authenticated
             buttons.classList.remove('hidden');
             checking.classList.add('hidden');
             alert('Please log in to HappyCoins first, then try again.');
         }
         
-        // Auto-check for authentication when the page loads
         window.addEventListener('load', function() {
-            // Check if this is a redirect from the HappyCoins login
             if (document.referrer.includes('happy-wallet.axzoragroup.com')) {
                 setTimeout(checkAuth, 1000);
             }
         });
         
-        // Listen for messages from popup windows (login flow)
         window.addEventListener('message', function(event) {
             if (event.origin === 'https://happy-wallet.axzoragroup.com') {
                 if (event.data.type === 'AUTH_SUCCESS' && event.data.accessToken) {
-                    window.location.href = authUrl + '&access_token=' + event.data.accessToken;
+                    window.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
                 }
             }
         });
