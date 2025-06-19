@@ -1,12 +1,12 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Updated CORS headers - removed X-Frame-Options since we're using direct redirects
+// Updated CORS headers with a more permissive CSP for auth checks
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';",
+  'Content-Security-Policy': "default-src 'self' https://zygpupmeradizrachnqj.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://zygpupmeradizrachnqj.supabase.co;",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin'
 }
@@ -357,7 +357,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins SSO Authorization</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://zygpupmeradizrachnqj.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://zygpupmeradizrachnqj.supabase.co;">
 </head>
 <body>
     <style>
@@ -481,7 +481,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                 const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/auth/v1/user', {
                     credentials: 'include',
                     headers: {
-                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQxMDI3ODAsImV4cCI6MjA0OTY3ODc4MH0.YjzILlyF9uKbHNPGP_PzfM-HDR6pRzHGv5r-qqmE2fI'
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczMDkwMDMsImV4cCI6MjA2Mjg4NTAwM30.u6cJkMkw17DSmapGl3dgG7NPOh5--PPnRHr8ZWy6WXo'
                     }
                 });
                 
@@ -515,7 +515,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             fetch('https://zygpupmeradizrachnqj.supabase.co/auth/v1/user', {
                 credentials: 'include',
                 headers: {
-                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQxMDI3ODAsImV4cCI6MjA0OTY3ODc4MH0.YjzILlyF9uKbHNPGP_PzfM-HDR6pRzHGv5r-qqmE2fI'
+                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5Z3B1cG1lcmFkaXpyYWNobnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczMDkwMDMsImV4cCI6MjA2Mjg4NTAwM30.u6cJkMkw17DSmapGl3dgG7NPOh5--PPnRHr8ZWy6WXo'
                 }
             })
             .then(response => {
