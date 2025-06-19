@@ -1,30 +1,21 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Updated CORS headers - specific origin handling for auth checks
+// Updated CORS headers - more permissive for embedding
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Content-Security-Policy': "default-src 'self' https://zygpupmeradizrachnqj.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://zygpupmeradizrachnqj.supabase.co;",
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'strict-origin-when-cross-origin'
+  'Access-Control-Max-Age': '86400'
 }
 
-// CORS headers for authenticated requests (specific origin)
-const getAuthCorsHeaders = (origin: string) => ({
-  'Access-Control-Allow-Origin': origin || 'https://happy-wallet.axzoragroup.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Credentials': 'true',
-})
-
-// HTML headers with proper Content-Type - removed CORS headers that conflict with HTML rendering
+// HTML headers for authentication pages
 const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, must-revalidate',
   'Pragma': 'no-cache',
-  'Expires': '0'
+  'Expires': '0',
+  'X-Frame-Options': 'SAMEORIGIN'
 }
 
 interface AuthorizeRequest {
@@ -41,11 +32,6 @@ serve(async (req) => {
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    const origin = req.headers.get('Origin');
-    if (url.pathname === '/sso-auth/check-auth') {
-      // For auth check endpoint, use specific origin headers
-      return new Response(null, { headers: getAuthCorsHeaders(origin) });
-    }
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -60,15 +46,14 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // New endpoint to check authentication status
+    // Endpoint to check authentication status - used by embedded widgets
     if (url.pathname === '/sso-auth/check-auth' && req.method === 'GET') {
-      const origin = req.headers.get('Origin');
       const authHeader = req.headers.get('Authorization');
       
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return new Response(JSON.stringify({ authenticated: false }), {
           status: 200,
-          headers: { ...getAuthCorsHeaders(origin), 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
@@ -78,7 +63,7 @@ serve(async (req) => {
       if (error || !user) {
         return new Response(JSON.stringify({ authenticated: false }), {
           status: 200,
-          headers: { ...getAuthCorsHeaders(origin), 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
@@ -94,12 +79,12 @@ serve(async (req) => {
         user: userProfile || { id: user.id, email: user.email }
       }), {
         status: 200,
-        headers: { ...getAuthCorsHeaders(origin), 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
+    // Main authorization endpoint
     if (url.pathname === '/sso-auth/authorize' && req.method === 'GET') {
-      // Handle authorization request
       const params = Object.fromEntries(url.searchParams.entries());
       console.log('URL params:', params);
 
@@ -161,7 +146,7 @@ serve(async (req) => {
 
       console.log('Valid API key found:', { id: apiKey.id, application_name: apiKey.application_name });
 
-      // Check for session from Authorization header OR access_token URL parameter
+      // Check for existing authentication
       let user = null;
       const authHeader = req.headers.get('Authorization');
       const accessToken = params.access_token;
@@ -182,7 +167,7 @@ serve(async (req) => {
         }
       }
 
-      // If no authenticated user, return login required page
+      // If no authenticated user, return login page
       if (!user) {
         console.log('No authenticated user found - showing login page');
         return new Response(
@@ -529,27 +514,55 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             checking.classList.remove('hidden');
             
             try {
-                const accessToken = sessionStorage.getItem('sb-access-token') || 
-                                   localStorage.getItem('sb-access-token');
+                // Check multiple storage locations for tokens
+                const possibleTokens = [
+                    sessionStorage.getItem('sb-access-token'),
+                    localStorage.getItem('sb-access-token'),
+                    sessionStorage.getItem('supabase.auth.token'),
+                    localStorage.getItem('supabase.auth.token')
+                ];
                 
-                if (accessToken) {
-                    const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/check-auth', {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': 'Bearer ' + accessToken,
-                            'Content-Type': 'application/json'
+                // Also check for full session objects
+                const sessionKeys = [
+                    'sb-' + 'zygpupmeradizrachnqj' + '-auth-token',
+                    'supabase.auth.session'
+                ];
+                
+                for (const key of sessionKeys) {
+                    try {
+                        const sessionData = localStorage.getItem(key) || sessionStorage.getItem(key);
+                        if (sessionData) {
+                            const parsed = JSON.parse(sessionData);
+                            if (parsed.access_token) {
+                                possibleTokens.push(parsed.access_token);
+                            }
                         }
-                    });
-                    
-                    if (response.ok) {
-                        const authData = await response.json();
-                        if (authData.authenticated) {
-                            window.location.href = authUrl + '&access_token=' + encodeURIComponent(accessToken);
-                            return;
+                    } catch (e) {
+                        // Ignore parsing errors
+                    }
+                }
+                
+                for (const token of possibleTokens) {
+                    if (token) {
+                        const response = await fetch('https://zygpupmeradizrachnqj.supabase.co/functions/v1/sso-auth/check-auth', {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': 'Bearer ' + token,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const authData = await response.json();
+                            if (authData.authenticated) {
+                                window.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
+                                return;
+                            }
                         }
                     }
                 }
                 
+                // Check URL fragment for access token (OAuth redirect)
                 const hash = window.location.hash;
                 if (hash && hash.includes('access_token=')) {
                     const params = new URLSearchParams(hash.substring(1));
@@ -569,12 +582,14 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
             alert('Please log in to HappyCoins first, then try again.');
         }
         
+        // Auto-check if coming from login page
         window.addEventListener('load', function() {
             if (document.referrer.includes('happy-wallet.axzoragroup.com')) {
                 setTimeout(checkAuth, 1000);
             }
         });
         
+        // Listen for messages from parent window (for embedded scenarios)
         window.addEventListener('message', function(event) {
             if (event.origin === 'https://happy-wallet.axzoragroup.com') {
                 if (event.data.type === 'AUTH_SUCCESS' && event.data.accessToken) {

@@ -2,7 +2,7 @@
 (function() {
   'use strict';
 
-  // HappyCoins SSO Widget - Updated to handle CORS restrictions
+  // HappyCoins SSO Widget - Enhanced for external embedding
   window.HappyCoinsSSOWidget = {
     render: function(containerId, config) {
       console.log('HappyCoins SSO Widget: Attempting to render in container:', containerId);
@@ -277,8 +277,10 @@
         this.showMessage(null, 'Authentication successful!', 'success');
         config.onSuccess(code);
         
+        // Clean up URL parameters
         if (window.history && window.history.replaceState) {
-          window.history.replaceState({}, document.title, window.location.pathname);
+          const cleanUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
         }
       } else if (error) {
         console.error('HappyCoins SSO Widget: Authentication error:', error);
@@ -317,8 +319,16 @@
         
         console.log('HappyCoins SSO Widget: Redirecting to authorization:', authUrl);
 
-        // Use direct redirect - the server will handle authentication checking
-        window.location.href = authUrl;
+        // For embedded widgets, open in new window to avoid iframe restrictions
+        if (window.parent !== window) {
+          // We're in an iframe, open in parent window
+          window.parent.open(authUrl, '_blank');
+          this.showMessage(messageDiv, 'Authentication opened in new window. Please complete the process and return here.', 'info');
+          this.resetButton(button, config);
+        } else {
+          // Direct redirect for same-origin scenarios
+          window.location.href = authUrl;
+        }
 
       } catch (error) {
         console.error('HappyCoins SSO Widget: Failed to initiate authentication:', error);
