@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -9,13 +10,13 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400'
 }
 
-// HTML headers for authentication pages
+// HTML headers for authentication pages - REMOVED X-Frame-Options to allow iframe embedding
 const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, must-revalidate',
   'Pragma': 'no-cache',
-  'Expires': '0',
-  'X-Frame-Options': 'SAMEORIGIN'
+  'Expires': '0'
+  // Removed X-Frame-Options to allow iframe embedding for SSO
 }
 
 interface AuthorizeRequest {
@@ -485,7 +486,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
         </div>
         
         <div id="auth-buttons">
-            <a href="${loginUrl}" class="button" target="_blank">
+            <a href="${loginUrl}" class="button" target="_top">
                 Log in to HappyCoins
             </a>
             <button onclick="checkAuth()" class="button secondary">
@@ -555,7 +556,8 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                         if (response.ok) {
                             const authData = await response.json();
                             if (authData.authenticated) {
-                                window.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
+                                // Use _top instead of current window for iframe compatibility
+                                window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
                                 return;
                             }
                         }
@@ -568,7 +570,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
                     const params = new URLSearchParams(hash.substring(1));
                     const token = params.get('access_token');
                     if (token) {
-                        window.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
+                        window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(token);
                         return;
                     }
                 }
@@ -593,7 +595,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
         window.addEventListener('message', function(event) {
             if (event.origin === 'https://happy-wallet.axzoragroup.com') {
                 if (event.data.type === 'AUTH_SUCCESS' && event.data.accessToken) {
-                    window.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
+                    window.top.location.href = authUrl + '&access_token=' + encodeURIComponent(event.data.accessToken);
                 }
             }
         });
