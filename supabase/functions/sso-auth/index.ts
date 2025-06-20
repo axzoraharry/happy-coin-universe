@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -9,14 +10,14 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400'
 }
 
-// HTML headers for authentication pages - REMOVED X-Frame-Options to allow iframe embedding
+// HTML headers for authentication pages - Updated CSP for popup compatibility
 const htmlHeaders = {
   'Content-Type': 'text/html; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, must-revalidate',
   'Pragma': 'no-cache',
   'Expires': '0',
+  'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data: https:; frame-ancestors *;",
   ...corsHeaders
-  // Removed X-Frame-Options to allow iframe embedding for SSO
 }
 
 interface AuthorizeRequest {
@@ -236,7 +237,7 @@ serve(async (req) => {
       // Build redirect URL with authorization code
       if (isPopup) {
         // For popup mode, return a page that posts message to parent window
-        const html = createPopupCallbackPage(authCode, authRequest.state || '');
+        const html = createPopupCallbackPage(authCode, authRequest.state || '', originalRedirectUri);
         return new Response(html, {
           status: 200,
           headers: htmlHeaders
@@ -625,7 +626,7 @@ function createInteractiveAuthPage(authRequest: AuthorizeRequest, appName: strin
 </html>`;
 }
 
-function createPopupCallbackPage(authCode: string, state: string): string {
+function createPopupCallbackPage(authCode: string, state: string, originalRedirectUri: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -682,22 +683,50 @@ function createPopupCallbackPage(authCode: string, state: string): string {
     </div>
     
     <script>
-        // Send success message to parent window
-        if (window.opener) {
-            window.opener.postMessage({
-                type: 'SSO_AUTH_SUCCESS',
-                code: '${authCode}',
-                returnedState: '${state}'
-            }, window.location.origin);
-            
-            // Close popup after a short delay
-            setTimeout(() => {
-                window.close();
-            }, 1000);
-        } else {
-            // Fallback for non-popup scenario
-            window.location.href = '/';
+        function sendMessageToParent() {
+            try {
+                // Try multiple target origins to ensure message delivery
+                const targetOrigins = [
+                    window.location.origin,
+                    '${new URL(originalRedirectUri).origin}',
+                    '*'
+                ];
+                
+                const message = {
+                    type: 'SSO_AUTH_SUCCESS',
+                    code: '${authCode}',
+                    returnedState: '${state}'
+                };
+                
+                if (window.opener) {
+                    for (const origin of targetOrigins) {
+                        try {
+                            window.opener.postMessage(message, origin);
+                            console.log('Message sent to origin:', origin);
+                        } catch (e) {
+                            console.log('Failed to send to origin:', origin, e.message);
+                        }
+                    }
+                    
+                    // Close popup after a short delay
+                    setTimeout(() => {
+                        window.close();
+                    }, 1000);
+                } else {
+                    // Fallback for non-popup scenario
+                    console.log('No opener window found, redirecting...');
+                    window.location.href = '${originalRedirectUri}?code=${authCode}&state=${state}';
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                // Fallback redirect
+                window.location.href = '${originalRedirectUri}?code=${authCode}&state=${state}';
+            }
         }
+        
+        // Send message immediately and also after a short delay
+        sendMessageToParent();
+        setTimeout(sendMessageToParent, 500);
     </script>
 </body>
 </html>`;

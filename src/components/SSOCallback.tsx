@@ -11,24 +11,50 @@ export function SSOCallback() {
 
     if (window.opener) {
       // We're in a popup window, send message to parent
-      if (code) {
-        window.opener.postMessage({
-          type: 'SSO_AUTH_SUCCESS',
-          code: code,
-          returnedState: state
-        }, window.location.origin);
-      } else if (error) {
-        window.opener.postMessage({
-          type: 'SSO_AUTH_ERROR',
-          error: error
-        }, window.location.origin);
+      const message = code ? {
+        type: 'SSO_AUTH_SUCCESS',
+        code: code,
+        returnedState: state
+      } : {
+        type: 'SSO_AUTH_ERROR',
+        error: error || 'Unknown error'
+      };
+
+      // Try multiple target origins to ensure message delivery
+      const targetOrigins = [
+        window.location.origin,
+        'https://id-preview--b1724132-5093-46b8-bbdf-fbe0a6be2771.lovable.app',
+        '*'
+      ];
+
+      let messageSent = false;
+      for (const origin of targetOrigins) {
+        try {
+          window.opener.postMessage(message, origin);
+          console.log('SSO Callback: Message sent to origin:', origin);
+          messageSent = true;
+        } catch (e) {
+          console.log('SSO Callback: Failed to send message to origin:', origin, e.message);
+        }
+      }
+
+      if (!messageSent) {
+        console.error('SSO Callback: Failed to send message to any target origin');
       }
       
-      // Close the popup
-      window.close();
+      // Close the popup after a short delay
+      setTimeout(() => {
+        window.close();
+      }, 1000);
     } else {
       // Fallback - redirect to home or show message
-      window.location.href = '/';
+      if (code) {
+        // Success - could redirect to a success page or home
+        window.location.href = '/?sso_success=true';
+      } else {
+        // Error - redirect to home with error
+        window.location.href = '/?sso_error=' + encodeURIComponent(error || 'Authentication failed');
+      }
     }
   }, []);
 
