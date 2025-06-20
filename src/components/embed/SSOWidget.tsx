@@ -80,9 +80,8 @@ export function SSOWidget({
   useEffect(() => {
     // Listen for messages from popup window
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) {
-        return;
-      }
+      // Accept messages from any origin for better compatibility
+      console.log('SSO Widget: Received message:', event.data, 'from origin:', event.origin);
 
       if (event.data.type === 'SSO_AUTH_SUCCESS') {
         const { code, returnedState } = event.data;
@@ -115,10 +114,12 @@ export function SSOWidget({
   };
 
   const openAuthPopup = (authUrl: string) => {
+    // Create popup with specific features for better compatibility
     const popup = window.open(
       authUrl,
       'sso-auth',
-      'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+      'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no,left=' + 
+      (window.screen.width / 2 - 250) + ',top=' + (window.screen.height / 2 - 350)
     );
 
     if (!popup) {
@@ -129,7 +130,9 @@ export function SSOWidget({
       return;
     }
 
-    // Monitor popup for closure
+    // Monitor popup for closure and focus
+    popup.focus();
+    
     const checkClosed = setInterval(() => {
       if (popup.closed) {
         clearInterval(checkClosed);
@@ -180,7 +183,7 @@ export function SSOWidget({
       const supabaseUrl = getSupabaseUrl();
       const authUrl = `${supabaseUrl}/functions/v1/sso-auth/authorize?${params.toString()}&access_token=${encodeURIComponent(session.access_token)}`;
       
-      console.log('SSO Widget: Opening authorization popup');
+      console.log('SSO Widget: Opening authorization popup with URL:', authUrl);
       
       const popup = openAuthPopup(authUrl);
       if (!popup) return;
@@ -201,7 +204,8 @@ export function SSOWidget({
     const popup = window.open(
       '/',
       'happycoins-login',
-      'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+      'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no,left=' + 
+      (window.screen.width / 2 - 250) + ',top=' + (window.screen.height / 2 - 350)
     );
 
     if (!popup) {
@@ -209,6 +213,8 @@ export function SSOWidget({
       setMessage('Popup blocked. Please allow popups for this site.');
       return;
     }
+    
+    popup.focus();
   };
 
   const getStatusIcon = () => {

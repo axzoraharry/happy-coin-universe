@@ -739,8 +739,6 @@ function createRedirectPage(redirectUrl: string, appName: string = 'Application'
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins Authorization</title>
-</head>
-<body>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
@@ -789,7 +787,8 @@ function createRedirectPage(redirectUrl: string, appName: string = 'Application'
             font-weight: 600;
         }
     </style>
-    
+</head>
+<body>
     <div class="container">
         <div class="logo">🪙 HappyCoins</div>
         <div class="message">Authorization successful!</div>
@@ -818,8 +817,6 @@ function createErrorPage(errorMessage: string): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HappyCoins Authorization Error</title>
-</head>
-<body>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
@@ -857,7 +854,8 @@ function createErrorPage(errorMessage: string): string {
             margin: 1rem 0;
         }
     </style>
-    
+</head>
+<body>
     <div class="container">
         <div class="logo">🪙 HappyCoins</div>
         <div class="error-icon">⚠️</div>
