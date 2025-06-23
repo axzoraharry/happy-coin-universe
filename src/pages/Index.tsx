@@ -16,7 +16,11 @@ import { CoinExchange } from '@/components/coins/CoinExchange';
 import { PurchaseCoins } from '@/components/coins/PurchaseCoins';
 import { SSOGenerator } from '@/components/embed/SSOGenerator';
 import { RealTimeSecurityDashboard } from '@/components/security/RealTimeSecurityDashboard';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { PageHeader } from '@/components/common/PageHeader';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
+import { PageType, getPageConfig, shouldRedirectToAuth } from '@/utils/navigationUtils';
 
 interface ReferralResponse {
   success?: boolean;
@@ -26,7 +30,7 @@ interface ReferralResponse {
 
 const Index = () => {
   const [user, setUser] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState('landing');
+  const [currentPage, setCurrentPage] = useState<PageType>('landing');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -34,7 +38,6 @@ const Index = () => {
     try {
       console.log('Checking for pending referral processing for user:', userId);
       
-      // Check if there's a referral code in URL or localStorage
       const urlParams = new URLSearchParams(window.location.search);
       let referralCode = urlParams.get('ref');
       
@@ -59,9 +62,7 @@ const Index = () => {
             title: "Referral Bonus Awarded!",
             description: `You and your referrer both earned ${referralData.bonus_awarded} coins!`,
           });
-          // Clean up
           localStorage.removeItem('pendingReferralCode');
-          // Clean up URL
           if (urlParams.get('ref')) {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -71,27 +72,22 @@ const Index = () => {
       }
     } catch (error: any) {
       console.error('Error processing referral after confirmation:', error);
-      // Silent fail - don't disrupt user experience
     }
   };
 
   useEffect(() => {
-    // Process URL parameters once at the beginning
     const urlParams = new URLSearchParams(window.location.search);
     
-    // Store referral code if present in URL for later processing
     const referralCode = urlParams.get('ref');
     if (referralCode) {
       localStorage.setItem('pendingReferralCode', referralCode);
     }
 
-    // Check for Stripe redirect params
     if (urlParams.get('success') === 'true') {
       toast({
         title: "Purchase Successful!",
         description: "Your Happy Coins have been added to your wallet",
       });
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (urlParams.get('canceled') === 'true') {
       toast({
@@ -99,29 +95,24 @@ const Index = () => {
         description: "Your purchase was canceled",
         variant: "destructive",
       });
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // Get initial user
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       setLoading(false);
       if (user) {
         setCurrentPage('dashboard');
-        // Process referral if user just confirmed email
         processReferralAfterConfirmation(user.id);
       } else {
         setCurrentPage('landing');
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
       if (session?.user) {
         setCurrentPage('dashboard');
-        // Process referral for new users after email confirmation
         if (event === 'SIGNED_IN') {
           processReferralAfterConfirmation(session.user.id);
         }
@@ -133,22 +124,17 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, [toast]);
 
-  const renderPage = () => {
-    if (!user && (currentPage === 'landing' || currentPage === 'auth')) {
-      switch (currentPage) {
-        case 'landing':
-          return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
-        case 'auth':
-          return <AuthForm onBackToLanding={() => setCurrentPage('landing')} />;
-        default:
-          return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
-      }
+  const handlePageChange = (page: PageType) => {
+    if (shouldRedirectToAuth(page, !!user)) {
+      setCurrentPage('auth');
+      return;
     }
+    setCurrentPage(page);
+  };
 
-    if (!user) {
-      return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
-    }
-
+  const renderAuthenticatedPage = () => {
+    const config = getPageConfig(currentPage);
+    
     switch (currentPage) {
       case 'dashboard':
         return (
@@ -165,36 +151,22 @@ const Index = () => {
       case 'security':
         return (
           <div className="space-y-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Security Center</h1>
-              <p className="text-muted-foreground">
-                Advanced security monitoring, threat detection, and account protection.
-              </p>
-            </div>
+            <PageHeader title={config.title} description={config.description} />
             <RealTimeSecurityDashboard />
           </div>
         );
       case 'coins':
         return (
           <div className="space-y-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Coins & Rewards</h1>
-              <p className="text-muted-foreground">
-                Earn coins through daily bonuses, complete offers, exchange them for Happy Coins, or purchase directly.
-              </p>
-            </div>
-
+            <PageHeader title={config.title} description={config.description} />
             <WalletDashboard />
-
             <div className="grid gap-6 lg:grid-cols-2">
               <PurchaseCoins />
               <DailyLoginBonus />
             </div>
-
             <div className="grid gap-6 lg:grid-cols-2">
               <CoinExchange />
             </div>
-
             <div>
               <OffersList />
             </div>
@@ -203,12 +175,7 @@ const Index = () => {
       case 'sso':
         return (
           <div className="space-y-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">SSO Integration</h1>
-              <p className="text-muted-foreground">
-                Create Single Sign-On (SSO) authentication widgets and API integrations for your applications.
-              </p>
-            </div>
+            <PageHeader title={config.title} description={config.description} />
             <SSOGenerator />
           </div>
         );
@@ -238,20 +205,15 @@ const Index = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
-          <p className="text-muted-foreground">Setting up your digital wallet</p>
-        </div>
+        <LoadingSpinner size="lg" text="Setting up your digital wallet" />
       </div>
     );
   }
 
-  // Show landing page without navbar for non-authenticated users
   if (!user && currentPage === 'landing') {
     return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
   }
 
-  // Show auth form without navbar
   if (!user && currentPage === 'auth') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -260,15 +222,16 @@ const Index = () => {
     );
   }
 
-  // Show app with navbar for authenticated users
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
-      
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {renderPage()}
-      </main>
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+        
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          {renderAuthenticatedPage()}
+        </main>
+      </div>
+    </ErrorBoundary>
   );
 };
 
