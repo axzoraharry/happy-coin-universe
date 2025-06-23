@@ -6,8 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, MessageCircle, CreditCard, Plane, Smartphone, ShoppingCart, Brain, Shield, Zap, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export function LandingPage() {
+interface LandingPageProps {
+  onGetStarted?: () => void;
+}
+
+export function LandingPage({ onGetStarted }: LandingPageProps) {
   const [isHovered, setIsHovered] = useState(false);
+
+  const handleGetStarted = () => {
+    if (onGetStarted) {
+      onGetStarted();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white overflow-hidden">
@@ -34,17 +44,30 @@ export function LandingPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link to="/auth">
+              {onGetStarted ? (
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-none px-8 py-4 text-lg font-semibold transform hover:scale-105 transition-all duration-300"
                   onMouseEnter={() => setIsHovered(true)}
                   onMouseLeave={() => setIsHovered(false)}
+                  onClick={handleGetStarted}
                 >
                   <Brain className="h-5 w-5 mr-2" />
                   Start Your AI Journey
                 </Button>
-              </Link>
+              ) : (
+                <Link to="/auth">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-none px-8 py-4 text-lg font-semibold transform hover:scale-105 transition-all duration-300"
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                  >
+                    <Brain className="h-5 w-5 mr-2" />
+                    Start Your AI Journey
+                  </Button>
+                </Link>
+              )}
               <Button
                 variant="outline"
                 size="lg"
@@ -254,14 +277,24 @@ export function LandingPage() {
             Start your journey today with our AI-powered platform.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/auth">
+            {onGetStarted ? (
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-none px-8 py-4 text-lg font-semibold transform hover:scale-105 transition-all duration-300"
+                onClick={handleGetStarted}
               >
                 Get Started Free
               </Button>
-            </Link>
+            ) : (
+              <Link to="/auth">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-none px-8 py-4 text-lg font-semibold transform hover:scale-105 transition-all duration-300"
+                >
+                  Get Started Free
+                </Button>
+              </Link>
+            )}
             <Button
               variant="outline"
               size="lg"
