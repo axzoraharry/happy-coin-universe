@@ -1,26 +1,54 @@
 
+import { HomeIcon, CreditCard, ArrowLeftRight, Bell, User, Server, Wallet } from "lucide-react";
 import Index from "./pages/Index";
 import CoinsPage from "./pages/CoinsPage";
+import { TransfersPage } from "./components/transfers/TransfersPage";
+import { NotificationsList } from "./components/notifications/NotificationsList";
+import { UserProfile } from "./components/profile/UserProfile";
 import APIPage from "./pages/APIPage";
-import { Home, Coins, Code } from "lucide-react";
+import HappyPaisaPage from "./pages/HappyPaisaPage";
 
 export const navItems = [
   {
     title: "Home",
     to: "/",
-    icon: Home,
+    icon: <HomeIcon className="h-4 w-4" />,
     page: <Index />,
   },
   {
     title: "Coins",
     to: "/coins",
-    icon: Coins,
+    icon: <CreditCard className="h-4 w-4" />,
     page: <CoinsPage />,
+  },
+  {
+    title: "Transfers",
+    to: "/transfers",
+    icon: <ArrowLeftRight className="h-4 w-4" />,
+    page: <TransfersPage />,
+  },
+  {
+    title: "Happy Paisa",
+    to: "/happy-paisa",
+    icon: <Walletт className="h-4 w-4" />,
+    page: <HappyPaisaPage />,
+  },
+  {
+    title: "Notifications",
+    to: "/notifications",
+    icon: <Bell className="h-4 w-4" />,
+    page: <NotificationsList />,
+  },
+  {
+    title: "Profile",
+    to: "/profile",
+    icon: <User className="h-4 w-4" />,
+    page: <UserProfile />,
   },
   {
     title: "API",
     to: "/api",
-    icon: Code,
+    icon: <Server className="h-4 w-4" />,
     page: <APIPage />,
   },
 ];
