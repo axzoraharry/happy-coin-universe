@@ -8,6 +8,7 @@ import CoinsPage from "@/pages/CoinsPage";
 import CardsPage from "@/pages/CardsPage";
 import HappyPaisaPage from "@/pages/HappyPaisaPage";
 import APIPage from "@/pages/APIPage";
+import AnalyticsPage from "@/pages/AnalyticsPage";
 import NotFound from "@/pages/NotFound";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
@@ -24,6 +25,7 @@ function App() {
             <Route path="/cards" element={<CardsPage />} />
             <Route path="/happy-paisa" element={<HappyPaisaPage />} />
             <Route path="/api" element={<APIPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -11,7 +12,8 @@ import {
   Server,
   Wallet,
   Zap,
-  TrendingUp
+  TrendingUp,
+  BarChart3
 } from 'lucide-react';
 
 export function QuickActions() {
@@ -44,13 +46,13 @@ export function QuickActions() {
       hoverColor: "hover:bg-purple-500/5"
     },
     {
-      to: "/coins",
-      icon: Gift,
-      title: "Earn Rewards",
-      description: "Complete offers",
-      color: "orange",
-      gradient: "from-orange-500/10 to-orange-600/10",
-      hoverColor: "hover:bg-orange-500/5"
+      to: "/analytics",
+      icon: BarChart3,
+      title: "View Analytics",
+      description: "Financial insights",
+      color: "indigo",
+      gradient: "from-indigo-500/10 to-indigo-600/10",
+      hoverColor: "hover:bg-indigo-500/5"
     }
   ];
 
@@ -65,10 +67,10 @@ export function QuickActions() {
     },
     {
       to: "/coins",
-      icon: Coins,
-      title: "Purchase Coins",
-      description: "Buy with credit card or bank transfer",
-      color: "green",
+      icon: Gift,
+      title: "Earn Rewards",
+      description: "Complete offers and earn coins",
+      color: "orange",
       badge: "Popular"
     }
   ];

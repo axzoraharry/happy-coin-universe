@@ -151,6 +151,20 @@ const Index = () => {
             </div>
           </div>
         );
+      case 'analytics':
+        return (
+          <div className="space-y-8">
+            <PageHeader title={config.title} description={config.description} />
+            <UnifiedWalletDashboard />
+            <div className="mt-8">
+              <iframe 
+                src="/analytics" 
+                className="w-full h-screen border-0 rounded-lg"
+                title="Analytics Dashboard"
+              />
+            </div>
+          </div>
+        );
       case 'security':
         return (
           <div className="space-y-8">

@@ -3,78 +3,84 @@ export type PageType =
   | 'landing' 
   | 'auth' 
   | 'dashboard' 
-  | 'security' 
   | 'coins' 
-  | 'sso' 
   | 'transfers' 
   | 'notifications' 
   | 'offers' 
-  | 'profile';
+  | 'profile' 
+  | 'sso'
+  | 'security'
+  | 'analytics';
 
-export interface NavigationConfig {
-  requiresAuth: boolean;
+export interface PageConfig {
   title: string;
-  description?: string;
+  description: string;
+  requiresAuth: boolean;
 }
 
-export const pageConfigs: Record<PageType, NavigationConfig> = {
-  landing: {
-    requiresAuth: false,
-    title: 'Welcome to Axzora',
-    description: 'Your AI-powered digital universe'
-  },
-  auth: {
-    requiresAuth: false,
-    title: 'Sign In',
-    description: 'Access your digital wallet'
-  },
-  dashboard: {
-    requiresAuth: true,
-    title: 'Dashboard',
-    description: 'Manage your digital wallet'
-  },
-  security: {
-    requiresAuth: true,
-    title: 'Security Center',
-    description: 'Advanced security monitoring and protection'
-  },
-  coins: {
-    requiresAuth: true,
-    title: 'Coins & Rewards',
-    description: 'Earn and manage your digital currency'
-  },
-  sso: {
-    requiresAuth: true,
-    title: 'SSO Integration',
-    description: 'Create authentication widgets and API integrations'
-  },
-  transfers: {
-    requiresAuth: true,
-    title: 'Transfers',
-    description: 'Send and receive Happy Coins'
-  },
-  notifications: {
-    requiresAuth: true,
-    title: 'Notifications',
-    description: 'Stay updated with your account activity'
-  },
-  offers: {
-    requiresAuth: true,
-    title: 'Offers',
-    description: 'Discover exclusive deals and rewards'
-  },
-  profile: {
-    requiresAuth: true,
-    title: 'Profile',
-    description: 'Manage your account settings'
-  }
+export const getPageConfig = (page: PageType): PageConfig => {
+  const configs: Record<PageType, PageConfig> = {
+    landing: {
+      title: 'Welcome to Axzora',
+      description: 'Your digital wallet ecosystem',
+      requiresAuth: false
+    },
+    auth: {
+      title: 'Authentication',
+      description: 'Sign in to your account',
+      requiresAuth: false
+    },
+    dashboard: {
+      title: 'Dashboard',
+      description: 'Overview of your digital wallet',
+      requiresAuth: true
+    },
+    coins: {
+      title: 'Happy Coins',
+      description: 'Purchase and manage your digital currency',
+      requiresAuth: true
+    },
+    transfers: {
+      title: 'Transfers',
+      description: 'Send money and manage transactions',
+      requiresAuth: true
+    },
+    notifications: {
+      title: 'Notifications',
+      description: 'Stay updated with your account activity',
+      requiresAuth: true
+    },
+    offers: {
+      title: 'Offers & Rewards',
+      description: 'Earn coins through activities and offers',
+      requiresAuth: true
+    },
+    profile: {
+      title: 'Profile',
+      description: 'Manage your account settings',
+      requiresAuth: true
+    },
+    sso: {
+      title: 'SSO Generator',
+      description: 'Generate secure single sign-on tokens',
+      requiresAuth: true
+    },
+    security: {
+      title: 'Security Dashboard',
+      description: 'Monitor and manage account security',
+      requiresAuth: true
+    },
+    analytics: {
+      title: 'Analytics Dashboard',
+      description: 'Insights into your financial activity',
+      requiresAuth: true
+    }
+  };
+
+  return configs[page] || configs.dashboard;
 };
 
-export function getPageConfig(page: PageType): NavigationConfig {
-  return pageConfigs[page];
-}
-
-export function shouldRedirectToAuth(page: PageType, isAuthenticated: boolean): boolean {
+export const shouldRedirectToAuth = (page: PageType, isAuthenticated: boolean): boolean => {
   const config = getPageConfig(page);
   return config.requiresAuth && !isAuthenticated;
-}
+};
