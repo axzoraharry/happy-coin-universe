@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -36,10 +35,10 @@ export function QuickActions() {
       hoverColor: "hover:bg-blue-500/5"
     },
     {
-      to: "/coins",
-      icon: ArrowLeftRight,
-      title: "Exchange",
-      description: "Convert currencies",
+      to: "/cards",
+      icon: CreditCard,
+      title: "Virtual Cards",
+      description: "Issue debit cards",
       color: "purple",
       gradient: "from-purple-500/10 to-purple-600/10",
       hoverColor: "hover:bg-purple-500/5"
@@ -66,7 +65,7 @@ export function QuickActions() {
     },
     {
       to: "/coins",
-      icon: CreditCard,
+      icon: Coins,
       title: "Purchase Coins",
       description: "Buy with credit card or bank transfer",
       color: "green",
