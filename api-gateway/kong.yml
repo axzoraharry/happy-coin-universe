@@ -1,0 +1,45 @@
+
+_format_version: "3.0"
+
+services:
+  - name: auth-service-internal
+    url: http://auth-service:8000
+    routes:
+      - name: auth-route
+        paths: ["/v1/auth", "/v1/users"]
+        strip_path: false
+
+  - name: nlu-engine-service-internal
+    url: http://nlu-engine-service:8002
+    routes:
+      - name: nlu-route
+        paths: ["/v1/nlu"]
+        strip_path: false
+
+  - name: llm-orchestrator-service-internal
+    url: http://llm-orchestrator-service:8003
+    routes:
+      - name: llm-route
+        paths: ["/v1/llm"]
+        strip_path: false
+
+  - name: happy-paisa-ledger-internal
+    url: http://happy-paisa-ledger:8004
+    routes:
+      - name: happy-paisa-route
+        paths: ["/v1/happy-paisa"]
+        strip_path: false
+
+  - name: payment-gateway-service-internal
+    url: http://payment-gateway-service:8005
+    routes:
+      - name: payment-route
+        paths: ["/v1/payments"]
+        strip_path: false
+
+  - name: mycroft-api-proxy-internal
+    url: http://mycroft-core:8181
+    routes:
+      - name: mycroft-api-route
+        paths: ["/v1/mycroft"]
+        strip_path: false

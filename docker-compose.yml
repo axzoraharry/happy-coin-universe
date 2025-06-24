@@ -1,0 +1,143 @@
+
+version: '3.8'
+
+services:
+  # --- API Gateway (Kong) ---
+  api-gateway:
+    image: kong:3.4
+    hostname: api-gateway
+    ports:
+      - "8000:8000"  # HTTP API
+      - "8443:8443"  # HTTPS API
+      - "8001:8001"  # Admin API
+      - "8444:8444"  # Admin HTTPS
+    environment:
+      KONG_DATABASE: "postgres"
+      KONG_PG_HOST: "kong-db"
+      KONG_PG_USER: "kong"
+      KONG_PG_PASSWORD: "kong_password"
+      KONG_PROXY_ACCESS_LOG: "/dev/stdout"
+      KONG_ADMIN_ACCESS_LOG: "/dev/stdout"
+      KONG_PROXY_ERROR_LOG: "/dev/stderr"
+      KONG_ADMIN_ERROR_LOG: "/dev/stderr"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001,0.0.0.0:8444 ssl"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+    volumes:
+      - ./api-gateway/kong.yml:/etc/kong/kong.yml
+    depends_on:
+      - kong-db
+    networks:
+      - axzora-network
+
+  kong-db:
+    image: postgres:13
+    hostname: kong-db
+    environment:
+      POSTGRES_DB: "kong"
+      POSTGRES_USER: "kong"
+      POSTGRES_PASSWORD: "kong_password"
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+    networks:
+      - axzora-network
+
+  # --- Authentication Service ---
+  auth-service:
+    build: ./auth-service
+    hostname: auth-service
+    environment:
+      DATABASE_URL: "postgresql://auth_user:auth_password@auth-db:5432/auth_db"
+      JWT_SECRET_KEY: "your_super_secret_jwt_key_change_me_in_prod"
+    depends_on:
+      - auth-db
+    networks:
+      - axzora-network
+
+  auth-db:
+    image: postgres:13
+    hostname: auth-db
+    environment:
+      POSTGRES_DB: "auth_db"
+      POSTGRES_USER: "auth_user"
+      POSTGRES_PASSWORD: "auth_password"
+    volumes:
+      - auth_data:/var/lib/postgresql/data
+    networks:
+      - axzora-network
+
+  # --- NLU Engine Service ---
+  nlu-engine-service:
+    build: ./nlu-engine-service
+    hostname: nlu-engine-service
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+    networks:
+      - axzora-network
+
+  # --- LLM Orchestrator Service ---
+  llm-orchestrator-service:
+    build: ./llm-orchestrator-service
+    hostname: llm-orchestrator-service
+    environment:
+      OPENAI_API_KEY: "sk-your_openai_key_here"
+      LLM_PROVIDER: "openai"
+    networks:
+      - axzora-network
+
+  # --- Happy Paisa Ledger ---
+  happy-paisa-ledger:
+    build: ./happy-paisa-ledger
+    hostname: happy-paisa-ledger
+    environment:
+      DATABASE_URL: "postgresql://hp_user:hp_password@hp-db:5432/hp_db"
+    depends_on:
+      - hp-db
+    networks:
+      - axzora-network
+
+  hp-db:
+    image: postgres:13
+    hostname: hp-db
+    environment:
+      POSTGRES_DB: "hp_db"
+      POSTGRES_USER: "hp_user"
+      POSTGRES_PASSWORD: "hp_password"
+    volumes:
+      - hp_data:/var/lib/postgresql/data
+    networks:
+      - axzora-network
+
+  # --- Payment Gateway Service ---
+  payment-gateway-service:
+    build: ./payment-gateway-service
+    hostname: payment-gateway-service
+    environment:
+      STRIPE_SECRET_KEY: "sk_test_your_stripe_secret_key_here"
+      STRIPE_WEBHOOK_SECRET: "whsec_your_webhook_secret_here"
+      HAPPY_PAISA_LEDGER_API_URL: "http://happy-paisa-ledger:8004"
+    networks:
+      - axzora-network
+
+  # --- Mycroft Core (AI Brain) ---
+  mycroft-core:
+    build: ./mycroft-core
+    hostname: mycroft-core
+    environment:
+      AXZORA_API_GATEWAY_URL: "http://api-gateway:8000"
+      MYCROFT_TTS_STREAM_PORT: "8181"
+    ports:
+      - "8181:8181"  # TTS streaming port
+    networks:
+      - axzora-network
+
+networks:
+  axzora-network:
+    driver: bridge
+
+volumes:
+  kong_data:
+  auth_data:
+  hp_data:

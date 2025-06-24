@@ -1,73 +1,130 @@
-# Welcome to your Lovable project
 
-## Project info
+# Axzora "Mr. Happy 2.0" Ecosystem
 
-**URL**: https://lovable.dev/projects/b1724132-5093-46b8-bbdf-fbe0a6be2771
+Welcome to the complete development environment for Axzora's Mr. Happy 2.0 - an AI-powered digital assistant with emotional intelligence and financial capabilities.
 
-## How can I edit this code?
+## 🌟 What is Mr. Happy 2.0?
 
-There are several ways of editing your application.
+Mr. Happy 2.0 is an advanced AI companion that:
+- Understands and responds to emotions
+- Manages your Happy Paisa (₹1000 digital currency)
+- Provides travel booking, recharging, and e-commerce services
+- Integrates with your development workflow via Git
+- Speaks with natural, expressive voice synthesis
 
-**Use Lovable**
+## 🚀 Quick Start
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/b1724132-5093-46b8-bbdf-fbe0a6be2771) and start prompting.
+### Prerequisites
+Make sure you have installed:
+- [Git](https://git-scm.com/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- [Node.js](https://nodejs.org/)
+- [Python 3.9+](https://www.python.org/)
+- [Go 1.20+](https://go.dev/)
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### 1. Clone and Setup
+```bash
+git clone [your-repo-url]
+cd axzora-mrhappy-ecosystem
 ```
 
-**Edit a file directly in GitHub**
+### 2. Start Backend Services
+```bash
+# Make scripts executable
+chmod +x scripts/*.sh
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+# Start all backend services
+./scripts/start-backend.sh
+```
 
-**Use GitHub Codespaces**
+### 3. Verify Services
+Open these URLs to verify everything is running:
+- Kong Admin: http://localhost:8001/status
+- API Gateway: http://localhost:8000
+- Auth Service: http://localhost:8000/v1/auth/health
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📁 Project Structure
 
-## What technologies are used for this project?
+```
+axzora-mrhappy-ecosystem/
+├── 📄 docker-compose.yml          # Main orchestration file
+├── 🗂️ api-gateway/               # Kong API Gateway config
+├── 🔐 auth-service/               # User authentication
+├── 🧠 nlu-engine-service/         # Natural Language Understanding
+├── 🤖 llm-orchestrator-service/   # Large Language Model management
+├── 💰 happy-paisa-ledger/         # Digital currency system
+├── 💳 payment-gateway-service/    # Stripe payment integration
+├── 🎙️ mycroft-core/              # Voice AI (Mr. Happy's brain)
+├── 🌐 frontend-configs/           # Frontend environment templates
+├── 📜 scripts/                   # Utility scripts
+└── 📖 SETUP_GUIDE.md             # Detailed setup instructions
+```
 
-This project is built with:
+## 🔧 Development Commands
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+# View service logs
+docker-compose logs -f
 
-## How can I deploy this project?
+# Restart a specific service
+docker-compose restart auth-service
 
-Simply open [Lovable](https://lovable.dev/projects/b1724132-5093-46b8-bbdf-fbe0a6be2771) and click on Share -> Publish.
+# Stop all services
+./scripts/stop-backend.sh
 
-## Can I connect a custom domain to my Lovable project?
+# Check service status
+docker-compose ps
+```
 
-Yes, you can!
+## 🌐 API Endpoints
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Authentication
+- `POST /v1/auth/register` - User registration
+- `POST /v1/auth/login` - User login
+- `GET /v1/users/{user_id}/profile` - User profile
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### AI Processing
+- `POST /v1/nlu/process` - Natural language understanding
+- `POST /v1/llm/generate` - AI response generation
+- `POST /v1/llm/rag_query` - Knowledge-based queries
+
+### Happy Paisa Wallet
+- `GET /v1/happy-paisa/balance/{user_id}` - Get wallet balance
+- `POST /v1/happy-paisa/transfer` - Transfer Happy Paisa
+- `POST /v1/payments/create_payment_intent` - Create payment
+
+### Voice Streaming
+- `ws://localhost:8181/tts_stream` - Mr. Happy's voice stream
+
+## 🎯 Next Steps
+
+1. **Implement Service Logic**: Add business logic to each microservice
+2. **Build Frontend Applications**: Create web and mobile interfaces
+3. **Develop Mycroft Skills**: Build custom AI capabilities
+4. **Add More Services**: Implement travel, recharge, e-commerce
+5. **Security & Testing**: Add authentication, validation, tests
+6. **Deploy**: Set up CI/CD and production deployment
+
+## 📚 Learning Resources
+
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Mycroft AI Documentation](https://mycroft-ai.gitbook.io/docs/)
+- [Docker Compose Guide](https://docs.docker.com/compose/)
+- [Kong Gateway Docs](https://docs.konghq.com/)
+- [Go Programming Guide](https://go.dev/doc/)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test locally with Docker Compose
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+**Happy coding with Mr. Happy 2.0! 🚀**
