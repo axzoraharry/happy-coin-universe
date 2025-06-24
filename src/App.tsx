@@ -1,12 +1,8 @@
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
-import { useHydrate } from "@/hooks/useHydrate";
-import { useEffect, useState } from "react";
-import { useSession } from "@/hooks/useSession";
-import { supabase } from "./integrations/supabase/client";
-import { redirect } from "react-router-dom";
 import Index from "@/pages/Index";
 import CoinsPage from "@/pages/CoinsPage";
 import CardsPage from "@/pages/CardsPage";
@@ -14,6 +10,8 @@ import HappyPaisaPage from "@/pages/HappyPaisaPage";
 import APIPage from "@/pages/APIPage";
 import NotFound from "@/pages/NotFound";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+
+const queryClient = new QueryClient();
 
 function App() {
   return (
