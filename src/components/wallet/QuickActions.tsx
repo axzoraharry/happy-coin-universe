@@ -13,7 +13,9 @@ import {
   Wallet,
   Zap,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  Users,
+  Shield
 } from 'lucide-react';
 
 export function QuickActions() {
@@ -64,6 +66,14 @@ export function QuickActions() {
       description: "Advanced wallet service with enhanced security",
       color: "blue",
       badge: "Advanced"
+    },
+    {
+      to: "/user-management",
+      icon: Users,
+      title: "User Management",
+      description: "Manage accounts and monitor system security",
+      color: "purple",
+      badge: "Admin"
     },
     {
       to: "/coins",
@@ -123,7 +133,7 @@ export function QuickActions() {
         </div>
 
         {/* Advanced Actions */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           {advancedActions.map((action, index) => {
             const IconComponent = action.icon;
             return (

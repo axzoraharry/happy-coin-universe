@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
@@ -16,6 +15,7 @@ import { CoinExchange } from '@/components/coins/CoinExchange';
 import { PurchaseCoins } from '@/components/coins/PurchaseCoins';
 import { SSOGenerator } from '@/components/embed/SSOGenerator';
 import { RealTimeSecurityDashboard } from '@/components/security/RealTimeSecurityDashboard';
+import UserManagementPage from '@/pages/UserManagementPage';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -165,6 +165,8 @@ const Index = () => {
             </div>
           </div>
         );
+      case 'user-management':
+        return <UserManagementPage />;
       case 'security':
         return (
           <div className="space-y-8">

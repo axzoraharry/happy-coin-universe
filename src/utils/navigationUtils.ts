@@ -10,7 +10,8 @@ export type PageType =
   | 'profile' 
   | 'sso'
   | 'security'
-  | 'analytics';
+  | 'analytics'
+  | 'user-management';
 
 export interface PageConfig {
   title: string;
@@ -73,6 +74,11 @@ export const getPageConfig = (page: PageType): PageConfig => {
     analytics: {
       title: 'Analytics Dashboard',
       description: 'Insights into your financial activity',
+      requiresAuth: true
+    },
+    'user-management': {
+      title: 'User Management',
+      description: 'Manage user accounts and system security',
       requiresAuth: true
     }
   };
