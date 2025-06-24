@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import {
   Plus, 
   Eye, 
   EyeOff, 
-  Freeze, 
+  Snowflake, 
   Shield, 
   Settings,
   Smartphone,
@@ -103,7 +102,7 @@ export function VirtualCardManager() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active': return <CheckCircle className="h-3 w-3" />;
-      case 'frozen': return <Freeze className="h-3 w-3" />;
+      case 'frozen': return <Snowflake className="h-3 w-3" />;
       case 'pending': return <Clock className="h-3 w-3" />;
       case 'blocked': return <AlertTriangle className="h-3 w-3" />;
       default: return <CreditCard className="h-3 w-3" />;

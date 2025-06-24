@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import {
   Eye, 
   EyeOff, 
   Copy, 
-  Freeze, 
+  Snowflake, 
   Play, 
   Shield,
   Clock,
@@ -41,7 +40,7 @@ export function VirtualCardDisplay({
   onToggleDetails, 
   onCardAction 
 }: VirtualCardDisplayProps) {
-  const [detailsTimer, setDetailsTimer] = useState<number | null>(null);
+  const [detailsTimer, setDetailsTimer] = useState<NodeJS.Timeout | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const { toast } = useToast();
 
@@ -227,7 +226,7 @@ export function VirtualCardDisplay({
             </>
           ) : (
             <>
-              <Freeze className="h-4 w-4" />
+              <Snowflake className="h-4 w-4" />
               Freeze Card
             </>
           )}
