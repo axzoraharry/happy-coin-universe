@@ -4,8 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { LandingPage } from '@/components/landing/LandingPage';
-import { WalletDashboard } from '@/components/wallet/WalletDashboard';
-import { WalletActions } from '@/components/wallet/WalletActions';
+import { UnifiedWalletDashboard } from '@/components/wallet/UnifiedWalletDashboard';
+import { QuickActions } from '@/components/wallet/QuickActions';
 import { TransactionsList } from '@/components/transactions/TransactionsList';
 import { NotificationsList } from '@/components/notifications/NotificationsList';
 import { OffersList } from '@/components/offers/OffersList';
@@ -139,11 +139,14 @@ const Index = () => {
       case 'dashboard':
         return (
           <div className="space-y-6">
-            <WalletDashboard />
+            <UnifiedWalletDashboard />
+            <QuickActions />
             <div className="grid gap-6 lg:grid-cols-2">
-              <WalletActions />
               <div className="space-y-6">
                 <TransactionsList />
+              </div>
+              <div className="space-y-6">
+                <DailyLoginBonus />
               </div>
             </div>
           </div>
@@ -159,7 +162,8 @@ const Index = () => {
         return (
           <div className="space-y-8">
             <PageHeader title={config.title} description={config.description} />
-            <WalletDashboard />
+            <UnifiedWalletDashboard />
+            <QuickActions />
             <div className="grid gap-6 lg:grid-cols-2">
               <PurchaseCoins />
               <DailyLoginBonus />
@@ -190,11 +194,14 @@ const Index = () => {
       default:
         return (
           <div className="space-y-6">
-            <WalletDashboard />
+            <UnifiedWalletDashboard />
+            <QuickActions />
             <div className="grid gap-6 lg:grid-cols-2">
-              <WalletActions />
               <div className="space-y-6">
                 <TransactionsList />
+              </div>
+              <div className="space-y-6">
+                <DailyLoginBonus />
               </div>
             </div>
           </div>

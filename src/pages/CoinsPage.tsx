@@ -1,5 +1,6 @@
 
-import { WalletDashboard } from '@/components/wallet/WalletDashboard';
+import { UnifiedWalletDashboard } from '@/components/wallet/UnifiedWalletDashboard';
+import { QuickActions } from '@/components/wallet/QuickActions';
 import { DailyLoginBonus } from '@/components/offers/DailyLoginBonus';
 import { OffersList } from '@/components/offers/OffersList';
 import { CoinExchange } from '@/components/coins/CoinExchange';
@@ -15,11 +16,13 @@ export default function CoinsPage() {
       <div>
         <h1 className="text-3xl font-bold mb-2">Coins & Rewards</h1>
         <p className="text-muted-foreground">
-          Earn coins through daily bonuses, complete offers, exchange them for Happy Coins, or purchase directly. 1000 INR = 1 Happy Coin.
+          Earn coins through daily bonuses, complete offers, exchange them for Happy Coins, or purchase directly.
         </p>
       </div>
 
-      <WalletDashboard />
+      <UnifiedWalletDashboard />
+
+      <QuickActions />
 
       {/* Happy Paisa Ledger Integration Card */}
       <Card className="bg-gradient-to-r from-primary/10 to-blue-600/10 border-primary/20">
