@@ -30,7 +30,7 @@ export const navItems = [
   {
     title: "Happy Paisa",
     to: "/happy-paisa",
-    icon: <Walletт className="h-4 w-4" />,
+    icon: <Wallet className="h-4 w-4" />,
     page: <HappyPaisaPage />,
   },
   {
