@@ -921,9 +921,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      armor: {
+        Args: { "": string }
+        Returns: string
+      }
       cleanup_rate_limits: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      dearmor: {
+        Args: { "": string }
+        Returns: string
       }
       delete_user_completely: {
         Args: { p_user_id: string }
@@ -941,6 +949,18 @@ export type Database = {
         }
         Returns: Json
       }
+      gen_random_bytes: {
+        Args: { "": number }
+        Returns: string
+      }
+      gen_random_uuid: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      gen_salt: {
+        Args: { "": string }
+        Returns: string
+      }
       generate_api_keys: {
         Args: {
           p_user_id: string
@@ -949,6 +969,14 @@ export type Database = {
           p_allowed_domains?: string[]
         }
         Returns: Json
+      }
+      pgp_armor_headers: {
+        Args: { "": string }
+        Returns: Record<string, unknown>[]
+      }
+      pgp_key_id: {
+        Args: { "": string }
+        Returns: string
       }
       process_external_payment: {
         Args: {
