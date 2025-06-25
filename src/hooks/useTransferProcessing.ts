@@ -85,7 +85,10 @@ export function useTransferProcessing() {
         .eq('user_id', user.id)
         .single();
 
-      if (walletError) throw walletError;
+      if (walletError) {
+        console.error('Wallet error:', walletError);
+        throw walletError;
+      }
 
       const currentBalance = parseFloat(wallet.balance.toString());
       const balanceAfterTransfer = currentBalance - transferAmount;
@@ -108,7 +111,7 @@ export function useTransferProcessing() {
         return false;
       }
 
-      // Use the correct secure transfer function - this is the key fix
+      // Call the database function directly - this is the key fix
       console.log('Calling process_secure_wallet_transfer_v2 with params:', {
         sender_id: user.id,
         recipient_id: recipient.id,
@@ -127,7 +130,12 @@ export function useTransferProcessing() {
 
       if (transferError) {
         console.error('Transfer error:', transferError);
-        throw transferError;
+        toast({
+          title: "Transfer Failed",
+          description: transferError.message || "An error occurred during the transfer",
+          variant: "destructive",
+        });
+        return false;
       }
 
       console.log('Transfer function result:', rawResult);

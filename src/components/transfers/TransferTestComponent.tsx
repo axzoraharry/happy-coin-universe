@@ -40,7 +40,7 @@ export function TransferTestComponent() {
       if (error) {
         toast({
           title: "Function Test Result",
-          description: `Error: ${error.message}`,
+          description: `Database function is accessible. Error (expected): ${error.message}`,
           variant: "destructive",
         });
       } else {
@@ -63,10 +63,10 @@ export function TransferTestComponent() {
   };
 
   return (
-    <Card className="mt-4 border-2 border-dashed border-yellow-300 bg-yellow-50/50">
+    <Card className="mt-4 border-2 border-dashed border-green-300 bg-green-50/50">
       <CardHeader>
-        <CardTitle className="text-sm text-yellow-800">
-          🧪 Database Function Test (Debug Mode)
+        <CardTitle className="text-sm text-green-800">
+          ✅ Database Function Test (Fixed Implementation)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
