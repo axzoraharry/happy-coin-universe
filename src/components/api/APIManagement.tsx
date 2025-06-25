@@ -1,20 +1,15 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Key, Copy, Eye, EyeOff, Plus, Trash2, Globe, Code } from 'lucide-react';
-import { AccountStatusGuard } from '../common/AccountStatusGuard';
-import { PaymentRequests } from './PaymentRequests';
-import { EmbedGenerator } from '../embed/EmbedGenerator';
-import { IntegrationGuide } from './IntegrationGuide';
+import { Key, Plus, Trash2, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
-interface APIKey {
+interface ApiKey {
   id: string;
   application_name: string;
   api_key: string;
@@ -22,49 +17,83 @@ interface APIKey {
   is_active: boolean;
   created_at: string;
   last_used_at: string | null;
-  webhook_url: string | null;
-  allowed_domains: string[] | null;
-}
-
-interface GenerateApiKeysResponse {
-  success: boolean;
-  error?: string;
-  api_key_id?: string;
-  api_key?: string;
-  secret_key?: string;
-  application_name?: string;
 }
 
 export function APIManagement() {
-  const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [newAppName, setNewAppName] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newApp, setNewApp] = useState({
-    name: '',
-    webhook_url: '',
-    allowed_domains: ''
-  });
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchAPIKeys();
+    loadApiKeys();
   }, []);
 
-  const fetchAPIKeys = async () => {
+  const loadApiKeys = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
         .from('api_keys')
         .select('*')
+        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setApiKeys(data || []);
     } catch (error: any) {
-      console.error('Error fetching API keys:', error);
+      console.error('Error loading API keys:', error);
       toast({
         title: "Error",
         description: "Failed to load API keys",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const generateApiKey = async () => {
+    if (!newAppName.trim()) {
+      toast({
+        title: "Missing Application Name",
+        description: "Please provide an application name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase.rpc('generate_api_keys', {
+        p_user_id: user.id,
+        p_application_name: newAppName.trim(),
+        p_webhook_url: webhookUrl.trim() || null,
+        p_allowed_domains: null
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: "API Key Generated",
+          description: `New API key created for ${newAppName}`,
+        });
+        setNewAppName('');
+        setWebhookUrl('');
+        loadApiKeys();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error: any) {
+      console.error('Error generating API key:', error);
+      toast({
+        title: "Generation Failed",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -72,52 +101,26 @@ export function APIManagement() {
     }
   };
 
-  const createAPIKey = async () => {
-    if (!newApp.name.trim()) {
-      toast({
-        title: "Error",
-        description: "Application name is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const toggleApiKey = async (apiKeyId: string, currentStatus: boolean) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const domainsArray = newApp.allowed_domains 
-        ? newApp.allowed_domains.split(',').map(d => d.trim()).filter(d => d)
-        : null;
-
-      const { data, error } = await supabase.rpc('generate_api_keys', {
-        p_user_id: user.id,
-        p_application_name: newApp.name,
-        p_webhook_url: newApp.webhook_url || null,
-        p_allowed_domains: domainsArray
-      });
+      const { error } = await supabase
+        .from('api_keys')
+        .update({ is_active: !currentStatus })
+        .eq('id', apiKeyId);
 
       if (error) throw error;
 
-      // Proper type conversion: Json -> unknown -> GenerateApiKeysResponse
-      const response = data as unknown as GenerateApiKeysResponse;
-
-      if (response?.success) {
-        toast({
-          title: "API Keys Generated",
-          description: "Your API keys have been created successfully",
-        });
-        setNewApp({ name: '', webhook_url: '', allowed_domains: '' });
-        setShowCreateForm(false);
-        fetchAPIKeys();
-      } else {
-        throw new Error(response?.error || 'Failed to generate API keys');
-      }
-    } catch (error: any) {
-      console.error('Error creating API key:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to create API keys",
+        title: currentStatus ? "API Key Disabled" : "API Key Enabled",
+        description: `API key has been ${currentStatus ? 'disabled' : 'enabled'}`,
+      });
+
+      loadApiKeys();
+    } catch (error: any) {
+      console.error('Error toggling API key:', error);
+      toast({
+        title: "Update Failed",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -130,270 +133,177 @@ export function APIManagement() {
     }));
   };
 
-  const copyToClipboard = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
-        variant: "destructive",
-      });
-    }
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied to clipboard",
+      description: `${label} copied successfully`,
+    });
   };
 
-  const deactivateAPIKey = async (keyId: string) => {
-    try {
-      const { error } = await supabase
-        .from('api_keys')
-        .update({ is_active: false })
-        .eq('id', keyId);
-
-      if (error) throw error;
-
-      toast({
-        title: "API Key Deactivated",
-        description: "The API key has been deactivated",
-      });
-      fetchAPIKeys();
-    } catch (error: any) {
-      console.error('Error deactivating API key:', error);
-      toast({
-        title: "Error",
-        description: "Failed to deactivate API key",
-        variant: "destructive",
-      });
-    }
+  const maskSecret = (secret: string) => {
+    return secret.substring(0, 8) + '...';
   };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 bg-muted rounded w-1/3 animate-pulse"></div>
-        <div className="h-64 bg-muted rounded animate-pulse"></div>
-      </div>
-    );
-  }
 
   return (
-    <AccountStatusGuard>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-              API Management
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Manage API keys and integrate HappyCoins payments into your applications
-            </p>
-          </div>
-          <Button onClick={() => setShowCreateForm(true)} className="flex items-center space-x-2">
-            <Plus className="h-4 w-4" />
-            <span>Create API Key</span>
-          </Button>
-        </div>
-
-        <Tabs defaultValue="keys" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="keys">API Keys</TabsTrigger>
-            <TabsTrigger value="embed">Embed Widget</TabsTrigger>
-            <TabsTrigger value="requests">Payment Requests</TabsTrigger>
-            <TabsTrigger value="guide">Integration Guide</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="keys" className="space-y-6">
-            {showCreateForm && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Create New API Key</CardTitle>
-                  <CardDescription>
-                    Generate API credentials for external application integration
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="appName">Application Name *</Label>
-                    <Input
-                      id="appName"
-                      placeholder="My E-commerce Store"
-                      value={newApp.name}
-                      onChange={(e) => setNewApp(prev => ({ ...prev, name: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="webhookUrl">Webhook URL (Optional)</Label>
-                    <Input
-                      id="webhookUrl"
-                      placeholder="https://your-app.com/webhook"
-                      value={newApp.webhook_url}
-                      onChange={(e) => setNewApp(prev => ({ ...prev, webhook_url: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="domains">Allowed Domains (Optional)</Label>
-                    <Textarea
-                      id="domains"
-                      placeholder="example.com, app.example.com"
-                      value={newApp.allowed_domains}
-                      onChange={(e) => setNewApp(prev => ({ ...prev, allowed_domains: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Comma-separated list of domains that can use this API key
-                    </p>
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <Button onClick={createAPIKey}>Create API Key</Button>
-                    <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="grid gap-6">
-              {apiKeys.length === 0 ? (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Key className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No API Keys</h3>
-                    <p className="text-muted-foreground text-center mb-4">
-                      Create your first API key to start integrating external applications with your wallet.
-                    </p>
-                    <Button onClick={() => setShowCreateForm(true)}>
-                      Create API Key
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                apiKeys.map((apiKey) => (
-                  <Card key={apiKey.id} className={!apiKey.is_active ? 'opacity-60' : ''}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center space-x-2">
-                            <span>{apiKey.application_name}</span>
-                            <Badge variant={apiKey.is_active ? 'default' : 'secondary'}>
-                              {apiKey.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </CardTitle>
-                          <CardDescription>
-                            Created on {new Date(apiKey.created_at).toLocaleDateString()}
-                            {apiKey.last_used_at && (
-                              <> • Last used: {new Date(apiKey.last_used_at).toLocaleDateString()}</>
-                            )}
-                          </CardDescription>
-                        </div>
-                        {apiKey.is_active && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deactivateAPIKey(apiKey.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>API Key</Label>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            value={apiKey.api_key}
-                            readOnly
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyToClipboard(apiKey.api_key, 'API Key')}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Secret Key</Label>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type={showSecrets[apiKey.id] ? 'text' : 'password'}
-                            value={apiKey.secret_key}
-                            readOnly
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleSecretVisibility(apiKey.id)}
-                          >
-                            {showSecrets[apiKey.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyToClipboard(apiKey.secret_key, 'Secret Key')}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {apiKey.webhook_url && (
-                        <div className="space-y-2">
-                          <Label>Webhook URL</Label>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              value={apiKey.webhook_url}
-                              readOnly
-                              className="text-sm"
-                            />
-                            <Globe className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </div>
-                      )}
-
-                      {apiKey.allowed_domains && apiKey.allowed_domains.length > 0 && (
-                        <div className="space-y-2">
-                          <Label>Allowed Domains</Label>
-                          <div className="flex flex-wrap gap-2">
-                            {apiKey.allowed_domains.map((domain, index) => (
-                              <Badge key={index} variant="outline">
-                                {domain}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Key className="h-5 w-5" />
+            <span>API Key Management</span>
+          </CardTitle>
+          <CardDescription>
+            Generate and manage API keys for accessing the Happy Wallet REST API
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="app-name">Application Name</Label>
+              <Input
+                id="app-name"
+                placeholder="My App"
+                value={newAppName}
+                onChange={(e) => setNewAppName(e.target.value)}
+              />
             </div>
-          </TabsContent>
+            <div className="space-y-2">
+              <Label htmlFor="webhook-url">Webhook URL (Optional)</Label>
+              <Input
+                id="webhook-url"
+                type="url"
+                placeholder="https://your-app.com/webhooks"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+              />
+            </div>
+          </div>
 
-          <TabsContent value="embed">
-            <EmbedGenerator />
-          </TabsContent>
+          <Button onClick={generateApiKey} disabled={loading} className="w-full">
+            <Plus className="h-4 w-4 mr-2" />
+            {loading ? 'Generating...' : 'Generate New API Key'}
+          </Button>
+        </CardContent>
+      </Card>
 
-          <TabsContent value="requests">
-            <PaymentRequests />
-          </TabsContent>
+      <Card>
+        <CardHeader>
+          <CardTitle>Your API Keys</CardTitle>
+          <CardDescription>
+            Manage your existing API keys and monitor their usage
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {apiKeys.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No API keys yet</p>
+              <p className="text-sm">Generate your first API key to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {apiKeys.map((key) => (
+                <div key={key.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">{key.application_name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Created {new Date(key.created_at).toLocaleDateString()}
+                        {key.last_used_at && (
+                          <span> • Last used {new Date(key.last_used_at).toLocaleDateString()}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={key.is_active ? "default" : "secondary"}>
+                        {key.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleApiKey(key.id, key.is_active)}
+                      >
+                        {key.is_active ? "Disable" : "Enable"}
+                      </Button>
+                    </div>
+                  </div>
 
-          <TabsContent value="guide">
-            <IntegrationGuide />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </AccountStatusGuard>
+                  <div className="space-y-2">
+                    <div>
+                      <Label className="text-xs">API Key</Label>
+                      <div className="flex items-center space-x-2">
+                        <code className="flex-1 bg-muted p-2 rounded text-sm font-mono">
+                          {showSecrets[key.id] ? key.api_key : maskSecret(key.api_key)}
+                        </code>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleSecretVisibility(key.id)}
+                        >
+                          {showSecrets[key.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(key.api_key, 'API Key')}
+                        >
+                          📋
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Secret Key</Label>
+                      <div className="flex items-center space-x-2">
+                        <code className="flex-1 bg-muted p-2 rounded text-sm font-mono">
+                          {showSecrets[key.id] ? key.secret_key : maskSecret(key.secret_key)}
+                        </code>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(key.secret_key, 'Secret Key')}
+                        >
+                          📋
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Usage Guidelines</CardTitle>
+          <CardDescription>
+            Important information about using your API keys securely
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <h4 className="font-medium text-yellow-800 mb-2">🔒 Security Best Practices</h4>
+            <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
+              <li>Never expose API keys in client-side code or public repositories</li>
+              <li>Use environment variables to store API keys securely</li>
+              <li>Rotate API keys regularly for enhanced security</li>
+              <li>Monitor API key usage and disable unused keys</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <h4 className="font-medium text-blue-800 mb-2">📊 Rate Limits</h4>
+            <ul className="list-disc list-inside text-sm text-blue-800 space-y-1">
+              <li>Transfer API: 100 requests per hour per API key</li>
+              <li>API Management: 1000 requests per hour per API key</li>
+              <li>Webhook deliveries: 50 per minute per endpoint</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
