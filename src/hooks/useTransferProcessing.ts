@@ -15,6 +15,9 @@ interface TransferResult {
   error?: string;
   pin_verified?: boolean;
   reference_id?: string;
+  sender_new_balance?: number;
+  recipient_new_balance?: number;
+  daily_limit_remaining?: number;
 }
 
 const MINIMUM_TRANSFER_AMOUNT = 1; // 1 Happy Coin
@@ -105,8 +108,16 @@ export function useTransferProcessing() {
         return false;
       }
 
-      // Use the new secure transfer function
-      const { data: rawResult, error: transferError } = await supabase.rpc('process_secure_wallet_transfer' as any, {
+      // Use the correct secure transfer function - this is the key fix
+      console.log('Calling process_secure_wallet_transfer_v2 with params:', {
+        sender_id: user.id,
+        recipient_id: recipient.id,
+        transfer_amount: transferAmount,
+        transfer_description: description || `Transfer to ${recipient.email}`,
+        sender_pin: pin || null
+      });
+
+      const { data: rawResult, error: transferError } = await supabase.rpc('process_secure_wallet_transfer_v2', {
         sender_id: user.id,
         recipient_id: recipient.id,
         transfer_amount: transferAmount,
@@ -118,6 +129,8 @@ export function useTransferProcessing() {
         console.error('Transfer error:', transferError);
         throw transferError;
       }
+
+      console.log('Transfer function result:', rawResult);
 
       const result = rawResult as unknown as TransferResult;
 
@@ -154,7 +167,7 @@ export function useTransferProcessing() {
 
       toast({
         title: "Transfer Successful",
-        description: `${amount} HC securely sent to ${recipient.full_name || recipient.email}`,
+        description: `${amount} HC securely sent to ${recipient.full_name || recipient.email}. Reference: ${result.reference_id || 'N/A'}`,
       });
 
       return true;

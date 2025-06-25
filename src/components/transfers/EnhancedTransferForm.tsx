@@ -1,119 +1,63 @@
 
 import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Send, ArrowLeftRight } from 'lucide-react';
-import { RecipientSearch } from './RecipientSearch';
-import { TransferAmountInput } from './TransferAmountInput';
-import { SecurePinInput } from '../wallet/SecurePinInput';
-import { AccountStatusGuard } from '../common/AccountStatusGuard';
-import { useSecureTransfer } from '@/hooks/useSecureTransfer';
-
-interface RecipientInfo {
-  id: string;
-  email: string;
-  full_name?: string;
-  phone?: string;
-}
+import { Shield, ArrowLeftRight } from 'lucide-react';
+import { SecureTransferForm } from './SecureTransferForm';
+import { TransferForm } from './TransferForm';
 
 export function EnhancedTransferForm() {
-  const [recipient, setRecipient] = useState<RecipientInfo | null>(null);
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  
-  const {
-    loading,
-    showPinInput,
-    pendingTransfer,
-    initiateTransfer,
-    executeTransfer,
-    cancelTransfer
-  } = useSecureTransfer();
-
-  const handleTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!recipient) return;
-    
-    if (!amount || parseFloat(amount) <= 0) {
-      return;
-    }
-
-    // Initiate secure transfer (this will show PIN input)
-    initiateTransfer({
-      recipientId: recipient.id,
-      amount,
-      description: description || `Transfer to ${recipient.email}`
-    });
-  };
-
-  const handlePinSubmit = async (pin: string) => {
-    const success = await executeTransfer(pin);
-    
-    if (success) {
-      // Reset form
-      setRecipient(null);
-      setAmount('');
-      setDescription('');
-      
-      // Refresh page to show updated data
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    }
-  };
-
   return (
-    <AccountStatusGuard>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <ArrowLeftRight className="h-5 w-5" />
-            <span>{showPinInput ? 'Confirm Transfer' : 'Send Happy Coins'}</span>
-          </CardTitle>
-          <CardDescription>
-            {showPinInput && pendingTransfer 
-              ? `Transferring ${pendingTransfer.amount} HC to ${recipient?.full_name || recipient?.email}`
-              : 'Transfer Happy Coins securely with PIN verification'
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {showPinInput && pendingTransfer ? (
-            <SecurePinInput
-              onPinEntered={handlePinSubmit}
-              onCancel={cancelTransfer}
-              isVerifying={loading}
-              title="Confirm Transfer"
-              description="Enter your PIN to securely complete this transfer"
-            />
-          ) : (
-            <form onSubmit={handleTransfer} className="space-y-6">
-              <RecipientSearch
-                onRecipientFound={setRecipient}
-                onRecipientCleared={() => setRecipient(null)}
-                recipient={recipient}
-              />
+    <Card className="backdrop-blur-sm bg-gradient-to-r from-card/80 to-card/60 border-border/50 shadow-lg">
+      <CardHeader>
+        <CardTitle className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent flex items-center">
+          <ArrowLeftRight className="h-5 w-5 mr-2 text-green-600" />
+          Happy Coins Transfer
+        </CardTitle>
+        <CardDescription className="text-muted-foreground">
+          Choose your preferred transfer method
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="secure" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1 rounded-lg">
+            <TabsTrigger value="secure" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Shield className="h-4 w-4 mr-2" />
+              Secure Transfer
+            </TabsTrigger>
+            <TabsTrigger value="basic" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <ArrowLeftRight className="h-4 w-4 mr-2" />
+              Basic Transfer
+            </TabsTrigger>
+          </TabsList>
 
-              <TransferAmountInput
-                amount={amount}
-                description={description}
-                onAmountChange={setAmount}
-                onDescriptionChange={setDescription}
-              />
+          <TabsContent value="secure" className="space-y-4">
+            <div className="bg-green-50 p-3 rounded-lg border border-green-200 mb-4">
+              <div className="flex items-start space-x-2">
+                <Shield className="h-4 w-4 text-green-600 mt-0.5" />
+                <div className="text-sm text-green-800">
+                  <p className="font-medium">Recommended: Secure Transfer</p>
+                  <p>Enhanced security with PIN verification and recipient validation</p>
+                </div>
+              </div>
+            </div>
+            <SecureTransferForm />
+          </TabsContent>
 
-              <Button 
-                type="submit" 
-                disabled={loading || !recipient} 
-                className="w-full"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {loading ? 'Processing Transfer...' : 'Send Happy Coins Securely'}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </AccountStatusGuard>
+          <TabsContent value="basic" className="space-y-4">
+            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-4">
+              <div className="flex items-start space-x-2">
+                <ArrowLeftRight className="h-4 w-4 text-yellow-600 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium">Basic Transfer</p>
+                  <p>Simple transfer without additional security verification</p>
+                </div>
+              </div>
+            </div>
+            <TransferForm />
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }

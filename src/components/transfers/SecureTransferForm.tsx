@@ -7,89 +7,119 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Shield, AlertTriangle } from 'lucide-react';
-import { secureApi } from '@/lib/secureApi';
-import { transferRequestSchema } from '@/lib/validation';
+import { useTransferProcessing } from '@/hooks/useTransferProcessing';
+import { supabase } from '@/integrations/supabase/client';
 import { SecurePinInput } from '../wallet/SecurePinInput';
+
+interface RecipientInfo {
+  id: string;
+  email: string;
+  full_name?: string;
+  phone?: string;
+}
 
 export function SecureTransferForm() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [recipient, setRecipient] = useState<RecipientInfo | null>(null);
   const [showPinInput, setShowPinInput] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [searchingRecipient, setSearchingRecipient] = useState(false);
+  const { processTransfer, loading } = useTransferProcessing();
   const { toast } = useToast();
 
-  const validateForm = () => {
-    try {
-      transferRequestSchema.parse({
-        recipientEmail,
-        amount: parseFloat(amount),
-        description: description || undefined
-      });
-      setValidationErrors({});
-      return true;
-    } catch (error: any) {
-      const errors: Record<string, string> = {};
-      error.errors?.forEach((err: any) => {
-        errors[err.path[0]] = err.message;
-      });
-      setValidationErrors(errors);
-      return false;
-    }
-  };
-
-  const handleTransfer = async (pin?: string) => {
-    if (!validateForm()) {
+  const searchRecipient = async () => {
+    if (!recipientEmail.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Please fix the form errors before proceeding",
+        title: "Email Required",
+        description: "Please enter a recipient email address",
         variant: "destructive",
       });
       return;
     }
 
-    setLoading(true);
+    setSearchingRecipient(true);
     try {
-      const result = await secureApi.secureTransfer({
-        recipientEmail,
-        amount: parseFloat(amount),
-        description: description || undefined,
-        pin
-      });
+      const { data: recipientProfile, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone')
+        .eq('email', recipientEmail.trim())
+        .eq('is_active', true)
+        .single();
 
+      if (error || !recipientProfile) {
+        toast({
+          title: "Recipient Not Found",
+          description: "No active user found with that email address",
+          variant: "destructive",
+        });
+        setRecipient(null);
+        return;
+      }
+
+      // Check if trying to send to self
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && recipientProfile.id === user.id) {
+        toast({
+          title: "Invalid Recipient",
+          description: "You cannot transfer Happy Coins to yourself",
+          variant: "destructive",
+        });
+        setRecipient(null);
+        return;
+      }
+
+      setRecipient(recipientProfile);
       toast({
-        title: "Transfer Successful",
-        description: `${amount} HC sent to ${recipientEmail}. Reference: ${result.reference_id || 'N/A'}`,
+        title: "Recipient Found",
+        description: `Ready to send to ${recipientProfile.full_name || recipientProfile.email}`,
       });
+    } catch (error: any) {
+      console.error('Error searching recipient:', error);
+      toast({
+        title: "Search Failed",
+        description: "Failed to search for recipient",
+        variant: "destructive",
+      });
+      setRecipient(null);
+    } finally {
+      setSearchingRecipient(false);
+    }
+  };
 
-      // Reset form
+  const handleTransfer = async (pin?: string) => {
+    if (!recipient) {
+      toast({
+        title: "No Recipient Selected",
+        description: "Please search and select a recipient first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid transfer amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const success = await processTransfer(recipient, amount, description, pin);
+    
+    if (success) {
+      // Reset form on success
       setRecipientEmail('');
       setAmount('');
       setDescription('');
+      setRecipient(null);
       setShowPinInput(false);
       
-      // Refresh page to show updated data
+      // Refresh page to show updated balance
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-    } catch (error: any) {
-      console.error('Transfer error:', error);
-      
-      // Check if PIN is required
-      if (error.message?.includes('PIN') && !pin) {
-        setShowPinInput(true);
-        setLoading(false);
-        return;
-      }
-      
-      toast({
-        title: "Transfer Failed",
-        description: error.message || "An error occurred during the transfer",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -99,7 +129,10 @@ export function SecureTransferForm() {
 
   const handlePinCancel = () => {
     setShowPinInput(false);
-    setLoading(false);
+  };
+
+  const initiateTransfer = () => {
+    setShowPinInput(true);
   };
 
   if (showPinInput) {
@@ -111,7 +144,7 @@ export function SecureTransferForm() {
             <span>Secure Transfer Verification</span>
           </CardTitle>
           <CardDescription>
-            Enter your 4-digit PIN to authorize the transfer
+            Enter your 4-digit PIN to authorize the transfer of {amount} HC to {recipient?.full_name || recipient?.email}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -120,7 +153,7 @@ export function SecureTransferForm() {
             onCancel={handlePinCancel}
             isVerifying={loading}
             title="Authorize Transfer"
-            description={`Confirm transfer of ${amount} HC to ${recipientEmail}`}
+            description={`Confirm transfer of ${amount} HC to ${recipient?.email}`}
           />
         </CardContent>
       </Card>
@@ -136,72 +169,69 @@ export function SecureTransferForm() {
           <Shield className="h-4 w-4 text-green-600" />
         </CardTitle>
         <CardDescription>
-          Transfer Happy Coins securely with enhanced validation and rate limiting
+          Transfer Happy Coins securely with PIN verification
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={(e) => { e.preventDefault(); handleTransfer(); }} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); initiateTransfer(); }} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="recipient">Recipient Email</Label>
-            <Input
-              id="recipient"
-              type="email"
-              placeholder="recipient@example.com"
-              value={recipientEmail}
-              onChange={(e) => setRecipientEmail(e.target.value)}
-              className={validationErrors.recipientEmail ? 'border-red-500' : ''}
-              required
-            />
-            {validationErrors.recipientEmail && (
-              <p className="text-sm text-red-600 flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-1" />
-                {validationErrors.recipientEmail}
-              </p>
+            <div className="flex space-x-2">
+              <Input
+                id="recipient"
+                type="email"
+                placeholder="recipient@example.com"
+                value={recipientEmail}
+                onChange={(e) => {
+                  setRecipientEmail(e.target.value);
+                  setRecipient(null); // Clear recipient when email changes
+                }}
+                required
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={searchRecipient}
+                disabled={searchingRecipient}
+              >
+                {searchingRecipient ? 'Searching...' : 'Search'}
+              </Button>
+            </div>
+            {recipient && (
+              <div className="text-sm text-green-600 flex items-center">
+                <Shield className="h-4 w-4 mr-1" />
+                Recipient verified: {recipient.full_name || recipient.email}
+              </div>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount (max 10,000 HC)</Label>
+            <Label htmlFor="amount">Amount (Happy Coins)</Label>
             <Input
               id="amount"
               type="number"
               placeholder="0.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              min="0.01"
-              max="10000"
+              min="1"
               step="0.01"
-              className={validationErrors.amount ? 'border-red-500' : ''}
               required
             />
-            {validationErrors.amount && (
-              <p className="text-sm text-red-600 flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-1" />
-                {validationErrors.amount}
-              </p>
-            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description (Optional, max 500 characters)</Label>
+            <Label htmlFor="description">Description (Optional)</Label>
             <Textarea
               id="description"
               placeholder="What's this transfer for?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={500}
-              className={validationErrors.description ? 'border-red-500' : ''}
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
               {description.length}/500 characters
             </p>
-            {validationErrors.description && (
-              <p className="text-sm text-red-600 flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-1" />
-                {validationErrors.description}
-              </p>
-            )}
           </div>
 
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
@@ -210,18 +240,22 @@ export function SecureTransferForm() {
               <div className="text-sm text-blue-800">
                 <p className="font-medium">Security Features:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Rate limiting: 5 transfers per 5 minutes</li>
-                  <li>Input validation and sanitization</li>
-                  <li>PIN verification for secure transfers</li>
+                  <li>PIN verification required for all transfers</li>
+                  <li>Recipient verification before transfer</li>
                   <li>Daily transfer limits apply</li>
+                  <li>Real-time balance validation</li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button 
+            type="submit" 
+            disabled={loading || !recipient || !amount} 
+            className="w-full"
+          >
             <Send className="h-4 w-4 mr-2" />
-            {loading ? 'Processing Secure Transfer...' : 'Send Happy Coins Securely'}
+            {loading ? 'Processing...' : 'Continue to PIN Verification'}
           </Button>
         </form>
       </CardContent>
