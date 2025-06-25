@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Send, Code, ExternalLink } from 'lucide-react';
+import { Send, Code, ExternalLink, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { APIKeyTestComponent } from './APIKeyTestComponent';
 
 export function InternalTransferAPI() {
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -110,13 +110,27 @@ export function InternalTransferAPI() {
             </p>
           </div>
 
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <div className="flex items-start space-x-2">
+              <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium">Authentication Methods</p>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li><strong>JWT:</strong> Use Authorization: Bearer &lt;token&gt; (for logged-in users)</li>
+                  <li><strong>API Key:</strong> Use x-api-key: &lt;api-key&gt; (for external integrations)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h4 className="font-medium mb-2">Request Headers</h4>
               <div className="space-y-1 text-sm font-mono bg-muted p-3 rounded">
                 <div>Authorization: Bearer &lt;token&gt;</div>
+                <div className="text-muted-foreground">OR</div>
+                <div>x-api-key: &lt;api-key&gt;</div>
                 <div>Content-Type: application/json</div>
-                <div className="text-muted-foreground">x-api-key: &lt;optional&gt;</div>
               </div>
             </div>
             <div>
@@ -134,9 +148,9 @@ export function InternalTransferAPI() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Test API Endpoint</CardTitle>
+          <CardTitle>Test with JWT Authentication</CardTitle>
           <CardDescription>
-            Test the internal transfer API with your credentials
+            Test the internal transfer API with your logged-in session
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -193,7 +207,7 @@ export function InternalTransferAPI() {
 
             <Button type="submit" disabled={loading} className="w-full">
               <Send className="h-4 w-4 mr-2" />
-              {loading ? 'Testing...' : 'Test Transfer API'}
+              {loading ? 'Testing...' : 'Test Transfer API (JWT)'}
             </Button>
           </form>
 
@@ -208,6 +222,8 @@ export function InternalTransferAPI() {
         </CardContent>
       </Card>
 
+      <APIKeyTestComponent />
+
       <Card>
         <CardHeader>
           <CardTitle>Error Codes</CardTitle>
@@ -221,6 +237,10 @@ export function InternalTransferAPI() {
               <div>
                 <code className="bg-muted px-2 py-1 rounded">INVALID_API_KEY</code>
                 <p className="text-muted-foreground mt-1">API key is invalid or inactive</p>
+              </div>
+              <div>
+                <code className="bg-muted px-2 py-1 rounded">INVALID_API_KEY_FORMAT</code>
+                <p className="text-muted-foreground mt-1">API key format is incorrect</p>
               </div>
               <div>
                 <code className="bg-muted px-2 py-1 rounded">AUTH_REQUIRED</code>
@@ -241,6 +261,10 @@ export function InternalTransferAPI() {
               <div>
                 <code className="bg-muted px-2 py-1 rounded">INSUFFICIENT_FUNDS</code>
                 <p className="text-muted-foreground mt-1">Sender has insufficient balance</p>
+              </div>
+              <div>
+                <code className="bg-muted px-2 py-1 rounded">SELF_TRANSFER</code>
+                <p className="text-muted-foreground mt-1">Cannot transfer to yourself</p>
               </div>
             </div>
           </div>

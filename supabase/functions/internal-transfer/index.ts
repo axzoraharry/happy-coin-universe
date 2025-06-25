@@ -54,8 +54,17 @@ serve(async (req) => {
 
     if (apiKey) {
       // API key authentication for external services
-      console.log('Authenticating with API key');
+      console.log('Authenticating with API key:', apiKey.substring(0, 8) + '...');
       
+      // Validate API key format
+      if (!apiKey.match(/^ak_[A-Za-z0-9_-]{24,}$/)) {
+        console.error('Invalid API key format');
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid API key format', error_code: 'INVALID_API_KEY_FORMAT' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const { data: apiKeyData, error: apiKeyError } = await supabase
         .from('api_keys')
         .select('id, created_by, is_active')
@@ -63,15 +72,24 @@ serve(async (req) => {
         .eq('is_active', true)
         .single();
 
-      if (apiKeyError || !apiKeyData) {
-        console.error('Invalid API key:', apiKeyError);
+      if (apiKeyError) {
+        console.error('API key lookup error:', apiKeyError);
         return new Response(
-          JSON.stringify({ success: false, error: 'Invalid API key', error_code: 'INVALID_API_KEY' }),
+          JSON.stringify({ success: false, error: 'API key lookup failed', error_code: 'API_KEY_LOOKUP_ERROR' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!apiKeyData) {
+        console.error('API key not found or inactive');
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid or inactive API key', error_code: 'INVALID_API_KEY' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       userId = apiKeyData.created_by;
+      console.log('API key authenticated for user:', userId);
       
       // Update last used timestamp
       await supabase
@@ -101,6 +119,7 @@ serve(async (req) => {
       }
 
       userId = user.id;
+      console.log('JWT authenticated for user:', userId);
     }
 
     // Parse request body

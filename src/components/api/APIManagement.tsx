@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,15 @@ interface ApiKey {
   is_active: boolean;
   created_at: string;
   last_used_at: string | null;
+}
+
+interface GenerateApiKeysResponse {
+  success: boolean;
+  error?: string;
+  api_key_id?: string;
+  api_key?: string;
+  secret_key?: string;
+  application_name?: string;
 }
 
 export function APIManagement() {
@@ -78,7 +86,9 @@ export function APIManagement() {
 
       if (error) throw error;
 
-      if (data.success) {
+      const response = data as GenerateApiKeysResponse;
+      
+      if (response.success) {
         toast({
           title: "API Key Generated",
           description: `New API key created for ${newAppName}`,
@@ -87,7 +97,7 @@ export function APIManagement() {
         setWebhookUrl('');
         loadApiKeys();
       } else {
-        throw new Error(data.error);
+        throw new Error(response.error || 'Failed to generate API key');
       }
     } catch (error: any) {
       console.error('Error generating API key:', error);
