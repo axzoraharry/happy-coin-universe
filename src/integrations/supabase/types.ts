@@ -1026,6 +1026,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      reset_transaction_pin_with_password: {
+        Args: {
+          p_user_id: string
+          p_current_password: string
+          p_new_pin: string
+        }
+        Returns: Json
+      }
       set_secure_transaction_pin: {
         Args: { p_user_id: string; p_pin: string }
         Returns: Json

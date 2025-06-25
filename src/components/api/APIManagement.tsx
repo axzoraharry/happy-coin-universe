@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,7 +87,8 @@ export function APIManagement() {
 
       if (error) throw error;
 
-      const response = data as GenerateApiKeysResponse;
+      // Properly type the response
+      const response = data as unknown as GenerateApiKeysResponse;
       
       if (response.success) {
         toast({
