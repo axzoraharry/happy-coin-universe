@@ -7,6 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { 
   CreditCard, 
   Plus, 
   Eye, 
@@ -21,7 +32,8 @@ import {
   CheckCircle,
   Clock,
   Lock,
-  Calendar
+  Calendar,
+  Trash2
 } from 'lucide-react';
 import { VirtualCardAPI, VirtualCard, VirtualCardTransaction } from '@/lib/virtualCardApi';
 import { useToast } from '@/hooks/use-toast';
@@ -278,6 +290,39 @@ export function VirtualCardManagement() {
     } catch (error) {
       toast({
         title: "Status Update Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteCard = async (cardId: string) => {
+    try {
+      setIsLoading(true);
+      const result = await VirtualCardAPI.deleteVirtualCard(cardId);
+      
+      if (result.success) {
+        toast({
+          title: "Card Deleted",
+          description: result.message || "Virtual card has been permanently deleted",
+        });
+        
+        // If the deleted card was selected, clear the selection or select another card
+        if (selectedCard?.id === cardId) {
+          const remainingCards = cards.filter(card => card.id !== cardId);
+          setSelectedCard(remainingCards.length > 0 ? remainingCards[0] : null);
+        }
+        
+        // Reload the cards list
+        await loadUserCards();
+      } else {
+        throw new Error(result.error || 'Card deletion failed');
+      }
+    } catch (error) {
+      toast({
+        title: "Deletion Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
@@ -607,6 +652,55 @@ export function VirtualCardManagement() {
                           <Lock className="h-4 w-4 mr-2" />
                           Block Card
                         </Button>
+                      </div>
+                      
+                      <div className="pt-4 border-t">
+                        <h4 className="font-semibold text-sm text-red-800 mb-3">Danger Zone</h4>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="destructive" 
+                              className="w-full bg-red-600 hover:bg-red-700"
+                              disabled={isLoading}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Card Permanently
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="flex items-center gap-2">
+                                <AlertTriangle className="h-5 w-5 text-red-600" />
+                                Delete Virtual Card
+                              </AlertDialogTitle>
+                              <AlertDialogDescription className="space-y-2">
+                                <p>
+                                  Are you sure you want to permanently delete this virtual card? This action cannot be undone.
+                                </p>
+                                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                                  <p className="text-sm text-red-800 font-medium">
+                                    Card ending in ****{selectedCard.card_number?.slice(-4) || '****'}
+                                  </p>
+                                  <p className="text-sm text-red-700">
+                                    Status: {selectedCard.status} | Daily Limit: {selectedCard.daily_limit} HC
+                                  </p>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  All transaction history for this card will also be permanently deleted.
+                                </p>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteCard(selectedCard.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete Permanently
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </CardContent>
                   </Card>
