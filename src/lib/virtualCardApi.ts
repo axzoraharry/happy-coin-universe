@@ -43,6 +43,7 @@ export interface CardValidationResult {
   monthly_limit?: number;
   daily_spent?: number;
   monthly_spent?: number;
+  cards_checked?: number;
   error?: string;
 }
 
@@ -93,6 +94,7 @@ export class VirtualCardAPI {
       }
       
       console.log('Card issuance result:', data);
+      // Type assertion with proper error handling
       const result = data as unknown as CardIssuanceResult;
       return result;
     } catch (error) {
@@ -165,14 +167,23 @@ export class VirtualCardAPI {
         throw error;
       }
       
-      console.log('Validation result:', {
-        success: data.success,
-        cards_checked: data.cards_checked,
-        error: data.error
-      });
+      // Type assertion with proper validation
+      const result = data as unknown;
+      if (typeof result === 'object' && result !== null) {
+        const validationResult = result as CardValidationResult;
+        console.log('Validation result:', {
+          success: validationResult.success,
+          cards_checked: validationResult.cards_checked,
+          error: validationResult.error
+        });
+        return validationResult;
+      }
       
-      const result = data as unknown as CardValidationResult;
-      return result;
+      // Fallback for unexpected response format
+      return {
+        success: false,
+        error: 'Invalid response format from validation'
+      };
     } catch (error) {
       console.error('Card validation failed:', error);
       throw error;
@@ -195,7 +206,6 @@ export class VirtualCardAPI {
 
     if (error) throw error;
     
-    // Type cast the JSON response with proper type safety
     const result = data as unknown as CardStatusUpdateResult;
     return result;
   }
@@ -219,7 +229,6 @@ export class VirtualCardAPI {
 
     if (error) throw error;
     
-    // Transform the data to match our interface
     return (data || []).map(transaction => ({
       ...transaction,
       transaction_type: transaction.transaction_type as 'purchase' | 'refund' | 'validation' | 'activation' | 'deactivation',
@@ -273,7 +282,6 @@ export class VirtualCardAPI {
     user_agent?: string;
   }): Promise<{ success: boolean; transaction_id?: string; error?: string }> {
     try {
-      // First validate the card
       const validation = await this.validateCard({
         card_number: params.card_number,
         pin: params.pin,
@@ -285,7 +293,6 @@ export class VirtualCardAPI {
         return { success: false, error: validation.error };
       }
 
-      // Check spending limits
       const dailyRemaining = (validation.daily_limit || 0) - (validation.daily_spent || 0);
       const monthlyRemaining = (validation.monthly_limit || 0) - (validation.monthly_spent || 0);
 
@@ -303,7 +310,6 @@ export class VirtualCardAPI {
         };
       }
 
-      // Record the transaction
       const transaction = await this.recordTransaction({
         card_id: validation.card_id!,
         transaction_type: 'purchase',
@@ -390,7 +396,6 @@ export class VirtualCardAPI {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get card details
       const { data: cardData, error: cardError } = await supabase
         .from('virtual_cards')
         .select('*')
@@ -401,7 +406,6 @@ export class VirtualCardAPI {
       if (cardError) throw cardError;
       if (!cardData) return { success: false, error: 'Card not found' };
 
-      // Get validation attempts for today
       const today = new Date().toISOString().split('T')[0];
       const { data: validationData, error: validationError } = await supabase
         .from('card_validation_attempts')

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,11 +24,45 @@ export function VirtualCardDebugPanel() {
   const checkIntegrity = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('check_virtual_card_integrity');
+      // Use a direct SQL query instead of RPC call since the function might not be in types
+      const { data, error } = await supabase
+        .from('virtual_cards')
+        .select('*', { count: 'exact', head: true });
       
       if (error) throw error;
       
-      setIntegrityData(data);
+      // Get basic card statistics
+      const { data: allCards } = await supabase
+        .from('virtual_cards')
+        .select('status, expiry_date');
+      
+      const { data: validationAttempts } = await supabase
+        .from('card_validation_attempts')
+        .select('success, created_at')
+        .gte('created_at', new Date().toISOString().split('T')[0]);
+      
+      const totalCards = allCards?.length || 0;
+      const activeCards = allCards?.filter(card => 
+        card.status === 'active' && new Date(card.expiry_date) > new Date()
+      ).length || 0;
+      const expiredCards = allCards?.filter(card => 
+        new Date(card.expiry_date) <= new Date()
+      ).length || 0;
+      
+      const attemptsToday = validationAttempts?.length || 0;
+      const successfulToday = validationAttempts?.filter(attempt => attempt.success).length || 0;
+      const successRate = attemptsToday > 0 ? Math.round((successfulToday / attemptsToday) * 100) : 0;
+      
+      const integrityResult: IntegrityCheck = {
+        total_cards: totalCards,
+        active_cards: activeCards,
+        expired_cards: expiredCards,
+        validation_attempts_today: attemptsToday,
+        successful_validations_today: successfulToday,
+        validation_success_rate: successRate
+      };
+      
+      setIntegrityData(integrityResult);
       toast({
         title: "Integrity Check Complete",
         description: "Virtual card system integrity has been analyzed",
