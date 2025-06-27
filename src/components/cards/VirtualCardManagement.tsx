@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -128,17 +127,19 @@ export function VirtualCardManagement() {
         });
         
         // Show card details temporarily
-        toast({
-          title: "Card Details (Save These!)",
-          description: `Card: ${result.card_number}, CVV: ${result.cvv}, Expires: ${format(new Date(result.expiry_date), 'MM/yy')}`,
-          duration: 10000
-        });
+        if (result.card_number && result.cvv && result.expiry_date) {
+          toast({
+            title: "Card Details (Save These!)",
+            description: `Card: ${result.card_number}, CVV: ${result.cvv}, Expires: ${format(new Date(result.expiry_date), 'MM/yy')}`,
+            duration: 10000
+          });
+        }
 
         setShowIssueDialog(false);
         setIssueForm({ pin: '', confirmPin: '', dailyLimit: '5000', monthlyLimit: '50000' });
         await loadUserCards();
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || 'Card issuance failed');
       }
     } catch (error) {
       toast({
@@ -199,7 +200,7 @@ export function VirtualCardManagement() {
         });
         await loadUserCards();
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || 'Status update failed');
       }
     } catch (error) {
       toast({

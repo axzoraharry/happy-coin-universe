@@ -47,6 +47,26 @@ export interface CardValidationResult {
   error?: string;
 }
 
+export interface CardIssuanceResult {
+  success: boolean;
+  card_id?: string;
+  card_number?: string;
+  cvv?: string;
+  expiry_date?: string;
+  status?: string;
+  daily_limit?: number;
+  monthly_limit?: number;
+  error?: string;
+}
+
+export interface CardStatusUpdateResult {
+  success: boolean;
+  card_id?: string;
+  new_status?: string;
+  updated_at?: string;
+  error?: string;
+}
+
 export class VirtualCardAPI {
   
   // Issue a new virtual card
@@ -54,7 +74,7 @@ export class VirtualCardAPI {
     pin: string;
     daily_limit?: number;
     monthly_limit?: number;
-  }) {
+  }): Promise<CardIssuanceResult> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -66,7 +86,10 @@ export class VirtualCardAPI {
     });
 
     if (error) throw error;
-    return data;
+    
+    // Type cast the JSON response
+    const result = data as CardIssuanceResult;
+    return result;
   }
 
   // Get user's virtual cards
@@ -81,7 +104,18 @@ export class VirtualCardAPI {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    
+    // Transform the data to match our interface
+    return (data || []).map(card => ({
+      ...card,
+      status: card.status as 'active' | 'inactive' | 'blocked' | 'expired',
+      card_type: card.card_type as 'virtual' | 'physical',
+      metadata: typeof card.metadata === 'object' ? card.metadata as Record<string, any> : {},
+      daily_limit: Number(card.daily_limit),
+      monthly_limit: Number(card.monthly_limit),
+      current_daily_spent: Number(card.current_daily_spent),
+      current_monthly_spent: Number(card.current_monthly_spent)
+    }));
   }
 
   // Validate card number and PIN
@@ -99,11 +133,17 @@ export class VirtualCardAPI {
     });
 
     if (error) throw error;
-    return data;
+    
+    // Type cast the JSON response
+    const result = data as CardValidationResult;
+    return result;
   }
 
   // Update card status
-  static async updateCardStatus(cardId: string, newStatus: 'active' | 'inactive' | 'blocked' | 'expired') {
+  static async updateCardStatus(
+    cardId: string, 
+    newStatus: 'active' | 'inactive' | 'blocked' | 'expired'
+  ): Promise<CardStatusUpdateResult> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -114,7 +154,10 @@ export class VirtualCardAPI {
     });
 
     if (error) throw error;
-    return data;
+    
+    // Type cast the JSON response
+    const result = data as CardStatusUpdateResult;
+    return result;
   }
 
   // Get card transactions
@@ -135,7 +178,16 @@ export class VirtualCardAPI {
     const { data, error } = await query;
 
     if (error) throw error;
-    return data || [];
+    
+    // Transform the data to match our interface
+    return (data || []).map(transaction => ({
+      ...transaction,
+      transaction_type: transaction.transaction_type as 'purchase' | 'refund' | 'validation' | 'activation' | 'deactivation',
+      status: transaction.status as 'pending' | 'completed' | 'failed' | 'cancelled',
+      merchant_info: typeof transaction.merchant_info === 'object' ? transaction.merchant_info as Record<string, any> : {},
+      metadata: typeof transaction.metadata === 'object' ? transaction.metadata as Record<string, any> : {},
+      amount: Number(transaction.amount)
+    }));
   }
 
   // Create a transaction record
