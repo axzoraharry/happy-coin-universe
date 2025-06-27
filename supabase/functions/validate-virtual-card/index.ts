@@ -40,12 +40,40 @@ serve(async (req) => {
       );
     }
 
+    // Validate card number format (16 digits)
+    if (!/^\d{16}$/.test(card_number)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Card number must be 16 digits' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Validate PIN format (4 digits)
+    if (!/^\d{4}$/.test(pin)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'PIN must be 4 digits' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     console.log('Processing virtual card request:', { 
       action,
       card_number: card_number.substring(0, 4) + '****', 
       merchant_id,
       amount,
-      ip_address 
+      ip_address: ip_address || req.headers.get('x-forwarded-for')
     });
 
     // Call the database function to validate card
@@ -59,7 +87,16 @@ serve(async (req) => {
 
     if (validationError) {
       console.error('Validation error:', validationError);
-      throw validationError;
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Database validation failed: ' + validationError.message
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     console.log('Validation result:', validationResult);
@@ -68,7 +105,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: validationResult.error || 'Card validation failed'
+          error: validationResult.error || 'Card validation failed',
+          cards_checked: validationResult.cards_checked || 0
         }),
         { 
           status: 400, 
@@ -91,7 +129,8 @@ serve(async (req) => {
           monthly_spent: validationResult.monthly_spent,
           daily_remaining: validationResult.daily_limit - validationResult.daily_spent,
           monthly_remaining: validationResult.monthly_limit - validationResult.monthly_spent,
-          validated_at: new Date().toISOString()
+          validated_at: new Date().toISOString(),
+          cards_checked: validationResult.cards_checked || 0
         }),
         { 
           status: 200,
@@ -152,7 +191,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Failed to process payment' 
+            error: 'Failed to process payment: ' + updateError.message
           }),
           { 
             status: 500, 
@@ -250,7 +289,8 @@ serve(async (req) => {
           daily_remaining: dailyRemaining,
           monthly_remaining: monthlyRemaining,
           amount_authorized: amount <= Math.min(dailyRemaining, monthlyRemaining),
-          validated_at: new Date().toISOString()
+          validated_at: new Date().toISOString(),
+          cards_checked: validationResult.cards_checked || 0
         }),
         { 
           status: 200,
@@ -272,7 +312,8 @@ serve(async (req) => {
         monthly_spent: validationResult.monthly_spent,
         daily_remaining: validationResult.daily_limit - validationResult.daily_spent,
         monthly_remaining: validationResult.monthly_limit - validationResult.monthly_spent,
-        validated_at: new Date().toISOString()
+        validated_at: new Date().toISOString(),
+        cards_checked: validationResult.cards_checked || 0
       }),
       { 
         status: 200,

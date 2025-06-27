@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface VirtualCard {
@@ -69,74 +68,115 @@ export interface CardStatusUpdateResult {
 
 export class VirtualCardAPI {
   
-  // Issue a new virtual card
+  // Issue a new virtual card with enhanced error handling
   static async issueVirtualCard(params: {
     pin: string;
     daily_limit?: number;
     monthly_limit?: number;
   }): Promise<CardIssuanceResult> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase.rpc('issue_virtual_card', {
-      p_user_id: user.id,
-      p_pin: params.pin,
-      p_daily_limit: params.daily_limit || 5000.00,
-      p_monthly_limit: params.monthly_limit || 50000.00
-    });
+      console.log('Issuing virtual card for user:', user.id);
 
-    if (error) throw error;
-    
-    // Type cast the JSON response with proper type safety
-    const result = data as unknown as CardIssuanceResult;
-    return result;
+      const { data, error } = await supabase.rpc('issue_virtual_card', {
+        p_user_id: user.id,
+        p_pin: params.pin,
+        p_daily_limit: params.daily_limit || 5000.00,
+        p_monthly_limit: params.monthly_limit || 50000.00
+      });
+
+      if (error) {
+        console.error('Database error during card issuance:', error);
+        throw error;
+      }
+      
+      console.log('Card issuance result:', data);
+      const result = data as unknown as CardIssuanceResult;
+      return result;
+    } catch (error) {
+      console.error('Card issuance failed:', error);
+      throw error;
+    }
   }
 
-  // Get user's virtual cards
+  // Get user's virtual cards with better error handling
   static async getUserCards(): Promise<VirtualCard[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
-      .from('virtual_cards')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      console.log('Fetching cards for user:', user.id);
 
-    if (error) throw error;
-    
-    // Transform the data to match our interface
-    return (data || []).map(card => ({
-      ...card,
-      status: card.status as 'active' | 'inactive' | 'blocked' | 'expired',
-      card_type: card.card_type as 'virtual' | 'physical',
-      metadata: typeof card.metadata === 'object' ? card.metadata as Record<string, any> : {},
-      daily_limit: Number(card.daily_limit),
-      monthly_limit: Number(card.monthly_limit),
-      current_daily_spent: Number(card.current_daily_spent),
-      current_monthly_spent: Number(card.current_monthly_spent)
-    }));
+      const { data, error } = await supabase
+        .from('virtual_cards')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Database error fetching cards:', error);
+        throw error;
+      }
+      
+      console.log('Retrieved cards:', data?.length || 0);
+      
+      // Transform the data to match our interface
+      return (data || []).map(card => ({
+        ...card,
+        status: card.status as 'active' | 'inactive' | 'blocked' | 'expired',
+        card_type: card.card_type as 'virtual' | 'physical',
+        metadata: typeof card.metadata === 'object' ? card.metadata as Record<string, any> : {},
+        daily_limit: Number(card.daily_limit),
+        monthly_limit: Number(card.monthly_limit),
+        current_daily_spent: Number(card.current_daily_spent),
+        current_monthly_spent: Number(card.current_monthly_spent)
+      }));
+    } catch (error) {
+      console.error('Failed to fetch user cards:', error);
+      throw error;
+    }
   }
 
-  // Validate card number and PIN
+  // Validate card number and PIN with enhanced logging
   static async validateCard(params: {
     card_number: string;
     pin: string;
     ip_address?: string;
     user_agent?: string;
   }): Promise<CardValidationResult> {
-    const { data, error } = await supabase.rpc('validate_virtual_card', {
-      p_card_number: params.card_number,
-      p_pin: params.pin,
-      p_ip_address: params.ip_address,
-      p_user_agent: params.user_agent
-    });
+    try {
+      console.log('Validating card:', {
+        card_number: params.card_number.substring(0, 4) + '****',
+        ip_address: params.ip_address,
+        user_agent: params.user_agent?.substring(0, 50) + '...'
+      });
 
-    if (error) throw error;
-    
-    // Type cast the JSON response with proper type safety
-    const result = data as unknown as CardValidationResult;
-    return result;
+      const { data, error } = await supabase.rpc('validate_virtual_card', {
+        p_card_number: params.card_number,
+        p_pin: params.pin,
+        p_ip_address: params.ip_address,
+        p_user_agent: params.user_agent
+      });
+
+      if (error) {
+        console.error('Database error during validation:', error);
+        throw error;
+      }
+      
+      console.log('Validation result:', {
+        success: data.success,
+        cards_checked: data.cards_checked,
+        error: data.error
+      });
+      
+      const result = data as unknown as CardValidationResult;
+      return result;
+    } catch (error) {
+      console.error('Card validation failed:', error);
+      throw error;
+    }
   }
 
   // Update card status
@@ -334,6 +374,62 @@ export class VirtualCardAPI {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get card balance'
+      };
+    }
+  }
+
+  // Enhanced method to get detailed card status
+  static async getCardStatus(cardId: string): Promise<{
+    success: boolean;
+    card?: VirtualCard;
+    validation_attempts_today?: number;
+    last_validation?: string;
+    error?: string;
+  }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get card details
+      const { data: cardData, error: cardError } = await supabase
+        .from('virtual_cards')
+        .select('*')
+        .eq('id', cardId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (cardError) throw cardError;
+      if (!cardData) return { success: false, error: 'Card not found' };
+
+      // Get validation attempts for today
+      const today = new Date().toISOString().split('T')[0];
+      const { data: validationData, error: validationError } = await supabase
+        .from('card_validation_attempts')
+        .select('created_at, success')
+        .gte('created_at', today)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      return {
+        success: true,
+        card: {
+          ...cardData,
+          status: cardData.status as 'active' | 'inactive' | 'blocked' | 'expired',
+          card_type: cardData.card_type as 'virtual' | 'physical',
+          metadata: typeof cardData.metadata === 'object' ? cardData.metadata as Record<string, any> : {},
+          daily_limit: Number(cardData.daily_limit),
+          monthly_limit: Number(cardData.monthly_limit),
+          current_daily_spent: Number(cardData.current_daily_spent),
+          current_monthly_spent: Number(cardData.current_monthly_spent)
+        },
+        validation_attempts_today: validationData?.length || 0,
+        last_validation: validationData?.[0]?.created_at
+      };
+    } catch (error) {
+      console.error('Failed to get card status:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }

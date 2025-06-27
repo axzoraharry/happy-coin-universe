@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +26,7 @@ import {
 import { VirtualCardAPI, VirtualCard, VirtualCardTransaction } from '@/lib/virtualCardApi';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { VirtualCardDebugPanel } from './VirtualCardDebugPanel';
 
 export function VirtualCardManagement() {
   const [cards, setCards] = useState<VirtualCard[]>([]);
@@ -139,12 +139,34 @@ export function VirtualCardManagement() {
       return;
     }
 
+    // Validate daily and monthly limits
+    const dailyLimit = parseFloat(issueForm.dailyLimit);
+    const monthlyLimit = parseFloat(issueForm.monthlyLimit);
+    
+    if (dailyLimit <= 0 || monthlyLimit <= 0) {
+      toast({
+        title: "Error",
+        description: "Limits must be greater than zero",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (dailyLimit > monthlyLimit) {
+      toast({
+        title: "Error",
+        description: "Daily limit cannot exceed monthly limit",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
       const result = await VirtualCardAPI.issueVirtualCard({
         pin: issueForm.pin,
-        daily_limit: parseFloat(issueForm.dailyLimit),
-        monthly_limit: parseFloat(issueForm.monthlyLimit)
+        daily_limit: dailyLimit,
+        monthly_limit: monthlyLimit
       });
 
       if (result.success) {
@@ -153,12 +175,15 @@ export function VirtualCardManagement() {
           description: "Your virtual card has been created and activated",
         });
         
-        // Show card details temporarily
+        // Show card details temporarily with better formatting
         if (result.card_number && result.cvv && result.expiry_date) {
+          const cardNumber = result.card_number.replace(/(\d{4})(?=\d)/g, '$1 ');
+          const expiryFormatted = format(new Date(result.expiry_date), 'MM/yy');
+          
           toast({
             title: "Card Details (Save These!)",
-            description: `Card: ${result.card_number}, CVV: ${result.cvv}, Expires: ${format(new Date(result.expiry_date), 'MM/yy')}`,
-            duration: 10000
+            description: `Card: ${cardNumber}, CVV: ${result.cvv}, Expires: ${expiryFormatted}`,
+            duration: 15000
           });
         }
 
@@ -169,6 +194,7 @@ export function VirtualCardManagement() {
         throw new Error(result.error || 'Card issuance failed');
       }
     } catch (error) {
+      console.error('Card issuance error:', error);
       toast({
         title: "Card Issuance Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -180,6 +206,25 @@ export function VirtualCardManagement() {
   };
 
   const handleValidateCard = async () => {
+    // Validate input formats
+    if (!/^\d{16}$/.test(validationForm.cardNumber)) {
+      toast({
+        title: "Error",
+        description: "Card number must be 16 digits",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!/^\d{4}$/.test(validationForm.pin)) {
+      toast({
+        title: "Error",
+        description: "PIN must be 4 digits",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
       const result = await VirtualCardAPI.validateCard({
@@ -205,6 +250,7 @@ export function VirtualCardManagement() {
       setShowValidationDialog(false);
       setValidationForm({ cardNumber: '', pin: '' });
     } catch (error) {
+      console.error('Card validation error:', error);
       toast({
         title: "Validation Error",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -395,6 +441,9 @@ export function VirtualCardManagement() {
           </Dialog>
         </div>
       </div>
+
+      {/* Add Debug Panel */}
+      <VirtualCardDebugPanel />
 
       {/* Cards Management */}
       {cards.length > 0 ? (
