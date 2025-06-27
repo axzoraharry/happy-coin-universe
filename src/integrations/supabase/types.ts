@@ -51,6 +51,36 @@ export type Database = {
         }
         Relationships: []
       }
+      card_validation_attempts: {
+        Row: {
+          card_number_hash: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          pin_attempt_hash: string
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          card_number_hash: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          pin_attempt_hash: string
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          card_number_hash?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          pin_attempt_hash?: string
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       coin_exchanges: {
         Row: {
           amount_received: number
@@ -832,6 +862,119 @@ export type Database = {
         }
         Relationships: []
       }
+      virtual_card_transactions: {
+        Row: {
+          amount: number | null
+          card_id: string
+          created_at: string
+          description: string | null
+          id: string
+          merchant_info: Json | null
+          metadata: Json | null
+          reference_id: string | null
+          status: string
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          card_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          merchant_info?: Json | null
+          metadata?: Json | null
+          reference_id?: string | null
+          status?: string
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          card_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          merchant_info?: Json | null
+          metadata?: Json | null
+          reference_id?: string | null
+          status?: string
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "virtual_card_transactions_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      virtual_cards: {
+        Row: {
+          activation_date: string | null
+          card_number_encrypted: string
+          card_type: string
+          created_at: string
+          current_daily_spent: number | null
+          current_monthly_spent: number | null
+          cvv_encrypted: string
+          daily_limit: number | null
+          expiry_date: string
+          id: string
+          issuer_name: string
+          last_used_at: string | null
+          metadata: Json | null
+          monthly_limit: number | null
+          pin_hash: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activation_date?: string | null
+          card_number_encrypted: string
+          card_type?: string
+          created_at?: string
+          current_daily_spent?: number | null
+          current_monthly_spent?: number | null
+          cvv_encrypted: string
+          daily_limit?: number | null
+          expiry_date: string
+          id?: string
+          issuer_name?: string
+          last_used_at?: string | null
+          metadata?: Json | null
+          monthly_limit?: number | null
+          pin_hash: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activation_date?: string | null
+          card_number_encrypted?: string
+          card_type?: string
+          created_at?: string
+          current_daily_spent?: number | null
+          current_monthly_spent?: number | null
+          cvv_encrypted?: string
+          daily_limit?: number | null
+          expiry_date?: string
+          id?: string
+          issuer_name?: string
+          last_used_at?: string | null
+          metadata?: Json | null
+          monthly_limit?: number | null
+          pin_hash?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       wallets: {
         Row: {
           balance: number
@@ -970,6 +1113,23 @@ export type Database = {
         }
         Returns: Json
       }
+      generate_card_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_cvv: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      issue_virtual_card: {
+        Args: {
+          p_user_id: string
+          p_pin: string
+          p_daily_limit?: number
+          p_monthly_limit?: number
+        }
+        Returns: Json
+      }
       pgp_armor_headers: {
         Args: { "": string }
         Returns: Record<string, unknown>[]
@@ -1084,6 +1244,10 @@ export type Database = {
         }
         Returns: Json
       }
+      update_card_status: {
+        Args: { p_user_id: string; p_card_id: string; p_new_status: string }
+        Returns: Json
+      }
       update_user_preferences: {
         Args: { new_preferences: Json }
         Returns: undefined
@@ -1095,6 +1259,15 @@ export type Database = {
       validate_redirect_uri: {
         Args: { p_uri: string; p_allowed_domains: string[] }
         Returns: boolean
+      }
+      validate_virtual_card: {
+        Args: {
+          p_card_number: string
+          p_pin: string
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: Json
       }
       verify_transaction_pin: {
         Args: { p_user_id: string; p_pin: string }
