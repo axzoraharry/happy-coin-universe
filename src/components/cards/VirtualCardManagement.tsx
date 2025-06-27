@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ export function VirtualCardManagement() {
   const [transactions, setTransactions] = useState<VirtualCardTransaction[]>([]);
   const [selectedCard, setSelectedCard] = useState<VirtualCard | null>(null);
   const [showCardDetails, setShowCardDetails] = useState(false);
+  const [visibleCardNumbers, setVisibleCardNumbers] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [showIssueDialog, setShowIssueDialog] = useState(false);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
@@ -91,6 +93,31 @@ export function VirtualCardManagement() {
         variant: "destructive"
       });
     }
+  };
+
+  const toggleCardNumberVisibility = (cardId: string) => {
+    setVisibleCardNumbers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId);
+      } else {
+        newSet.add(cardId);
+      }
+      return newSet;
+    });
+  };
+
+  const isCardNumberVisible = (cardId: string) => {
+    return visibleCardNumbers.has(cardId);
+  };
+
+  const getDisplayCardNumber = (card: VirtualCard) => {
+    if (isCardNumberVisible(card.id)) {
+      // In a real implementation, you'd fetch the actual card number
+      // For demo purposes, we'll show a mock full number
+      return card.card_number || '4532 1234 5678 1234';
+    }
+    return '**** **** **** ****';
   };
 
   const handleIssueCard = async () => {
@@ -397,8 +424,25 @@ export function VirtualCardManagement() {
                         {format(new Date(card.expiry_date), 'MM/yy')}
                       </span>
                     </div>
-                    <div className="space-y-2">
-                      <p className="font-mono text-sm">**** **** **** ****</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-mono text-sm">{getDisplayCardNumber(card)}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCardNumberVisibility(card.id);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          {isCardNumberVisible(card.id) ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Daily Spent</span>
                         <span className="font-semibold">{card.current_daily_spent} / {card.daily_limit} HC</span>
