@@ -24,7 +24,7 @@ serve(async (req) => {
       throw new Error('Method not allowed');
     }
 
-    const { card_number, pin, merchant_id, amount, ip_address, user_agent } = await req.json();
+    const { card_number, pin, merchant_id, amount, ip_address, user_agent, action = 'validate' } = await req.json();
 
     // Validate required fields
     if (!card_number || !pin) {
@@ -40,7 +40,8 @@ serve(async (req) => {
       );
     }
 
-    console.log('Validating virtual card:', { 
+    console.log('Processing virtual card request:', { 
+      action,
       card_number: card_number.substring(0, 4) + '****', 
       merchant_id,
       amount,
@@ -63,8 +64,44 @@ serve(async (req) => {
 
     console.log('Validation result:', validationResult);
 
-    // If validation successful and amount provided, check spending limits
-    if (validationResult.success && amount && amount > 0) {
+    if (!validationResult.success) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: validationResult.error || 'Card validation failed'
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // If this is just a validation request, return early
+    if (action === 'validate') {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          card_id: validationResult.card_id,
+          user_id: validationResult.user_id,
+          status: validationResult.status,
+          daily_limit: validationResult.daily_limit,
+          monthly_limit: validationResult.monthly_limit,
+          daily_spent: validationResult.daily_spent,
+          monthly_spent: validationResult.monthly_spent,
+          daily_remaining: validationResult.daily_limit - validationResult.daily_spent,
+          monthly_remaining: validationResult.monthly_limit - validationResult.monthly_spent,
+          validated_at: new Date().toISOString()
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Process payment if amount is provided and action is 'payment'
+    if (action === 'payment' && amount && amount > 0) {
       const dailyRemaining = validationResult.daily_limit - validationResult.daily_spent;
       const monthlyRemaining = validationResult.monthly_limit - validationResult.monthly_spent;
 
@@ -100,7 +137,82 @@ serve(async (req) => {
         );
       }
 
-      // If transaction amount is provided, record it as a validation transaction
+      // Update spending amounts
+      const { error: updateError } = await supabaseClient
+        .from('virtual_cards')
+        .update({
+          current_daily_spent: validationResult.daily_spent + amount,
+          current_monthly_spent: validationResult.monthly_spent + amount,
+          last_used_at: new Date().toISOString()
+        })
+        .eq('id', validationResult.card_id);
+
+      if (updateError) {
+        console.error('Error updating card spending:', updateError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Failed to process payment' 
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Record the transaction
+      const { data: transactionData, error: transactionError } = await supabaseClient
+        .from('virtual_card_transactions')
+        .insert({
+          card_id: validationResult.card_id,
+          user_id: validationResult.user_id,
+          transaction_type: 'purchase',
+          amount: amount,
+          description: `Payment to merchant: ${merchant_id || 'Unknown'}`,
+          merchant_info: {
+            merchant_id: merchant_id,
+            ip_address: ip_address,
+            user_agent: user_agent
+          },
+          reference_id: `PAY_${Date.now()}_${validationResult.card_id.substring(0, 8)}`,
+          status: 'completed'
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        console.error('Failed to record transaction:', transactionError);
+        // Don't fail the payment if we can't record the transaction
+      }
+
+      console.log('Payment processed successfully:', transactionData?.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          transaction_id: transactionData?.id,
+          card_id: validationResult.card_id,
+          amount_charged: amount,
+          new_daily_spent: validationResult.daily_spent + amount,
+          new_monthly_spent: validationResult.monthly_spent + amount,
+          daily_remaining: dailyRemaining - amount,
+          monthly_remaining: monthlyRemaining - amount,
+          processed_at: new Date().toISOString()
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // For validation with amount but no payment action
+    if (amount && amount > 0) {
+      const dailyRemaining = validationResult.daily_limit - validationResult.daily_spent;
+      const monthlyRemaining = validationResult.monthly_limit - validationResult.monthly_spent;
+
+      // Record validation transaction
       try {
         await supabaseClient
           .from('virtual_card_transactions')
@@ -124,11 +236,33 @@ serve(async (req) => {
         console.error('Failed to record validation transaction:', error);
         // Don't fail the validation if we can't record the transaction
       }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          card_id: validationResult.card_id,
+          user_id: validationResult.user_id,
+          status: validationResult.status,
+          daily_limit: validationResult.daily_limit,
+          monthly_limit: validationResult.monthly_limit,
+          daily_spent: validationResult.daily_spent,
+          monthly_spent: validationResult.monthly_spent,
+          daily_remaining: dailyRemaining,
+          monthly_remaining: monthlyRemaining,
+          amount_authorized: amount <= Math.min(dailyRemaining, monthlyRemaining),
+          validated_at: new Date().toISOString()
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
+    // Default validation response
     return new Response(
       JSON.stringify({
-        success: validationResult.success,
+        success: true,
         card_id: validationResult.card_id,
         user_id: validationResult.user_id,
         status: validationResult.status,
@@ -138,17 +272,16 @@ serve(async (req) => {
         monthly_spent: validationResult.monthly_spent,
         daily_remaining: validationResult.daily_limit - validationResult.daily_spent,
         monthly_remaining: validationResult.monthly_limit - validationResult.monthly_spent,
-        error: validationResult.error,
         validated_at: new Date().toISOString()
       }),
       { 
-        status: validationResult.success ? 200 : 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
 
   } catch (error) {
-    console.error('Virtual card validation error:', error);
+    console.error('Virtual card processing error:', error);
     
     return new Response(
       JSON.stringify({ 
