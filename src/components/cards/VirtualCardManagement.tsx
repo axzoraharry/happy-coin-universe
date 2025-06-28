@@ -35,7 +35,7 @@ import {
   Calendar,
   Trash2
 } from 'lucide-react';
-import { VirtualCardAPI, VirtualCard, VirtualCardTransaction } from '@/lib/virtualCardApi';
+import { VirtualCardAPI, VirtualCard, VirtualCardTransaction } from '@/lib/virtualCard';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { VirtualCardDebugPanel } from './VirtualCardDebugPanel';
