@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      amadeus_config: {
+        Row: {
+          api_key: string
+          api_secret: string
+          created_at: string
+          environment: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          api_key: string
+          api_secret: string
+          created_at?: string
+          environment?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          api_secret?: string
+          created_at?: string
+          environment?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           allowed_domains: string[] | null
@@ -48,6 +75,45 @@ export type Database = {
           secret_key?: string
           updated_at?: string
           webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      bookings: {
+        Row: {
+          booking_data: Json
+          booking_reference: string | null
+          booking_type: string
+          created_at: string
+          currency: string
+          id: string
+          status: string
+          total_amount: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          booking_data: Json
+          booking_reference?: string | null
+          booking_type: string
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          booking_data?: Json
+          booking_reference?: string | null
+          booking_type?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -108,6 +174,45 @@ export type Database = {
           id?: string
           status?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      flight_searches: {
+        Row: {
+          cabin_class: string
+          created_at: string
+          departure_date: string
+          destination: string
+          id: string
+          origin: string
+          passengers: number
+          return_date: string | null
+          search_results: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          cabin_class?: string
+          created_at?: string
+          departure_date: string
+          destination: string
+          id?: string
+          origin: string
+          passengers?: number
+          return_date?: string | null
+          search_results?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          cabin_class?: string
+          created_at?: string
+          departure_date?: string
+          destination?: string
+          id?: string
+          origin?: string
+          passengers?: number
+          return_date?: string | null
+          search_results?: Json | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -250,6 +355,42 @@ export type Database = {
           total_purchased?: number
           total_spent?: number
           updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      hotel_searches: {
+        Row: {
+          check_in_date: string
+          check_out_date: string
+          city_code: string
+          created_at: string
+          guests: number
+          id: string
+          rooms: number
+          search_results: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          check_in_date: string
+          check_out_date: string
+          city_code: string
+          created_at?: string
+          guests?: number
+          id?: string
+          rooms?: number
+          search_results?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          check_in_date?: string
+          check_out_date?: string
+          city_code?: string
+          created_at?: string
+          guests?: number
+          id?: string
+          rooms?: number
+          search_results?: Json | null
           user_id?: string | null
         }
         Relationships: []
