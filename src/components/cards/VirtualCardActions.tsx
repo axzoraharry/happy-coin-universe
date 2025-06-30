@@ -1,11 +1,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff, Copy, Snowflake, Play } from 'lucide-react';
-
-interface VirtualCard {
-  id: string;
-  status: 'active' | 'frozen' | 'pending' | 'blocked';
-}
+import { VirtualCard } from '@/lib/virtualCard';
 
 interface VirtualCardActionsProps {
   card: VirtualCard;
@@ -61,14 +57,14 @@ export function VirtualCardActions({
       )}
 
       <Button
-        variant={card.status === 'frozen' ? 'default' : 'outline'}
-        onClick={() => onCardAction(card.status === 'frozen' ? 'unfreeze' : 'freeze', card.id)}
+        variant={card.status === 'inactive' ? 'default' : 'outline'}
+        onClick={() => onCardAction(card.status === 'inactive' ? 'unfreeze' : 'freeze', card.id)}
         className="flex items-center gap-2 h-12"
       >
-        {card.status === 'frozen' ? (
+        {card.status === 'inactive' ? (
           <>
             <Play className="h-4 w-4" />
-            Unfreeze
+            Activate
           </>
         ) : (
           <>
