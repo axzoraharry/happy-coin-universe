@@ -37,7 +37,8 @@ export class SecureCardService {
         throw error;
       }
 
-      return data as SecureCardDetails;
+      // Properly type the response from the RPC function
+      return data as unknown as SecureCardDetails;
     } catch (error) {
       console.error('Failed to get secure card details:', error);
       return {

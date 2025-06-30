@@ -4,7 +4,7 @@ import { VirtualCard, CardIssuanceResult, CardStatusUpdateResult, CardDeleteResu
 import { SecureCardService } from './secureCardService';
 
 export class CardManagementService {
-  // Issue a new virtual card with enhanced error handling
+  // Issue a new virtual card with enhanced error handling  
   static async issueVirtualCard(params: {
     pin: string;
     daily_limit?: number;
@@ -117,7 +117,23 @@ export class CardManagementService {
       // Log the deletion action
       await SecureCardService.logCardAction(cardId, 'delete');
 
-      // Use a transaction approach - delete transactions first, then card
+      // First verify the card exists and belongs to the user
+      const { data: cardExists, error: checkError } = await supabase
+        .from('virtual_cards')
+        .select('id')
+        .eq('id', cardId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (checkError || !cardExists) {
+        console.warn('Card not found or does not belong to user:', cardId);
+        return {
+          success: false,
+          error: 'Card not found or you do not have permission to delete it'
+        };
+      }
+
+      // Delete card transactions first
       const { error: deleteTransactionsError } = await supabase
         .from('virtual_card_transactions')
         .delete()
@@ -132,8 +148,20 @@ export class CardManagementService {
         };
       }
 
+      // Delete card access logs
+      const { error: deleteLogsError } = await supabase
+        .from('card_access_logs')
+        .delete()
+        .eq('card_id', cardId)
+        .eq('user_id', user.id);
+
+      if (deleteLogsError) {
+        console.error('Failed to delete card access logs:', deleteLogsError);
+        // Continue with deletion even if logs fail to delete
+      }
+
       // Now delete the card
-      const { error: deleteCardError, count } = await supabase
+      const { error: deleteCardError } = await supabase
         .from('virtual_cards')
         .delete()
         .eq('id', cardId)
@@ -144,14 +172,6 @@ export class CardManagementService {
         return {
           success: false,
           error: 'Failed to delete virtual card: ' + deleteCardError.message
-        };
-      }
-
-      if (count === 0) {
-        console.warn('No card was deleted - card may not exist or not belong to user');
-        return {
-          success: false,
-          error: 'Card not found or you do not have permission to delete it'
         };
       }
 

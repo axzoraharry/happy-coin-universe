@@ -41,18 +41,16 @@ export function VirtualCardList({
     }
   };
 
-  const isCardNumberVisible = (cardId: string) => {
-    return visibleCardNumbers.has(cardId);
-  };
-
   const getDisplayCardNumber = (card: VirtualCard) => {
-    if (isCardNumberVisible(card.id)) {
-      // Show the masked card number from database
+    const isVisible = visibleCardNumbers.has(card.id);
+    
+    if (isVisible) {
+      // Show the masked card number from database when "visible"
       return card.masked_card_number || `4000 **** **** ${card.id.slice(-4)}`;
     }
-    // Generate a unique masked number based on card ID for display consistency
-    const cardIdHash = card.id.slice(-4);
-    return `**** **** **** ${cardIdHash}`;
+    
+    // When hidden, show even more masked version
+    return `**** **** **** ${card.id.slice(-4)}`;
   };
 
   return (
@@ -92,7 +90,7 @@ export function VirtualCardList({
                     }}
                     className="h-8 w-8 p-0"
                   >
-                    {isCardNumberVisible(card.id) ? (
+                    {visibleCardNumbers.has(card.id) ? (
                       <EyeOff className="h-4 w-4" />
                     ) : (
                       <Eye className="h-4 w-4" />
