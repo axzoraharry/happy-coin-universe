@@ -1,17 +1,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface VirtualCard {
-  balance: number;
-  spend_limit_daily: number;
-  last_used?: string;
-}
+import { VirtualCard } from '@/lib/virtualCard/types';
 
 interface VirtualCardInfoProps {
   card: VirtualCard;
 }
 
 export function VirtualCardInfo({ card }: VirtualCardInfoProps) {
+  // Calculate available balance based on daily limit and spent amount
+  const availableBalance = (card.daily_limit - card.current_daily_spent) / 1000; // Convert to HC
+  
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <Card>
@@ -19,9 +17,9 @@ export function VirtualCardInfo({ card }: VirtualCardInfoProps) {
           <CardTitle className="text-sm text-muted-foreground">Available Balance</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold text-primary">{card.balance.toFixed(2)} HC</p>
+          <p className="text-2xl font-bold text-primary">{availableBalance.toFixed(2)} HC</p>
           <p className="text-xs text-muted-foreground mt-1">
-            ≈ ₹{(card.balance * 1000).toLocaleString('en-IN')}
+            ≈ ₹{(card.daily_limit - card.current_daily_spent).toLocaleString('en-IN')}
           </p>
         </CardContent>
       </Card>
@@ -31,9 +29,9 @@ export function VirtualCardInfo({ card }: VirtualCardInfoProps) {
           <CardTitle className="text-sm text-muted-foreground">Daily Limit</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">₹{card.spend_limit_daily.toLocaleString('en-IN')}</p>
+          <p className="text-2xl font-bold">₹{card.daily_limit.toLocaleString('en-IN')}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            ≈ {(card.spend_limit_daily / 1000).toFixed(2)} HC
+            ≈ {(card.daily_limit / 1000).toFixed(2)} HC
           </p>
         </CardContent>
       </Card>
@@ -44,7 +42,7 @@ export function VirtualCardInfo({ card }: VirtualCardInfoProps) {
         </CardHeader>
         <CardContent>
           <p className="text-lg font-semibold">
-            {card.last_used ? new Date(card.last_used).toLocaleDateString() : 'Never'}
+            {card.last_used_at ? new Date(card.last_used_at).toLocaleDateString() : 'Never'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Transaction date
