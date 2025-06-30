@@ -55,12 +55,31 @@ export class EnhancedTransactionService {
   private static readonly FUNCTION_URL = 'card-transaction-api';
 
   /**
+   * Get authentication headers for API calls
+   */
+  private static async getAuthHeaders() {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+
+    return {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  /**
    * Process a card transaction using the enhanced API
    */
   static async processTransaction(request: ProcessTransactionRequest) {
     try {
+      const headers = await this.getAuthHeaders();
+      
       const { data, error } = await supabase.functions.invoke(`${this.FUNCTION_URL}/process-transaction`, {
-        body: request
+        body: request,
+        headers
       });
 
       if (error) {
@@ -80,8 +99,11 @@ export class EnhancedTransactionService {
    */
   static async processPayment(request: ProcessPaymentRequest) {
     try {
+      const headers = await this.getAuthHeaders();
+      
       const { data, error } = await supabase.functions.invoke(`${this.FUNCTION_URL}/process-payment`, {
-        body: request
+        body: request,
+        headers
       });
 
       if (error) {
@@ -101,9 +123,12 @@ export class EnhancedTransactionService {
    */
   static async getTransactionAnalytics(cardId?: string): Promise<TransactionAnalytics[]> {
     try {
+      const headers = await this.getAuthHeaders();
       const url = cardId ? `${this.FUNCTION_URL}/get-analytics?card_id=${cardId}` : `${this.FUNCTION_URL}/get-analytics`;
       
-      const { data, error } = await supabase.functions.invoke(url);
+      const { data, error } = await supabase.functions.invoke(url, {
+        headers
+      });
 
       if (error) {
         console.error('Analytics fetch error:', error);
@@ -122,12 +147,15 @@ export class EnhancedTransactionService {
    */
   static async getTransactions(cardId?: string, limit: number = 50, offset: number = 0) {
     try {
+      const headers = await this.getAuthHeaders();
       let url = `${this.FUNCTION_URL}/get-transactions?limit=${limit}&offset=${offset}`;
       if (cardId) {
         url += `&card_id=${cardId}`;
       }
       
-      const { data, error } = await supabase.functions.invoke(url);
+      const { data, error } = await supabase.functions.invoke(url, {
+        headers
+      });
 
       if (error) {
         console.error('Transactions fetch error:', error);
@@ -146,8 +174,11 @@ export class EnhancedTransactionService {
    */
   static async validateTransactionLimits(request: LimitValidationRequest): Promise<LimitValidationResponse> {
     try {
+      const headers = await this.getAuthHeaders();
+      
       const { data, error } = await supabase.functions.invoke(`${this.FUNCTION_URL}/validate-limits`, {
-        body: request
+        body: request,
+        headers
       });
 
       if (error) {

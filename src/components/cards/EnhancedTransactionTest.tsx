@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Play, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Play, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react';
 import { EnhancedTransactionService } from '@/lib/virtualCard/enhancedTransactionService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EnhancedTransactionTestProps {
   cards: Array<{ id: string; masked_card_number: string; status: string }>;
@@ -24,9 +25,34 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
   const [merchantInfo, setMerchantInfo] = useState<string>('{}');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const { toast } = useToast();
 
+  // Check authentication status on component mount
+  useState(() => {
+    checkAuthStatus();
+  });
+
+  const checkAuthStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setAuthStatus(session ? 'authenticated' : 'unauthenticated');
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setAuthStatus('unauthenticated');
+    }
+  };
+
   const handleProcessTransaction = async () => {
+    if (authStatus !== 'authenticated') {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to test the transaction API",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedCard) {
       toast({
         title: "Error",
@@ -76,20 +102,40 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
           variant: "destructive"
         });
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    } catch (error: any) {
+      console.error('API Key test error:', error);
+      const errorMessage = error.message || 'Unknown error';
       setResult({ success: false, error: errorMessage });
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      
+      if (errorMessage.includes('Authentication required')) {
+        setAuthStatus('unauthenticated');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to test the API",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Test Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleLimitValidation = async () => {
+    if (authStatus !== 'authenticated') {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to test the validation API",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedCard || !amount) {
       toast({
         title: "Error",
@@ -123,17 +169,62 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
           variant: "destructive"
         });
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      
+      if (errorMessage.includes('Authentication required')) {
+        setAuthStatus('unauthenticated');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to test the API",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (authStatus === 'checking') {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <Shield className="h-4 w-4 animate-spin" />
+            <span>Checking authentication...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (authStatus === 'unauthenticated') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-orange-600">
+            <AlertTriangle className="h-5 w-5" />
+            Authentication Required
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-4">
+            You need to be authenticated to test the transaction API. Please log in to continue.
+          </p>
+          <Button onClick={checkAuthStatus} variant="outline">
+            <Shield className="h-4 w-4 mr-2" />
+            Check Authentication Status
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -141,6 +232,10 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
         <CardTitle className="flex items-center gap-2">
           <Play className="h-5 w-5" />
           Enhanced Transaction API Test
+          <Badge variant="secondary" className="ml-2">
+            <Shield className="h-3 w-3 mr-1" />
+            Authenticated
+          </Badge>
         </CardTitle>
       </CardHeader>
       
