@@ -38,7 +38,19 @@ export class SecureCardService {
       }
 
       // Properly type the response from the RPC function
-      return data as unknown as SecureCardDetails;
+      const result = data as unknown as SecureCardDetails;
+      
+      // Ensure we have the required fields
+      if (result && result.success) {
+        return {
+          ...result,
+          card_number: result.card_number || '',
+          cvv: result.cvv || '',
+          cardholder_name: result.cardholder_name || 'AXZORA USER'
+        };
+      }
+      
+      return result;
     } catch (error) {
       console.error('Failed to get secure card details:', error);
       return {

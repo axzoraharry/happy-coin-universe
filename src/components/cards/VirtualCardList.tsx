@@ -45,12 +45,12 @@ export function VirtualCardList({
     const isVisible = visibleCardNumbers.has(card.id);
     
     if (isVisible) {
-      // Show the masked card number from database when "visible"
+      // When visible, show the masked card number from database or generate one
       return card.masked_card_number || `4000 **** **** ${card.id.slice(-4)}`;
     }
     
-    // When hidden, show even more masked version
-    return `**** **** **** ${card.id.slice(-4)}`;
+    // When hidden, show fully masked version
+    return `**** **** **** ****`;
   };
 
   return (
