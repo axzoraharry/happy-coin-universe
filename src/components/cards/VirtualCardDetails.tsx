@@ -8,6 +8,7 @@ import { VirtualCardActions } from './VirtualCardActions';
 import { CardTransactions } from './CardTransactions';
 import { CardTransactionAnalytics } from './CardTransactionAnalytics';
 import { EnhancedTransactionTest } from './EnhancedTransactionTest';
+import { useToast } from '@/hooks/use-toast';
 
 interface VirtualCardDetailsProps {
   selectedCard: VirtualCard;
@@ -25,22 +26,63 @@ export function VirtualCardDetails({
   onCardUpdated
 }: VirtualCardDetailsProps) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showDetails, setShowDetails] = useState(false);
+  const [secureDetails, setSecureDetails] = useState({
+    full_number: '',
+    cvv: ''
+  });
+  const [isLoadingSecure, setIsLoadingSecure] = useState(false);
+  const { toast } = useToast();
 
   const handleTransactionComplete = () => {
     onCardUpdated();
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const handleToggleDetails = () => {
+    setShowDetails(!showDetails);
+    // Here you would typically fetch secure details from your API
+    // For now, using placeholder data
+    if (!showDetails && !secureDetails.full_number) {
+      setIsLoadingSecure(true);
+      // Simulate API call
+      setTimeout(() => {
+        setSecureDetails({
+          full_number: '4532 1234 5678 9012',
+          cvv: '123'
+        });
+        setIsLoadingSecure(false);
+      }, 1000);
+    }
+  };
+
+  const handleCardAction = (action: string, cardId: string) => {
+    console.log(`Card action: ${action} for card ${cardId}`);
+    // Implement card action logic here
+    handleTransactionComplete();
+  };
+
+  const handleCopyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied!",
+      description: `${label} copied to clipboard`,
+    });
+  };
+
   return (
     <div className="lg:col-span-2 space-y-6">
       <Card>
         <CardContent className="p-6">
-          <VirtualCardInfo selectedCard={selectedCard} />
+          <VirtualCardInfo card={selectedCard} />
           <VirtualCardActions
-            selectedCard={selectedCard}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-            onCardUpdated={handleTransactionComplete}
+            card={selectedCard}
+            showDetails={showDetails}
+            onToggleDetails={handleToggleDetails}
+            onCardAction={handleCardAction}
+            onCopyToClipboard={handleCopyToClipboard}
+            secureDetails={secureDetails}
+            isLoadingSecure={isLoadingSecure}
           />
         </CardContent>
       </Card>
