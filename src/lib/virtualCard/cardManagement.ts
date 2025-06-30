@@ -95,47 +95,15 @@ export class CardManagementService {
     return result;
   }
 
-  // Delete/Remove a virtual card
+  // Delete/Remove a virtual card with improved error handling
   static async deleteVirtualCard(cardId: string): Promise<CardDeleteResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      console.log('Deleting virtual card:', cardId);
+      console.log('Attempting to delete virtual card:', cardId, 'for user:', user.id);
 
-      // First, check if the card exists and belongs to the user
-      const { data: cardData, error: cardError } = await supabase
-        .from('virtual_cards')
-        .select('id, status')
-        .eq('id', cardId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (cardError || !cardData) {
-        console.error('Card not found or access denied:', cardError);
-        return {
-          success: false,
-          error: 'Card not found or you do not have permission to delete it'
-        };
-      }
-
-      // Record deletion transaction before deleting the card
-      const { error: transactionError } = await supabase
-        .from('virtual_card_transactions')
-        .insert({
-          card_id: cardId,
-          user_id: user.id,
-          transaction_type: 'deactivation',
-          description: 'Virtual card deleted by user',
-          amount: 0
-        });
-
-      if (transactionError) {
-        console.error('Failed to record deletion transaction:', transactionError);
-        // Continue with deletion even if transaction recording fails
-      }
-
-      // Delete all related transactions first
+      // Use a transaction approach - delete transactions first, then card
       const { error: deleteTransactionsError } = await supabase
         .from('virtual_card_transactions')
         .delete()
@@ -146,22 +114,30 @@ export class CardManagementService {
         console.error('Failed to delete card transactions:', deleteTransactionsError);
         return {
           success: false,
-          error: 'Failed to delete card transactions'
+          error: 'Failed to delete card transactions: ' + deleteTransactionsError.message
         };
       }
 
-      // Delete the card
-      const { error: deleteError } = await supabase
+      // Now delete the card
+      const { error: deleteCardError, count } = await supabase
         .from('virtual_cards')
         .delete()
         .eq('id', cardId)
         .eq('user_id', user.id);
 
-      if (deleteError) {
-        console.error('Failed to delete card:', deleteError);
+      if (deleteCardError) {
+        console.error('Failed to delete card:', deleteCardError);
         return {
           success: false,
-          error: 'Failed to delete virtual card'
+          error: 'Failed to delete virtual card: ' + deleteCardError.message
+        };
+      }
+
+      if (count === 0) {
+        console.warn('No card was deleted - card may not exist or not belong to user');
+        return {
+          success: false,
+          error: 'Card not found or you do not have permission to delete it'
         };
       }
 

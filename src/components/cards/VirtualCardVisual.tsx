@@ -4,13 +4,16 @@ import { Wallet, Clock } from 'lucide-react';
 
 interface VirtualCard {
   id: string;
-  masked_number: string;
+  masked_number?: string;
+  card_number?: string;
   expiry_date: string;
-  status: 'active' | 'frozen' | 'pending' | 'blocked';
+  status: 'active' | 'frozen' | 'pending' | 'blocked' | 'inactive' | 'expired';
   created_at: string;
-  spend_limit_daily: number;
-  spend_limit_monthly: number;
-  balance: number;
+  spend_limit_daily?: number;
+  spend_limit_monthly?: number;
+  daily_limit: number;
+  monthly_limit: number;
+  balance?: number;
   last_used?: string;
 }
 
@@ -34,11 +37,31 @@ export function VirtualCardVisual({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'from-green-500 to-emerald-600';
-      case 'frozen': return 'from-blue-500 to-cyan-600';
+      case 'frozen': 
+      case 'inactive': return 'from-blue-500 to-cyan-600';
       case 'pending': return 'from-yellow-500 to-orange-600';
-      case 'blocked': return 'from-red-500 to-red-600';
+      case 'blocked': 
+      case 'expired': return 'from-red-500 to-red-600';
       default: return 'from-gray-500 to-gray-600';
     }
+  };
+
+  // Generate a display card number based on the card's actual data
+  const getDisplayCardNumber = () => {
+    if (showDetails) {
+      return secureDetails.full_number;
+    }
+    
+    // Use the card's actual number if available, otherwise generate based on ID
+    if (card.card_number) {
+      // Mask the real card number
+      const cardNum = card.card_number.replace(/\s/g, '');
+      return `${cardNum.slice(0, 4)} **** **** ${cardNum.slice(-4)}`;
+    }
+    
+    // Generate a unique masked number based on card ID
+    const cardIdHash = card.id.slice(-4);
+    return `4000 **** **** ${cardIdHash}`;
   };
 
   return (
@@ -67,7 +90,7 @@ export function VirtualCardVisual({
           <div className="space-y-2">
             <p className="text-sm opacity-75">Card Number</p>
             <p className="font-mono text-2xl font-bold tracking-wider">
-              {showDetails ? secureDetails.full_number : card.masked_number}
+              {getDisplayCardNumber()}
             </p>
           </div>
 
