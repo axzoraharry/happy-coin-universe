@@ -1,22 +1,11 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { VirtualCard } from '@/lib/virtualCard';
 import { VirtualCardVisual } from './VirtualCardVisual';
 import { VirtualCardActions } from './VirtualCardActions';
 import { VirtualCardInfo } from './VirtualCardInfo';
 import { VirtualCardSecurityNotice } from './VirtualCardSecurityNotice';
-
-interface VirtualCard {
-  id: string;
-  masked_number: string;
-  expiry_date: string;
-  status: 'active' | 'frozen' | 'pending' | 'blocked';
-  created_at: string;
-  spend_limit_daily: number;
-  spend_limit_monthly: number;
-  balance: number;
-  last_used?: string;
-}
 
 interface VirtualCardDisplayProps {
   card: VirtualCard;
@@ -94,10 +83,33 @@ export function VirtualCardDisplay({
     }
   };
 
+  // Transform the card data to match the expected format for VirtualCardVisual
+  const visualCard = {
+    id: card.id,
+    masked_number: card.card_number || `**** **** **** ${card.id.slice(-4)}`,
+    card_number: card.card_number,
+    expiry_date: card.expiry_date,
+    status: card.status,
+    created_at: card.created_at,
+    spend_limit_daily: card.daily_limit,
+    spend_limit_monthly: card.monthly_limit,
+    daily_limit: card.daily_limit,
+    monthly_limit: card.monthly_limit,
+    balance: card.current_daily_spent || 0,
+    last_used: card.last_used_at
+  };
+
+  // Transform the card data for VirtualCardInfo component
+  const infoCard = {
+    balance: (card.daily_limit - card.current_daily_spent) || card.daily_limit,
+    spend_limit_daily: card.daily_limit,
+    last_used: card.last_used_at
+  };
+
   return (
     <div className="space-y-6">
       <VirtualCardVisual
-        card={card}
+        card={visualCard}
         showDetails={showDetails}
         timeLeft={timeLeft}
         secureDetails={secureDetails}
@@ -112,7 +124,7 @@ export function VirtualCardDisplay({
         secureDetails={secureDetails}
       />
 
-      <VirtualCardInfo card={card} />
+      <VirtualCardInfo card={infoCard} />
 
       <VirtualCardSecurityNotice />
     </div>
