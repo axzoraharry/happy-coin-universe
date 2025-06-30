@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { VirtualCard } from '@/lib/virtualCard';
@@ -188,13 +187,6 @@ export function VirtualCardDisplay({
     last_used: card.last_used_at
   };
 
-  // Transform the card data for VirtualCardInfo component
-  const infoCard = {
-    balance: (card.daily_limit - card.current_daily_spent) || card.daily_limit,
-    spend_limit_daily: card.daily_limit,
-    last_used: card.last_used_at
-  };
-
   const getActionDescription = () => {
     switch (pendingAction) {
       case 'view': return 'view card details';
@@ -243,7 +235,7 @@ export function VirtualCardDisplay({
         isLoadingSecure={isLoadingSecure}
       />
 
-      <VirtualCardInfo card={infoCard} />
+      <VirtualCardInfo card={card} />
 
       <VirtualCardSecurityNotice />
 
