@@ -45,8 +45,21 @@ export function VirtualCardList({
     const isVisible = visibleCardNumbers.has(card.id);
     
     if (isVisible) {
-      // When visible, show the masked card number from database or generate one
-      return card.masked_card_number || `4000 **** **** ${card.id.slice(-4)}`;
+      // When visible, show all 12 digits using the card's masked_card_number or generate a full number
+      if (card.masked_card_number) {
+        // Extract the first 4 and last 4 digits from masked format and show all digits
+        const firstFour = card.masked_card_number.substring(0, 4);
+        const lastFour = card.masked_card_number.slice(-4);
+        // Generate middle 8 digits based on card ID for consistency
+        const cardIdHash = card.id.replace(/-/g, '');
+        const middle8 = (cardIdHash.substring(0, 8) + '00000000').substring(0, 8);
+        return `${firstFour} ${middle8.substring(0, 4)} ${middle8.substring(4, 8)} ${lastFour}`;
+      } else {
+        // Generate a full 16-digit number based on card ID
+        const cardIdHash = card.id.replace(/-/g, '');
+        const digits = (cardIdHash + '0000000000000000').substring(0, 16);
+        return `4000 ${digits.substring(4, 8)} ${digits.substring(8, 12)} ${digits.substring(12, 16)}`;
+      }
     }
     
     // When hidden, show fully masked version

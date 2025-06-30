@@ -106,7 +106,7 @@ export class CardManagementService {
     }
   }
 
-  // Delete/Remove a virtual card with improved error handling and transaction management
+  // Delete/Remove a virtual card with improved error handling and manual deletion
   static async deleteVirtualCard(cardId: string): Promise<CardDeleteResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -141,54 +141,43 @@ export class CardManagementService {
       // Log the deletion attempt
       await SecureCardService.logCardAction(cardId, 'delete');
 
-      // Use a transaction to ensure all related data is deleted properly
-      const { error: transactionError } = await supabase
-        .rpc('delete_virtual_card_with_related_data', {
-          p_card_id: cardId,
-          p_user_id: user.id
-        });
+      // Manual deletion process - delete related records first
+      console.log('Deleting related card transactions...');
+      const { error: deleteTransactionsError } = await supabase
+        .from('virtual_card_transactions')
+        .delete()
+        .eq('card_id', cardId)
+        .eq('user_id', user.id);
 
-      if (transactionError) {
-        console.error('Transaction deletion failed:', transactionError);
-        
-        // Fallback to manual deletion if the RPC function doesn't exist
-        console.log('Attempting manual deletion as fallback...');
-        
-        // Delete related records first
-        const { error: deleteTransactionsError } = await supabase
-          .from('virtual_card_transactions')
-          .delete()
-          .eq('card_id', cardId)
-          .eq('user_id', user.id);
+      if (deleteTransactionsError) {
+        console.error('Failed to delete card transactions:', deleteTransactionsError);
+      }
 
-        if (deleteTransactionsError) {
-          console.error('Failed to delete card transactions:', deleteTransactionsError);
-        }
+      console.log('Deleting card access logs...');
+      const { error: deleteLogsError } = await supabase
+        .from('card_access_logs')
+        .delete()
+        .eq('card_id', cardId)
+        .eq('user_id', user.id);
 
-        const { error: deleteLogsError } = await supabase
-          .from('card_access_logs')
-          .delete()
-          .eq('card_id', cardId)
-          .eq('user_id', user.id);
+      if (deleteLogsError) {
+        console.error('Failed to delete card access logs:', deleteLogsError);
+      }
 
-        if (deleteLogsError) {
-          console.error('Failed to delete card access logs:', deleteLogsError);
-        }
+      // Finally delete the card
+      console.log('Deleting the card record...');
+      const { error: deleteCardError } = await supabase
+        .from('virtual_cards')
+        .delete()
+        .eq('id', cardId)
+        .eq('user_id', user.id);
 
-        // Finally delete the card
-        const { error: deleteCardError } = await supabase
-          .from('virtual_cards')
-          .delete()
-          .eq('id', cardId)
-          .eq('user_id', user.id);
-
-        if (deleteCardError) {
-          console.error('Failed to delete card:', deleteCardError);
-          return {
-            success: false,
-            error: 'Failed to delete virtual card: ' + deleteCardError.message
-          };
-        }
+      if (deleteCardError) {
+        console.error('Failed to delete card:', deleteCardError);
+        return {
+          success: false,
+          error: 'Failed to delete virtual card: ' + deleteCardError.message
+        };
       }
 
       console.log('Virtual card deleted successfully:', cardId);
