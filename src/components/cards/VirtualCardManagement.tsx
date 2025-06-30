@@ -1,6 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VirtualCardAPI, VirtualCard, VirtualCardTransaction } from '@/lib/virtualCard';
 import { useToast } from '@/hooks/use-toast';
 import { VirtualCardHeader } from './VirtualCardHeader';
@@ -10,6 +10,7 @@ import { VirtualCardList } from './VirtualCardList';
 import { VirtualCardDetails } from './VirtualCardDetails';
 import { VirtualCardEmptyState } from './VirtualCardEmptyState';
 import { VirtualCardDebugPanel } from './VirtualCardDebugPanel';
+import { ExternalCardDemo } from './ExternalCardDemo';
 
 export function VirtualCardManagement() {
   const [cards, setCards] = useState<VirtualCard[]>([]);
@@ -80,7 +81,6 @@ export function VirtualCardManagement() {
     const currentCardId = selectedCard?.id;
     await loadUserCards();
     
-    // If the deleted card was selected, clear the selection or select another card
     if (currentCardId && !cards.find(card => card.id === currentCardId)) {
       const remainingCards = cards.filter(card => card.id !== currentCardId);
       setSelectedCard(remainingCards.length > 0 ? remainingCards[0] : null);
@@ -117,29 +117,42 @@ export function VirtualCardManagement() {
 
       <VirtualCardDebugPanel />
 
-      {cards.length > 0 ? (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <VirtualCardList
-            cards={cards}
-            selectedCard={selectedCard}
-            setSelectedCard={setSelectedCard}
-            visibleCardNumbers={visibleCardNumbers}
-            toggleCardNumberVisibility={toggleCardNumberVisibility}
-          />
+      <Tabs defaultValue="cards" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="cards">Card Management</TabsTrigger>
+          <TabsTrigger value="external">External API Demo</TabsTrigger>
+        </TabsList>
 
-          {selectedCard && (
-            <VirtualCardDetails
-              selectedCard={selectedCard}
-              transactions={transactions}
-              isLoading={isLoading}
-              setIsLoading={setIsLoading}
-              onCardUpdated={handleCardUpdated}
-            />
+        <TabsContent value="cards" className="space-y-6">
+          {cards.length > 0 ? (
+            <div className="grid gap-6 lg:grid-cols-3">
+              <VirtualCardList
+                cards={cards}
+                selectedCard={selectedCard}
+                setSelectedCard={setSelectedCard}
+                visibleCardNumbers={visibleCardNumbers}
+                toggleCardNumberVisibility={toggleCardNumberVisibility}
+              />
+
+              {selectedCard && (
+                <VirtualCardDetails
+                  selectedCard={selectedCard}
+                  transactions={transactions}
+                  isLoading={isLoading}
+                  setIsLoading={setIsLoading}
+                  onCardUpdated={handleCardUpdated}
+                />
+              )}
+            </div>
+          ) : (
+            <VirtualCardEmptyState onIssueCard={() => setShowIssueDialog(true)} />
           )}
-        </div>
-      ) : (
-        <VirtualCardEmptyState onIssueCard={() => setShowIssueDialog(true)} />
-      )}
+        </TabsContent>
+
+        <TabsContent value="external" className="space-y-6">
+          <ExternalCardDemo />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
