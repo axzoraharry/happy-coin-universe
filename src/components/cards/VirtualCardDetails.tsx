@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { VirtualCard, VirtualCardTransaction } from '@/lib/virtualCard';
+import { VirtualCard, VirtualCardTransaction, VirtualCardAPI } from '@/lib/virtualCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VirtualCardInfo } from './VirtualCardInfo';
@@ -56,10 +56,44 @@ export function VirtualCardDetails({
     }
   };
 
-  const handleCardAction = (action: string, cardId: string) => {
-    console.log(`Card action: ${action} for card ${cardId}`);
-    // Implement card action logic here
-    handleTransactionComplete();
+  const handleCardAction = async (action: string, cardId: string) => {
+    console.log(`Processing card action: ${action} for card ${cardId}`);
+    setIsLoading(true);
+    
+    try {
+      let newStatus: 'active' | 'inactive' | 'blocked' | 'expired';
+      
+      // Determine the new status based on the action
+      if (action === 'freeze') {
+        newStatus = 'inactive';
+      } else if (action === 'unfreeze') {
+        newStatus = 'active';
+      } else {
+        throw new Error(`Unknown card action: ${action}`);
+      }
+
+      // Call the API to update card status
+      const result = await VirtualCardAPI.updateCardStatus(cardId, newStatus);
+      
+      if (result.success) {
+        toast({
+          title: "Card Updated",
+          description: `Card has been ${action === 'freeze' ? 'frozen' : 'activated'} successfully`,
+        });
+        handleTransactionComplete();
+      } else {
+        throw new Error(result.error || 'Failed to update card status');
+      }
+    } catch (error) {
+      console.error('Card action failed:', error);
+      toast({
+        title: "Action Failed",
+        description: error instanceof Error ? error.message : 'Failed to update card status',
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCopyToClipboard = (text: string, label: string) => {
