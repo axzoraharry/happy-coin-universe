@@ -153,7 +153,81 @@ export type Database = {
             foreignKeyName: "card_access_logs_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
+            referencedRelation: "card_transaction_analytics"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_access_logs_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
             referencedRelation: "virtual_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_transaction_webhooks: {
+        Row: {
+          attempts: number | null
+          card_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          last_attempt_at: string | null
+          payload: Json
+          status: string
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+          webhook_url: string
+        }
+        Insert: {
+          attempts?: number | null
+          card_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          last_attempt_at?: string | null
+          payload: Json
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+          webhook_url: string
+        }
+        Update: {
+          attempts?: number | null
+          card_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          last_attempt_at?: string | null
+          payload?: Json
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+          webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_transaction_webhooks_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "card_transaction_analytics"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_transaction_webhooks_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_transaction_webhooks_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_card_transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -1089,6 +1163,13 @@ export type Database = {
             foreignKeyName: "virtual_card_transactions_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
+            referencedRelation: "card_transaction_analytics"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "virtual_card_transactions_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
             referencedRelation: "virtual_cards"
             referencedColumns: ["id"]
           },
@@ -1107,12 +1188,14 @@ export type Database = {
           expiry_date: string
           id: string
           issuer_name: string
+          last_transaction_at: string | null
           last_used_at: string | null
           masked_card_number: string
           metadata: Json | null
           monthly_limit: number | null
           pin_hash: string
           status: string
+          total_transactions: number | null
           updated_at: string
           user_id: string
         }
@@ -1128,12 +1211,14 @@ export type Database = {
           expiry_date: string
           id?: string
           issuer_name?: string
+          last_transaction_at?: string | null
           last_used_at?: string | null
           masked_card_number: string
           metadata?: Json | null
           monthly_limit?: number | null
           pin_hash: string
           status?: string
+          total_transactions?: number | null
           updated_at?: string
           user_id: string
         }
@@ -1149,12 +1234,14 @@ export type Database = {
           expiry_date?: string
           id?: string
           issuer_name?: string
+          last_transaction_at?: string | null
           last_used_at?: string | null
           masked_card_number?: string
           metadata?: Json | null
           monthly_limit?: number | null
           pin_hash?: string
           status?: string
+          total_transactions?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -1246,7 +1333,23 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      card_transaction_analytics: {
+        Row: {
+          card_id: string | null
+          card_status: string | null
+          daily_spent: number | null
+          daily_transactions: number | null
+          failed_transactions: number | null
+          last_transaction_at: string | null
+          masked_card_number: string | null
+          monthly_spent: number | null
+          total_purchases: number | null
+          total_refunds: number | null
+          total_transactions: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       armor: {
@@ -1340,6 +1443,17 @@ export type Database = {
       pgp_key_id: {
         Args: { "": string }
         Returns: string
+      }
+      process_card_transaction: {
+        Args: {
+          p_card_id: string
+          p_transaction_type: string
+          p_amount?: number
+          p_description?: string
+          p_merchant_info?: Json
+          p_reference_id?: string
+        }
+        Returns: Json
       }
       process_external_payment: {
         Args: {

@@ -1,14 +1,13 @@
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Trash2, Settings } from 'lucide-react';
-import { VirtualCard, VirtualCardTransaction, VirtualCardAPI } from '@/lib/virtualCard';
-import { VirtualCardDisplay } from './VirtualCardDisplay';
+import { VirtualCard, VirtualCardTransaction } from '@/lib/virtualCard';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { VirtualCardInfo } from './VirtualCardInfo';
+import { VirtualCardActions } from './VirtualCardActions';
 import { CardTransactions } from './CardTransactions';
-import { DeleteCardDialog } from './DeleteCardDialog';
-import { useToast } from '@/hooks/use-toast';
+import { CardTransactionAnalytics } from './CardTransactionAnalytics';
+import { EnhancedTransactionTest } from './EnhancedTransactionTest';
 
 interface VirtualCardDetailsProps {
   selectedCard: VirtualCard;
@@ -25,116 +24,62 @@ export function VirtualCardDetails({
   setIsLoading,
   onCardUpdated
 }: VirtualCardDetailsProps) {
-  const [showDetails, setShowDetails] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const { toast } = useToast();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const handleCardAction = async (action: string, cardId: string) => {
-    setIsLoading(true);
-    
-    try {
-      let newStatus: 'active' | 'inactive' | 'blocked' | 'expired';
-      
-      switch (action) {
-        case 'freeze':
-          newStatus = 'inactive';
-          break;
-        case 'unfreeze':
-          newStatus = 'active';
-          break;
-        default:
-          return;
-      }
-      
-      const result = await VirtualCardAPI.updateCardStatus(cardId, newStatus);
-      
-      if (result.success) {
-        toast({
-          title: "Card Updated",
-          description: `Card has been ${newStatus === 'active' ? 'activated' : 'frozen'}`,
-        });
-        onCardUpdated();
-      } else {
-        toast({
-          title: "Update Failed",
-          description: result.error || "Failed to update card status",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Card action error:', error);
-      toast({
-        title: "Action Failed",
-        description: "An unexpected error occurred",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteCard = () => {
-    setShowDeleteDialog(true);
-  };
-
-  const handleCardDeleted = () => {
+  const handleTransactionComplete = () => {
     onCardUpdated();
+    setRefreshTrigger(prev => prev + 1);
   };
 
   return (
-    <>
-      <div className="lg:col-span-2 space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Card Details</h3>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteCard}
-              className="flex items-center gap-2"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Card
-            </Button>
-          </div>
-        </div>
+    <div className="lg:col-span-2 space-y-6">
+      <Card>
+        <CardContent className="p-6">
+          <VirtualCardInfo selectedCard={selectedCard} />
+          <VirtualCardActions
+            selectedCard={selectedCard}
+            isLoading={isLoading}
+            setIsLoading={setIsLoading}
+            onCardUpdated={handleTransactionComplete}
+          />
+        </CardContent>
+      </Card>
 
-        <VirtualCardDisplay
-          card={selectedCard}
-          showDetails={showDetails}
-          onToggleDetails={() => setShowDetails(!showDetails)}
-          onCardAction={handleCardAction}
-        />
+      <Tabs defaultValue="transactions" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="test-api">Test API</TabsTrigger>
+        </TabsList>
 
-        <Separator />
+        <TabsContent value="transactions" className="space-y-4">
+          <Card>
+            <CardContent className="p-6">
+              <CardTransactions 
+                transactions={transactions} 
+                isLoading={isLoading} 
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CardTransactions 
-              transactions={transactions}
-              isLoading={isLoading}
-            />
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="analytics" className="space-y-4">
+          <CardTransactionAnalytics 
+            cardId={selectedCard.id} 
+            refreshTrigger={refreshTrigger}
+          />
+        </TabsContent>
 
-      <DeleteCardDialog
-        isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        card={selectedCard}
-        onCardDeleted={handleCardDeleted}
-      />
-    </>
+        <TabsContent value="test-api" className="space-y-4">
+          <EnhancedTransactionTest 
+            cards={[{
+              id: selectedCard.id,
+              masked_card_number: selectedCard.masked_card_number || '',
+              status: selectedCard.status
+            }]}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
