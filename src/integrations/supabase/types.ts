@@ -117,6 +117,47 @@ export type Database = {
         }
         Relationships: []
       }
+      card_access_logs: {
+        Row: {
+          access_type: string
+          card_id: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          success: boolean
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          access_type: string
+          card_id: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          card_id?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_access_logs_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_validation_attempts: {
         Row: {
           card_number_hash: string
@@ -1067,6 +1108,7 @@ export type Database = {
           id: string
           issuer_name: string
           last_used_at: string | null
+          masked_card_number: string
           metadata: Json | null
           monthly_limit: number | null
           pin_hash: string
@@ -1087,6 +1129,7 @@ export type Database = {
           id?: string
           issuer_name?: string
           last_used_at?: string | null
+          masked_card_number: string
           metadata?: Json | null
           monthly_limit?: number | null
           pin_hash: string
@@ -1107,6 +1150,7 @@ export type Database = {
           id?: string
           issuer_name?: string
           last_used_at?: string | null
+          masked_card_number?: string
           metadata?: Json | null
           monthly_limit?: number | null
           pin_hash?: string
@@ -1262,6 +1306,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_card_secure_details: {
+        Args: {
+          p_card_id: string
+          p_user_pin: string
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: Json
+      }
       issue_virtual_card: {
         Args: {
           p_user_id: string
@@ -1270,6 +1323,15 @@ export type Database = {
           p_monthly_limit?: number
         }
         Returns: Json
+      }
+      log_card_action: {
+        Args: {
+          p_card_id: string
+          p_action_type: string
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: boolean
       }
       pgp_armor_headers: {
         Args: { "": string }

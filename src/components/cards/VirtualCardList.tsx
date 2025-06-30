@@ -47,8 +47,8 @@ export function VirtualCardList({
 
   const getDisplayCardNumber = (card: VirtualCard) => {
     if (isCardNumberVisible(card.id)) {
-      // Show the real card number if available, otherwise show mock
-      return card.card_number || '4000 **** **** ****';
+      // Show the masked card number from database
+      return card.masked_card_number || `4000 **** **** ${card.id.slice(-4)}`;
     }
     // Generate a unique masked number based on card ID for display consistency
     const cardIdHash = card.id.slice(-4);

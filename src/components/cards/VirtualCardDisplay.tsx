@@ -6,6 +6,8 @@ import { VirtualCardVisual } from './VirtualCardVisual';
 import { VirtualCardActions } from './VirtualCardActions';
 import { VirtualCardInfo } from './VirtualCardInfo';
 import { VirtualCardSecurityNotice } from './VirtualCardSecurityNotice';
+import { SecurePinDialog } from './SecurePinDialog';
+import { SecureCardService, SecureCardDetails } from '@/lib/virtualCard/secureCardService';
 
 interface VirtualCardDisplayProps {
   card: VirtualCard;
@@ -22,19 +24,17 @@ export function VirtualCardDisplay({
 }: VirtualCardDisplayProps) {
   const [detailsTimer, setDetailsTimer] = useState<NodeJS.Timeout | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'view' | 'copy_number' | 'copy_cvv' | null>(null);
+  const [secureDetails, setSecureDetails] = useState<SecureCardDetails | null>(null);
+  const [isLoadingSecure, setIsLoadingSecure] = useState(false);
   const { toast } = useToast();
 
-  // Mock secure card details - In production, these would come from secure API
-  const secureDetails = {
-    full_number: '4532 1234 5678 1234',
-    cvv: '123',
-    cardholder_name: 'AXZORA USER'
-  };
-
   useEffect(() => {
-    if (showDetails) {
+    if (showDetails && secureDetails?.success) {
       const timer = setTimeout(() => {
         onToggleDetails();
+        setSecureDetails(null);
         toast({
           title: "Card Details Hidden",
           description: "For security, card details are automatically hidden after 30 seconds",
@@ -65,28 +65,117 @@ export function VirtualCardDisplay({
       }
       setTimeLeft(0);
     }
-  }, [showDetails, onToggleDetails, detailsTimer, toast]);
+  }, [showDetails, secureDetails, onToggleDetails, detailsTimer, toast]);
 
-  const copyToClipboard = async (text: string, label: string) => {
+  const handleToggleDetails = () => {
+    if (showDetails) {
+      // Hide details
+      onToggleDetails();
+      setSecureDetails(null);
+    } else {
+      // Show PIN dialog to get secure details
+      setPendingAction('view');
+      setShowPinDialog(true);
+    }
+  };
+
+  const handlePinVerified = async (pin: string) => {
+    setIsLoadingSecure(true);
+    
     try {
-      await navigator.clipboard.writeText(text);
+      const details = await SecureCardService.getSecureCardDetails(card.id, pin);
+      
+      if (details.success) {
+        setSecureDetails(details);
+        onToggleDetails();
+        
+        toast({
+          title: "Card Details Retrieved",
+          description: "Secure details will be hidden automatically after 30 seconds",
+        });
+      } else {
+        toast({
+          title: "Access Denied",
+          description: details.error || "Failed to retrieve card details",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('PIN verification failed:', error);
+      toast({
+        title: "Verification Failed",
+        description: "Please try again",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingSecure(false);
+      setPendingAction(null);
+    }
+  };
+
+  const handleCopyToClipboard = async (text: string, label: string, actionType: 'copy_number' | 'copy_cvv') => {
+    if (!secureDetails?.success) {
+      // Need to get secure details first
+      setPendingAction(actionType);
+      setShowPinDialog(true);
+      return;
+    }
+
+    const result = await SecureCardService.copyToClipboardSecure(text, label, card.id, actionType);
+    
+    if (result.success) {
       toast({
         title: "Copied",
         description: `${label} copied to clipboard`,
       });
-    } catch (error) {
+    } else {
       toast({
         title: "Copy Failed",
-        description: "Unable to copy to clipboard",
+        description: result.error || "Unable to copy to clipboard",
         variant: "destructive",
       });
+    }
+  };
+
+  const handlePinVerifiedForCopy = async (pin: string) => {
+    setIsLoadingSecure(true);
+    
+    try {
+      const details = await SecureCardService.getSecureCardDetails(card.id, pin);
+      
+      if (details.success) {
+        setSecureDetails(details);
+        
+        // Perform the pending copy action
+        if (pendingAction === 'copy_number' && details.card_number) {
+          await handleCopyToClipboard(details.card_number, 'Card number', 'copy_number');
+        } else if (pendingAction === 'copy_cvv' && details.cvv) {
+          await handleCopyToClipboard(details.cvv, 'CVV', 'copy_cvv');
+        }
+      } else {
+        toast({
+          title: "Access Denied",
+          description: details.error || "Failed to retrieve card details",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('PIN verification failed:', error);
+      toast({
+        title: "Verification Failed",
+        description: "Please try again",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingSecure(false);
+      setPendingAction(null);
     }
   };
 
   // Transform the card data to match the expected format for VirtualCardVisual
   const visualCard = {
     id: card.id,
-    masked_number: card.card_number || `**** **** **** ${card.id.slice(-4)}`,
+    masked_number: card.masked_card_number || `**** **** **** ${card.id.slice(-4)}`,
     card_number: card.card_number,
     expiry_date: card.expiry_date,
     status: card.status,
@@ -106,27 +195,68 @@ export function VirtualCardDisplay({
     last_used: card.last_used_at
   };
 
+  const getActionDescription = () => {
+    switch (pendingAction) {
+      case 'view': return 'view card details';
+      case 'copy_number': return 'copy card number';
+      case 'copy_cvv': return 'copy CVV';
+      default: return 'perform this action';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <VirtualCardVisual
         card={visualCard}
         showDetails={showDetails}
         timeLeft={timeLeft}
-        secureDetails={secureDetails}
+        secureDetails={secureDetails?.success ? {
+          full_number: secureDetails.card_number || '',
+          cvv: secureDetails.cvv || '',
+          cardholder_name: secureDetails.cardholder_name || 'AXZORA USER'
+        } : {
+          full_number: '',
+          cvv: '',
+          cardholder_name: 'AXZORA USER'
+        }}
       />
 
       <VirtualCardActions
         card={card}
         showDetails={showDetails}
-        onToggleDetails={onToggleDetails}
+        onToggleDetails={handleToggleDetails}
         onCardAction={onCardAction}
-        onCopyToClipboard={copyToClipboard}
-        secureDetails={secureDetails}
+        onCopyToClipboard={(text, label) => {
+          if (label.includes('number')) {
+            handleCopyToClipboard(text, label, 'copy_number');
+          } else if (label.includes('CVV')) {
+            handleCopyToClipboard(text, label, 'copy_cvv');
+          }
+        }}
+        secureDetails={secureDetails?.success ? {
+          full_number: secureDetails.card_number || '',
+          cvv: secureDetails.cvv || ''
+        } : {
+          full_number: '',
+          cvv: ''
+        }}
+        isLoadingSecure={isLoadingSecure}
       />
 
       <VirtualCardInfo card={infoCard} />
 
       <VirtualCardSecurityNotice />
+
+      <SecurePinDialog
+        isOpen={showPinDialog}
+        onClose={() => {
+          setShowPinDialog(false);
+          setPendingAction(null);
+        }}
+        onPinVerified={pendingAction === 'view' ? handlePinVerified : handlePinVerifiedForCopy}
+        cardId={card.id}
+        actionDescription={getActionDescription()}
+      />
     </div>
   );
 }

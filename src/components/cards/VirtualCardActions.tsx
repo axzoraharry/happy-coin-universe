@@ -1,6 +1,6 @@
 
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, Copy, Snowflake, Play } from 'lucide-react';
+import { Eye, EyeOff, Copy, Snowflake, Play, Loader2 } from 'lucide-react';
 import { VirtualCard } from '@/lib/virtualCard';
 
 interface VirtualCardActionsProps {
@@ -13,6 +13,7 @@ interface VirtualCardActionsProps {
     full_number: string;
     cvv: string;
   };
+  isLoadingSecure?: boolean;
 }
 
 export function VirtualCardActions({
@@ -21,7 +22,8 @@ export function VirtualCardActions({
   onToggleDetails,
   onCardAction,
   onCopyToClipboard,
-  secureDetails
+  secureDetails,
+  isLoadingSecure = false
 }: VirtualCardActionsProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -29,12 +31,19 @@ export function VirtualCardActions({
         variant="outline"
         onClick={onToggleDetails}
         className="flex items-center gap-2 h-12"
+        disabled={isLoadingSecure}
       >
-        {showDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        {showDetails ? 'Hide Details' : 'Show Details'}
+        {isLoadingSecure ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : showDetails ? (
+          <EyeOff className="h-4 w-4" />
+        ) : (
+          <Eye className="h-4 w-4" />
+        )}
+        {isLoadingSecure ? 'Verifying...' : showDetails ? 'Hide Details' : 'Show Details'}
       </Button>
 
-      {showDetails && (
+      {showDetails && secureDetails.full_number && (
         <>
           <Button
             variant="outline"

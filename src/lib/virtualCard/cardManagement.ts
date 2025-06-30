@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { VirtualCard, CardIssuanceResult, CardStatusUpdateResult, CardDeleteResult } from './types';
+import { SecureCardService } from './secureCardService';
 
 export class CardManagementService {
   // Issue a new virtual card with enhanced error handling
@@ -67,7 +68,9 @@ export class CardManagementService {
         daily_limit: Number(card.daily_limit),
         monthly_limit: Number(card.monthly_limit),
         current_daily_spent: Number(card.current_daily_spent),
-        current_monthly_spent: Number(card.current_monthly_spent)
+        current_monthly_spent: Number(card.current_monthly_spent),
+        // Include the new masked_card_number field
+        masked_card_number: card.masked_card_number
       }));
     } catch (error) {
       console.error('Failed to fetch user cards:', error);
@@ -75,33 +78,44 @@ export class CardManagementService {
     }
   }
 
-  // Update card status
+  // Update card status with audit logging
   static async updateCardStatus(
     cardId: string, 
     newStatus: 'active' | 'inactive' | 'blocked' | 'expired'
   ): Promise<CardStatusUpdateResult> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase.rpc('update_card_status', {
-      p_user_id: user.id,
-      p_card_id: cardId,
-      p_new_status: newStatus
-    });
+      // Log the status change action
+      await SecureCardService.logCardAction(cardId, 'status_change');
 
-    if (error) throw error;
-    
-    const result = data as unknown as CardStatusUpdateResult;
-    return result;
+      const { data, error } = await supabase.rpc('update_card_status', {
+        p_user_id: user.id,
+        p_card_id: cardId,
+        p_new_status: newStatus
+      });
+
+      if (error) throw error;
+      
+      const result = data as unknown as CardStatusUpdateResult;
+      return result;
+    } catch (error) {
+      console.error('Failed to update card status:', error);
+      throw error;
+    }
   }
 
-  // Delete/Remove a virtual card with improved error handling
+  // Delete/Remove a virtual card with improved error handling and audit logging
   static async deleteVirtualCard(cardId: string): Promise<CardDeleteResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       console.log('Attempting to delete virtual card:', cardId, 'for user:', user.id);
+
+      // Log the deletion action
+      await SecureCardService.logCardAction(cardId, 'delete');
 
       // Use a transaction approach - delete transactions first, then card
       const { error: deleteTransactionsError } = await supabase

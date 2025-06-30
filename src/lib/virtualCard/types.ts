@@ -4,6 +4,7 @@ export interface VirtualCard {
   user_id: string;
   card_number?: string; // Only available during issuance
   cvv?: string; // Only available during issuance
+  masked_card_number?: string; // New field for secure display
   expiry_date: string;
   status: 'active' | 'inactive' | 'blocked' | 'expired';
   card_type: 'virtual' | 'physical';
@@ -33,6 +34,17 @@ export interface VirtualCardTransaction {
   metadata: Record<string, any>;
 }
 
+export interface CardAccessLog {
+  id: string;
+  card_id: string;
+  user_id: string;
+  access_type: 'view_details' | 'copy_number' | 'copy_cvv' | 'status_change' | 'delete';
+  ip_address?: string;
+  user_agent?: string;
+  success: boolean;
+  created_at: string;
+}
+
 export interface CardValidationResult {
   success: boolean;
   card_id?: string;
@@ -52,6 +64,7 @@ export interface CardIssuanceResult {
   card_number?: string;
   cvv?: string;
   expiry_date?: string;
+  masked_card_number?: string; // New field
   status?: string;
   daily_limit?: number;
   monthly_limit?: number;
