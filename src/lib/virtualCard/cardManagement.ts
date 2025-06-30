@@ -106,7 +106,7 @@ export class CardManagementService {
     }
   }
 
-  // Delete/Remove a virtual card with improved error handling and manual deletion
+  // Delete/Remove a virtual card with improved error handling
   static async deleteVirtualCard(cardId: string): Promise<CardDeleteResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -141,7 +141,7 @@ export class CardManagementService {
       // Log the deletion attempt
       await SecureCardService.logCardAction(cardId, 'delete');
 
-      // Manual deletion process - delete related records first
+      // Delete related records first, then the card
       console.log('Deleting related card transactions...');
       const { error: deleteTransactionsError } = await supabase
         .from('virtual_card_transactions')
@@ -164,7 +164,7 @@ export class CardManagementService {
         console.error('Failed to delete card access logs:', deleteLogsError);
       }
 
-      // Finally delete the card
+      // Finally delete the card record
       console.log('Deleting the card record...');
       const { error: deleteCardError } = await supabase
         .from('virtual_cards')

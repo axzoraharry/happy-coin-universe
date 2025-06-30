@@ -46,22 +46,27 @@ export function VirtualCardVisual({
     }
   };
 
-  // Generate a display card number based on the card's actual data
+  // Generate a display card number that's always numeric
   const getDisplayCardNumber = () => {
-    if (showDetails) {
+    if (showDetails && secureDetails.full_number) {
+      // Ensure the full number is properly formatted and numeric
+      const cleanNumber = secureDetails.full_number.replace(/\D/g, '');
+      if (cleanNumber.length >= 16) {
+        return `${cleanNumber.substring(0, 4)} ${cleanNumber.substring(4, 8)} ${cleanNumber.substring(8, 12)} ${cleanNumber.substring(12, 16)}`;
+      }
       return secureDetails.full_number;
     }
     
-    // Use the card's actual number if available, otherwise generate based on ID
-    if (card.card_number) {
-      // Mask the real card number
-      const cardNum = card.card_number.replace(/\s/g, '');
-      return `${cardNum.slice(0, 4)} **** **** ${cardNum.slice(-4)}`;
-    }
+    // Generate a consistent numeric masked display
+    const cardIdHash = card.id.replace(/-/g, '').substring(0, 16);
+    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
+    // Convert to numeric only
+    const numericOnly = paddedHash.split('').map(char => {
+      const code = char.charCodeAt(0);
+      return (code % 10).toString();
+    }).join('');
     
-    // Generate a unique masked number based on card ID
-    const cardIdHash = card.id.slice(-4);
-    return `4000 **** **** ${cardIdHash}`;
+    return `4000 **** **** ${numericOnly.substring(12, 16)}`;
   };
 
   return (
@@ -109,7 +114,7 @@ export function VirtualCardVisual({
                   <p className="text-sm opacity-75">Expires</p>
                   <p className="font-mono font-semibold">{card.expiry_date}</p>
                 </div>
-                {showDetails && (
+                {showDetails && secureDetails.cvv && (
                   <div>
                     <p className="text-sm opacity-75">CVV</p>
                     <p className="font-mono font-semibold text-xl">{secureDetails.cvv}</p>
