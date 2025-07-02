@@ -28,11 +28,13 @@ export function VirtualCardActions({
 }: VirtualCardActionsProps) {
   
   const handleCopyCardNumber = () => {
+    // Always use CardNumberUtils for consistent card number
     const consistentCardNumber = CardNumberUtils.getConsistentCardNumber(card.id);
     onCopyToClipboard(consistentCardNumber, 'Card number');
   };
 
   const handleCopyCVV = () => {
+    // Always use CardNumberUtils for consistent CVV
     const consistentCVV = CardNumberUtils.getConsistentCVV(card.id);
     onCopyToClipboard(consistentCVV, 'CVV');
   };

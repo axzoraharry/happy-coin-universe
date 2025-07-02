@@ -1,6 +1,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Wallet, Clock } from 'lucide-react';
+import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface VirtualCard {
   id: string;
@@ -46,27 +47,15 @@ export function VirtualCardVisual({
     }
   };
 
-  // Generate a display card number that's always numeric
+  // Use CardNumberUtils for consistent card number display
   const getDisplayCardNumber = () => {
     if (showDetails && secureDetails.full_number) {
-      // Ensure the full number is properly formatted and numeric
-      const cleanNumber = secureDetails.full_number.replace(/\D/g, '');
-      if (cleanNumber.length >= 16) {
-        return `${cleanNumber.substring(0, 4)} ${cleanNumber.substring(4, 8)} ${cleanNumber.substring(8, 12)} ${cleanNumber.substring(12, 16)}`;
-      }
+      // When details are shown and we have secure details, use them
       return secureDetails.full_number;
     }
     
-    // Generate a consistent numeric masked display
-    const cardIdHash = card.id.replace(/-/g, '').substring(0, 16);
-    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
-    // Convert to numeric only
-    const numericOnly = paddedHash.split('').map(char => {
-      const code = char.charCodeAt(0);
-      return (code % 10).toString();
-    }).join('');
-    
-    return `4000 **** **** ${numericOnly.substring(12, 16)}`;
+    // Always use CardNumberUtils for consistent display
+    return CardNumberUtils.getMaskedCardNumber(card.id);
   };
 
   return (
