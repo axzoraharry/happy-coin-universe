@@ -273,8 +273,9 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
               </SelectContent>
             </Select>
             {selectedCardNumber && (
-              <div className="text-xs text-muted-foreground">
-                Using card: {selectedCardNumber}
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div>Using card: {selectedCardNumber}</div>
+                <div className="font-mono text-green-600">✓ Generated from Card ID consistently</div>
               </div>
             )}
           </div>

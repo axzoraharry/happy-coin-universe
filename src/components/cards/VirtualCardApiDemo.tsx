@@ -136,6 +136,9 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
                     <Badge variant="secondary">Selected</Badge>
                   )}
                 </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Full number: {CardNumberUtils.getConsistentCardNumber(card.id)}
+                </div>
               </div>
             ))}
           </div>
@@ -146,8 +149,9 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
           <Label>Example API Usage</Label>
           <div className="bg-muted p-4 rounded-lg">
             <pre className="text-xs overflow-auto">
-{`curl -X POST https://zygpupmeradizrachnqj.supabase.co/functions/v1/card-transaction-api \\
+{`curl -X POST https://zygpupmeradizrachnqj.supabase.co/functions/v1/card-transaction-api/process-transaction \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "x-api-key: YOUR_X_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "card_number": "${getSelectedCardNumber() || 'SELECT_A_CARD_FIRST'}",
@@ -161,8 +165,9 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
             variant="outline"
             size="sm"
             onClick={() => copyToClipboard(
-              `curl -X POST https://zygpupmeradizrachnqj.supabase.co/functions/v1/card-transaction-api \\
+              `curl -X POST https://zygpupmeradizrachnqj.supabase.co/functions/v1/card-transaction-api/process-transaction \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "x-api-key: YOUR_X_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "card_number": "${getSelectedCardNumber() || 'SELECT_A_CARD_FIRST'}",
@@ -184,7 +189,8 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <h4 className="font-medium text-blue-900 mb-2">API Information</h4>
           <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Replace YOUR_API_KEY with your actual API key from the API Management page</li>
+            <li>• Replace YOUR_API_KEY with your actual Authorization Bearer token</li>
+            <li>• Replace YOUR_X_API_KEY with your actual x-api-key from the API Management page</li>
             <li>• All card numbers are consistently generated based on your card IDs</li>
             <li>• Transaction amounts are in Happy Coins (HC)</li>
             <li>• API endpoint supports purchase, refund, validation, activation, and deactivation</li>
