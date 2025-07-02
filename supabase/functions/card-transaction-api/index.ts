@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -8,6 +7,7 @@ const corsHeaders = {
 };
 
 interface TransactionRequest {
+  endpoint: string;
   card_id: string;
   transaction_type: 'purchase' | 'refund' | 'validation' | 'activation' | 'deactivation';
   amount?: number;
@@ -17,6 +17,7 @@ interface TransactionRequest {
 }
 
 interface ProcessPaymentRequest {
+  endpoint: string;
   card_number: string;
   pin: string;
   amount: number;
@@ -32,6 +33,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Card Transaction API - Request received:', req.method, req.url);
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -39,6 +42,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('No authorization header provided');
       return new Response(
         JSON.stringify({ error: 'Authorization header required' }), 
         { 
@@ -53,6 +57,7 @@ serve(async (req) => {
     );
 
     if (authError || !user) {
+      console.error('Auth verification failed:', authError);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }), 
         { 
@@ -62,30 +67,46 @@ serve(async (req) => {
       );
     }
 
-    const url = new URL(req.url);
-    const pathSegments = url.pathname.split('/');
-    const endpoint = pathSegments[pathSegments.length - 1];
+    console.log('Authenticated user:', user.id);
 
-    console.log('Processing endpoint:', endpoint, 'Method:', req.method);
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body parsed:', requestBody);
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
-    // Handle different API endpoints
+    const endpoint = requestBody.endpoint;
+    console.log('Processing endpoint:', endpoint);
+
+    // Handle different API endpoints based on the endpoint field in request body
     switch (endpoint) {
       case 'process-transaction':
-        return await handleProcessTransaction(req, supabaseClient, user.id);
+        return await handleProcessTransaction(requestBody, supabaseClient, user.id);
       
       case 'process-payment':
-        return await handleProcessPayment(req, supabaseClient);
+        return await handleProcessPayment(requestBody, supabaseClient);
       
       case 'get-analytics':
-        return await handleGetAnalytics(req, supabaseClient, user.id);
+        return await handleGetAnalytics(requestBody, supabaseClient, user.id);
       
       case 'get-transactions':
-        return await handleGetTransactions(req, supabaseClient, user.id);
+        return await handleGetTransactions(requestBody, supabaseClient, user.id);
       
       case 'validate-limits':
-        return await handleValidateLimits(req, supabaseClient, user.id);
+        return await handleValidateLimits(requestBody, supabaseClient, user.id);
       
       default:
+        console.error('Invalid endpoint:', endpoint);
         return new Response(
           JSON.stringify({ error: 'Invalid endpoint: ' + endpoint }), 
           { 
@@ -96,7 +117,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error in card-transaction-api:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error: ' + error.message }), 
       { 
@@ -107,21 +128,12 @@ serve(async (req) => {
   }
 });
 
-async function handleProcessTransaction(req: Request, supabaseClient: any, userId: string) {
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }), 
-      { 
-        status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
+async function handleProcessTransaction(body: TransactionRequest, supabaseClient: any, userId: string) {
   try {
-    const body: TransactionRequest = await req.json();
+    console.log('Processing transaction with body:', body);
     
     if (!body.card_id || !body.transaction_type) {
+      console.error('Missing required fields:', { card_id: body.card_id, transaction_type: body.transaction_type });
       return new Response(
         JSON.stringify({ error: 'Missing required fields: card_id, transaction_type' }), 
         { 
@@ -131,7 +143,19 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
       );
     }
 
-    console.log('Processing transaction:', body);
+    // Validate amount for purchase transactions
+    if (body.transaction_type === 'purchase' && (body.amount === undefined || body.amount < 0)) {
+      console.error('Invalid amount for purchase:', body.amount);
+      return new Response(
+        JSON.stringify({ error: 'Amount must be specified and non-negative for purchase transactions' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('Calling process_card_transaction function...');
 
     const { data, error } = await supabaseClient.rpc('process_card_transaction', {
       p_card_id: body.card_id,
@@ -143,7 +167,7 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
     });
 
     if (error) {
-      console.error('Transaction processing error:', error);
+      console.error('Database function error:', error);
       return new Response(
         JSON.stringify({ success: false, error: error.message }), 
         { 
@@ -152,6 +176,8 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
         }
       );
     }
+
+    console.log('Transaction processed successfully:', data);
 
     return new Response(
       JSON.stringify({ success: true, ...data }), 
@@ -162,7 +188,7 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
     );
 
   } catch (error) {
-    console.error('Transaction error:', error);
+    console.error('Transaction processing error:', error);
     return new Response(
       JSON.stringify({ success: false, error: 'Failed to process transaction: ' + error.message }), 
       { 
@@ -173,19 +199,8 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
   }
 }
 
-async function handleProcessPayment(req: Request, supabaseClient: any) {
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }), 
-      { 
-        status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
+async function handleProcessPayment(body: ProcessPaymentRequest, supabaseClient: any) {
   try {
-    const body: ProcessPaymentRequest = await req.json();
     
     if (!body.card_number || !body.pin || !body.amount || !body.merchant_id) {
       return new Response(
@@ -273,20 +288,9 @@ async function handleProcessPayment(req: Request, supabaseClient: any) {
   }
 }
 
-async function handleGetAnalytics(req: Request, supabaseClient: any, userId: string) {
-  if (req.method !== 'GET') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }), 
-      { 
-        status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
+async function handleGetAnalytics(body: any, supabaseClient: any, userId: string) {
   try {
-    const url = new URL(req.url);
-    const cardId = url.searchParams.get('card_id');
+    const cardId = body.card_id;
 
     let query = supabaseClient
       .from('card_transaction_analytics')
@@ -330,22 +334,11 @@ async function handleGetAnalytics(req: Request, supabaseClient: any, userId: str
   }
 }
 
-async function handleGetTransactions(req: Request, supabaseClient: any, userId: string) {
-  if (req.method !== 'GET') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }), 
-      { 
-        status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
+async function handleGetTransactions(body: any, supabaseClient: any, userId: string) {
   try {
-    const url = new URL(req.url);
-    const cardId = url.searchParams.get('card_id');
-    const limit = parseInt(url.searchParams.get('limit') || '50');
-    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const cardId = body.card_id;
+    const limit = body.limit || 50;
+    const offset = body.offset || 0;
 
     let query = supabaseClient
       .from('virtual_card_transactions')
@@ -391,19 +384,8 @@ async function handleGetTransactions(req: Request, supabaseClient: any, userId: 
   }
 }
 
-async function handleValidateLimits(req: Request, supabaseClient: any, userId: string) {
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }), 
-      { 
-        status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
+async function handleValidateLimits(body: any, supabaseClient: any, userId: string) {
   try {
-    const body = await req.json();
     const { card_id, amount } = body;
 
     if (!card_id || !amount) {
