@@ -5,8 +5,22 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TrendingUp, TrendingDown, AlertCircle, DollarSign, CreditCard, BarChart3 } from 'lucide-react';
-import { EnhancedTransactionService, TransactionAnalytics } from '@/lib/virtualCard/enhancedTransactionService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface TransactionAnalytics {
+  card_id: string;
+  masked_card_number: string;
+  card_status: string;
+  total_transactions: number;
+  total_purchases: number;
+  total_refunds: number;
+  daily_spent: number;
+  monthly_spent: number;
+  daily_transactions: number;
+  failed_transactions: number;
+  last_transaction_at: string | null;
+}
 
 interface CardTransactionAnalyticsProps {
   cardId?: string;
@@ -25,9 +39,18 @@ export function CardTransactionAnalytics({ cardId, refreshTrigger }: CardTransac
   const loadAnalytics = async () => {
     try {
       setIsLoading(true);
-      const data = await EnhancedTransactionService.getTransactionAnalytics(cardId);
-      setAnalytics(data);
+      
+      // Fetch analytics from the card_transaction_analytics view
+      const { data, error } = await supabase
+        .from('card_transaction_analytics')
+        .select('*')
+        .eq(cardId ? 'card_id' : 'user_id', cardId || (await supabase.auth.getUser()).data.user?.id);
+
+      if (error) throw error;
+      
+      setAnalytics(data || []);
     } catch (error) {
+      console.error('Failed to load analytics:', error);
       toast({
         title: "Error",
         description: "Failed to load transaction analytics",

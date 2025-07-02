@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +11,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Copy, CheckCircle, XCircle, Code, Play, Key } from 'lucide-react';
 import { EnhancedTransactionService } from '@/lib/virtualCard/enhancedTransactionService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface VirtualCard {
+  id: string;
+  masked_card_number: string;
+  status: string;
+}
 
 export function VirtualCardApiDemo() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [selectedEndpoint, setSelectedEndpoint] = useState('process-transaction');
+  const [userCards, setUserCards] = useState<VirtualCard[]>([]);
   
   // Form states
   const [cardId, setCardId] = useState('');
@@ -29,6 +37,37 @@ export function VirtualCardApiDemo() {
   const [monthlyLimit, setMonthlyLimit] = useState('50000');
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadUserCards();
+    getCurrentUserId();
+  }, []);
+
+  const loadUserCards = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('virtual_cards')
+        .select('id, masked_card_number, status')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      setUserCards(data || []);
+      
+      // Set first card as default if available
+      if (data && data.length > 0) {
+        setCardId(data[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load cards:', error);
+    }
+  };
+
+  const getCurrentUserId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setUserId(user.id);
+    }
+  };
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -55,6 +94,9 @@ export function VirtualCardApiDemo() {
 
       switch (selectedEndpoint) {
         case 'process-transaction':
+          if (!cardId) {
+            throw new Error('Please select a card ID');
+          }
           response = await EnhancedTransactionService.processTransaction({
             card_id: cardId,
             transaction_type: transactionType as any,
@@ -65,6 +107,9 @@ export function VirtualCardApiDemo() {
           break;
 
         case 'validate-limits':
+          if (!cardId) {
+            throw new Error('Please select a card ID');
+          }
           response = await EnhancedTransactionService.validateTransactionLimits({
             card_id: cardId,
             amount: parseFloat(amount)
@@ -81,10 +126,16 @@ export function VirtualCardApiDemo() {
           break;
 
         case 'get-card-details':
+          if (!cardId) {
+            throw new Error('Please select a card ID');
+          }
           response = await EnhancedTransactionService.getCardDetails(cardId, pin);
           break;
 
         case 'get-transactions':
+          if (!cardId) {
+            throw new Error('Please select a card ID');
+          }
           response = await EnhancedTransactionService.getTransactions(cardId, 10);
           break;
 
@@ -108,6 +159,11 @@ export function VirtualCardApiDemo() {
           title: "Success",
           description: "API call completed successfully",
         });
+        
+        // Refresh cards list if a new card was issued
+        if (selectedEndpoint === 'issue-card') {
+          loadUserCards();
+        }
       } else {
         toast({
           title: "API Error",
@@ -256,6 +312,25 @@ console.log(result);`;
       </CardHeader>
       
       <CardContent className="space-y-6">
+        {/* Card Selection */}
+        {userCards.length > 0 && (
+          <div className="space-y-2">
+            <Label>Your Virtual Cards</Label>
+            <select
+              className="w-full p-2 border rounded"
+              value={cardId}
+              onChange={(e) => setCardId(e.target.value)}
+            >
+              <option value="">Select a card...</option>
+              {userCards.map((card) => (
+                <option key={card.id} value={card.id}>
+                  {card.masked_card_number} ({card.status})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <Tabs value={selectedEndpoint} onValueChange={setSelectedEndpoint}>
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
             <TabsTrigger value="process-transaction">Process</TabsTrigger>
@@ -270,15 +345,6 @@ console.log(result);`;
             {/* Process Transaction */}
             <TabsContent value="process-transaction" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="card-id">Card ID</Label>
-                  <Input
-                    id="card-id"
-                    placeholder="Enter card ID"
-                    value={cardId}
-                    onChange={(e) => setCardId(e.target.value)}
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="transaction-type">Transaction Type</Label>
                   <select
@@ -301,7 +367,7 @@ console.log(result);`;
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="description">Description</Label>
                   <Input
                     id="description"
@@ -315,26 +381,15 @@ console.log(result);`;
 
             {/* Validate Limits */}
             <TabsContent value="validate-limits" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="validate-card-id">Card ID</Label>
-                  <Input
-                    id="validate-card-id"
-                    placeholder="Enter card ID"
-                    value={cardId}
-                    onChange={(e) => setCardId(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="validate-amount">Amount to Validate</Label>
-                  <Input
-                    id="validate-amount"
-                    type="number"
-                    placeholder="100"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="validate-amount">Amount to Validate</Label>
+                <Input
+                  id="validate-amount"
+                  type="number"
+                  placeholder="100"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
               </div>
             </TabsContent>
 
@@ -365,54 +420,28 @@ console.log(result);`;
 
             {/* Get Card Details */}
             <TabsContent value="get-card-details" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="details-card-id">Card ID</Label>
-                  <Input
-                    id="details-card-id"
-                    placeholder="Enter card ID"
-                    value={cardId}
-                    onChange={(e) => setCardId(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="details-pin">PIN (Optional)</Label>
-                  <Input
-                    id="details-pin"
-                    type="password"
-                    placeholder="Enter PIN"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="details-pin">PIN (Optional)</Label>
+                <Input
+                  id="details-pin"
+                  type="password"
+                  placeholder="Enter PIN"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                />
               </div>
             </TabsContent>
 
             {/* Get Transactions */}
             <TabsContent value="get-transactions" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="transactions-card-id">Card ID</Label>
-                <Input
-                  id="transactions-card-id"
-                  placeholder="Enter card ID"
-                  value={cardId}
-                  onChange={(e) => setCardId(e.target.value)}
-                />
-              </div>
+              <p className="text-sm text-muted-foreground">
+                This will fetch the last 10 transactions for the selected card.
+              </p>
             </TabsContent>
 
             {/* Issue Card */}
             <TabsContent value="issue-card" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="user-id">User ID</Label>
-                  <Input
-                    id="user-id"
-                    placeholder="Enter user ID"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-pin">PIN</Label>
                   <Input
@@ -433,7 +462,7 @@ console.log(result);`;
                     onChange={(e) => setDailyLimit(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="monthly-limit">Monthly Limit</Label>
                   <Input
                     id="monthly-limit"
