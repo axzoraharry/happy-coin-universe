@@ -1455,6 +1455,18 @@ export type Database = {
         }
         Returns: Json
       }
+      process_card_transaction_by_number: {
+        Args: {
+          p_card_number: string
+          p_transaction_type: string
+          p_amount?: number
+          p_description?: string
+          p_merchant_info?: Json
+          p_reference_id?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
       process_external_payment: {
         Args: {
           p_api_key: string
