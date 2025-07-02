@@ -2,17 +2,19 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface TransactionRequest {
-  card_id: string;
+  card_number: string; // Changed from card_id to card_number
   transaction_type: 'purchase' | 'refund' | 'validation' | 'activation' | 'deactivation';
   amount?: number;
   description?: string;
   merchant_info?: Record<string, any>;
   reference_id?: string;
+  user_id?: string; // Optional user_id for ownership verification
 }
 
 export interface ValidationRequest {
-  card_id: string;
+  card_number: string; // Changed from card_id to card_number
   amount: number;
+  user_id?: string; // Optional user_id for ownership verification
 }
 
 export interface ValidationResult {
@@ -26,6 +28,7 @@ export interface ValidationResult {
 export interface TransactionResult {
   success: boolean;
   transaction_id?: string;
+  card_id?: string; // Still returned for reference
   error?: string;
   daily_remaining?: number;
   monthly_remaining?: number;
@@ -86,7 +89,7 @@ export class EnhancedTransactionService {
 
   static async processTransaction(request: TransactionRequest): Promise<TransactionResult> {
     try {
-      console.log('Processing transaction via API:', request);
+      console.log('Processing transaction via API with card number:', { ...request, card_number: '****' + request.card_number.slice(-4) });
       
       const result = await this.makeApiRequest(
         '/card-transaction-api/process-transaction',
@@ -107,7 +110,7 @@ export class EnhancedTransactionService {
 
   static async validateTransactionLimits(request: ValidationRequest): Promise<ValidationResult> {
     try {
-      console.log('Validating transaction limits via API:', request);
+      console.log('Validating transaction limits via API with card number:', { ...request, card_number: '****' + request.card_number.slice(-4) });
       
       const result = await this.makeApiRequest(
         '/card-transaction-api/validate-limits',
@@ -152,14 +155,14 @@ export class EnhancedTransactionService {
     }
   }
 
-  static async getCardDetails(cardId: string, userPin?: string): Promise<any> {
+  static async getCardDetails(cardNumber: string, userPin?: string, userId?: string): Promise<any> {
     try {
-      console.log('Getting card details via API:', cardId);
+      console.log('Getting card details via API:', '****' + cardNumber.slice(-4));
       
       const result = await this.makeApiRequest(
         '/card-transaction-api/get-card-details',
         'POST',
-        { card_id: cardId, user_pin: userPin }
+        { card_number: cardNumber, user_pin: userPin, user_id: userId }
       );
 
       console.log('Card details API result:', result);
@@ -173,14 +176,14 @@ export class EnhancedTransactionService {
     }
   }
 
-  static async getTransactions(cardId: string, limit: number = 50): Promise<any> {
+  static async getTransactions(cardNumber: string, limit: number = 50, userId?: string): Promise<any> {
     try {
-      console.log('Getting transactions via API:', cardId);
+      console.log('Getting transactions via API:', '****' + cardNumber.slice(-4));
       
       const result = await this.makeApiRequest(
         '/card-transaction-api/get-transactions',
         'GET',
-        { card_id: cardId, limit: limit.toString() }
+        { card_number: cardNumber, limit: limit.toString(), user_id: userId }
       );
 
       console.log('Transactions API result:', result);

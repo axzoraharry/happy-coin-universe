@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,7 @@ interface EnhancedTransactionTestProps {
 }
 
 export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps) {
-  const [selectedCard, setSelectedCard] = useState<string>('');
+  const [selectedCardNumber, setSelectedCardNumber] = useState<string>('');
   const [transactionType, setTransactionType] = useState<string>('purchase');
   const [amount, setAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
@@ -27,6 +26,7 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
+  const [userId, setUserId] = useState<string>('');
   const { toast } = useToast();
 
   // Check authentication status on component mount
@@ -37,11 +37,22 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
   const checkAuthStatus = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      setAuthStatus(session ? 'authenticated' : 'unauthenticated');
+      if (session?.user) {
+        setAuthStatus('authenticated');
+        setUserId(session.user.id);
+      } else {
+        setAuthStatus('unauthenticated');
+      }
     } catch (error) {
       console.error('Auth check failed:', error);
       setAuthStatus('unauthenticated');
     }
+  };
+
+  const generateCardNumber = (cardId: string): string => {
+    // Generate consistent card number based on card ID
+    const cardIdHash = cardId.replace(/-/g, '').substring(0, 12);
+    return `4000${cardIdHash}`;
   };
 
   const handleProcessTransaction = async () => {
@@ -54,7 +65,7 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
       return;
     }
 
-    if (!selectedCard) {
+    if (!selectedCardNumber) {
       toast({
         title: "Error",
         description: "Please select a card",
@@ -82,11 +93,12 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
       }
 
       const response = await EnhancedTransactionService.processTransaction({
-        card_id: selectedCard,
+        card_number: selectedCardNumber,
         transaction_type: transactionType as any,
         amount: amount ? parseFloat(amount) : 0,
         description,
-        merchant_info: parsedMerchantInfo
+        merchant_info: parsedMerchantInfo,
+        user_id: userId
       });
 
       setResult(response);
@@ -137,7 +149,7 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
       return;
     }
 
-    if (!selectedCard || !amount) {
+    if (!selectedCardNumber || !amount) {
       toast({
         title: "Error",
         description: "Please select a card and enter an amount",
@@ -149,8 +161,9 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
     try {
       setIsLoading(true);
       const validation = await EnhancedTransactionService.validateTransactionLimits({
-        card_id: selectedCard,
-        amount: parseFloat(amount)
+        card_number: selectedCardNumber,
+        amount: parseFloat(amount),
+        user_id: userId
       });
 
       setResult({
@@ -244,23 +257,31 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="card-select">Select Card</Label>
-            <Select value={selectedCard} onValueChange={setSelectedCard}>
+            <Select value={selectedCardNumber} onValueChange={setSelectedCardNumber}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a card" />
               </SelectTrigger>
               <SelectContent>
-                {cards.map((card) => (
-                  <SelectItem key={card.id} value={card.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{CardNumberUtils.getMaskedCardNumber(card.id)}</span>
-                      <Badge variant={card.status === 'active' ? 'default' : 'secondary'}>
-                        {card.status}
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                ))}
+                {cards.map((card) => {
+                  const cardNumber = generateCardNumber(card.id);
+                  return (
+                    <SelectItem key={card.id} value={cardNumber}>
+                      <div className="flex items-center gap-2">
+                        <span>{CardNumberUtils.getMaskedCardNumber(card.id)}</span>
+                        <Badge variant={card.status === 'active' ? 'default' : 'secondary'}>
+                          {card.status}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
+            {selectedCardNumber && (
+              <div className="text-xs text-muted-foreground">
+                Using card: ****{selectedCardNumber.slice(-4)}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

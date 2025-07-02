@@ -95,24 +95,26 @@ async function validateApiKey(supabase: any, apiKey: string) {
   return apiKeyData;
 }
 
-// Enhanced transaction processing with validation
-async function processCardTransaction(supabase: any, params: {
-  card_id: string;
+// Enhanced transaction processing with card number support
+async function processCardTransactionByNumber(supabase: any, params: {
+  card_number: string;
   transaction_type: 'purchase' | 'refund' | 'validation' | 'activation' | 'deactivation';
   amount?: number;
   description?: string;
   merchant_info?: Record<string, any>;
   reference_id?: string;
+  user_id?: string;
 }) {
-  console.log('Processing card transaction:', params);
+  console.log('Processing card transaction by number:', { ...params, card_number: '****' + params.card_number.slice(-4) });
 
-  const { data, error } = await supabase.rpc('process_card_transaction', {
-    p_card_id: params.card_id,
+  const { data, error } = await supabase.rpc('process_card_transaction_by_number', {
+    p_card_number: params.card_number,
     p_transaction_type: params.transaction_type,
     p_amount: params.amount || 0,
     p_description: params.description || '',
     p_merchant_info: params.merchant_info || {},
-    p_reference_id: params.reference_id
+    p_reference_id: params.reference_id,
+    p_user_id: params.user_id
   });
 
   if (error) {
@@ -123,51 +125,20 @@ async function processCardTransaction(supabase: any, params: {
   return data;
 }
 
-// Validate transaction limits
-async function validateTransactionLimits(supabase: any, cardId: string, amount: number) {
-  const { data: card, error } = await supabase
-    .from('virtual_cards')
-    .select('daily_limit, monthly_limit, current_daily_spent, current_monthly_spent')
-    .eq('id', cardId)
-    .eq('status', 'active')
-    .single();
+// Validate transaction limits by card number
+async function validateTransactionLimitsByNumber(supabase: any, cardNumber: string, amount: number, userId?: string) {
+  const { data, error } = await supabase.rpc('validate_transaction_limits_by_number', {
+    p_card_number: cardNumber,
+    p_amount: amount,
+    p_user_id: userId
+  });
 
-  if (error || !card) {
-    return {
-      valid: false,
-      error: 'Card not found or inactive'
-    };
+  if (error) {
+    console.error('Limit validation error:', error);
+    throw error;
   }
 
-  const dailyRemaining = Number(card.daily_limit) - Number(card.current_daily_spent);
-  const monthlyRemaining = Number(card.monthly_limit) - Number(card.current_monthly_spent);
-
-  if (amount > dailyRemaining) {
-    return {
-      valid: false,
-      error: 'Transaction exceeds daily limit',
-      daily_remaining: dailyRemaining,
-      monthly_remaining: monthlyRemaining,
-      daily_limit: Number(card.daily_limit)
-    };
-  }
-
-  if (amount > monthlyRemaining) {
-    return {
-      valid: false, 
-      error: 'Transaction exceeds monthly limit',
-      daily_remaining: dailyRemaining,
-      monthly_remaining: monthlyRemaining,
-      daily_limit: Number(card.daily_limit)
-    };
-  }
-
-  return {
-    valid: true,
-    daily_remaining: dailyRemaining,
-    monthly_remaining: monthlyRemaining,
-    daily_limit: Number(card.daily_limit)
-  };
+  return data;
 }
 
 serve(async (req) => {
@@ -307,28 +278,30 @@ serve(async (req) => {
 
         const transactionBody = await req.json();
         const { 
-          card_id, 
+          card_number: txnCardNumber,
           transaction_type, 
           amount = 0, 
           description, 
           merchant_info = {},
-          reference_id 
+          reference_id,
+          user_id: txnUserId
         } = transactionBody;
 
-        if (!card_id || !transaction_type) {
+        if (!txnCardNumber || !transaction_type) {
           return new Response(
-            JSON.stringify({ success: false, error: 'card_id and transaction_type are required' }),
+            JSON.stringify({ success: false, error: 'card_number and transaction_type are required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        const transactionResult = await processCardTransaction(supabaseClient, {
-          card_id,
+        const transactionResult = await processCardTransactionByNumber(supabaseClient, {
+          card_number: txnCardNumber,
           transaction_type,
           amount,
           description,
           merchant_info,
-          reference_id
+          reference_id,
+          user_id: txnUserId
         });
 
         return new Response(
@@ -345,16 +318,16 @@ serve(async (req) => {
         }
 
         const limitsBody = await req.json();
-        const { card_id: limitsCardId, amount: limitsAmount } = limitsBody;
+        const { card_number: limitsCardNumber, amount: limitsAmount, user_id: limitsUserId } = limitsBody;
 
-        if (!limitsCardId || limitsAmount === undefined) {
+        if (!limitsCardNumber || limitsAmount === undefined) {
           return new Response(
-            JSON.stringify({ success: false, error: 'card_id and amount are required' }),
+            JSON.stringify({ success: false, error: 'card_number and amount are required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        const limitValidation = await validateTransactionLimits(supabaseClient, limitsCardId, limitsAmount);
+        const limitValidation = await validateTransactionLimitsByNumber(supabaseClient, limitsCardNumber, limitsAmount, limitsUserId);
 
         return new Response(
           JSON.stringify(limitValidation),
@@ -370,44 +343,43 @@ serve(async (req) => {
         }
 
         const detailsBody = await req.json();
-        const { card_id: detailsCardId, user_pin } = detailsBody;
+        const { card_number: detailsCardNumber, user_pin, user_id: detailsUserId } = detailsBody;
 
-        if (!detailsCardId) {
+        if (!detailsCardNumber) {
           return new Response(
-            JSON.stringify({ success: false, error: 'card_id is required' }),
+            JSON.stringify({ success: false, error: 'card_number is required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        // Get card details with consistent number generation
-        const { data: cardData, error: cardError } = await supabaseClient
-          .from('virtual_cards')
-          .select('*')
-          .eq('id', detailsCardId)
-          .eq('status', 'active')
-          .single();
+        // Get card details using the new function
+        const { data: cardData, error: cardError } = await supabaseClient.rpc('get_card_by_number', {
+          p_card_number: detailsCardNumber,
+          p_user_id: detailsUserId
+        });
 
-        if (cardError || !cardData) {
+        if (cardError || !cardData || cardData.length === 0) {
           return new Response(
-            JSON.stringify({ success: false, error: 'Card not found or inactive' }),
+            JSON.stringify({ success: false, error: 'Card not found or access denied' }),
             { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
+        const cardRecord = cardData[0];
         const cardDetails = {
           success: true,
           card: {
-            id: cardData.id,
-            card_number: CardNumberUtils.getConsistentCardNumber(cardData.id),
-            cvv: CardNumberUtils.getConsistentCVV(cardData.id),
-            expiry_date: cardData.expiry_date,
-            status: cardData.status,
-            daily_limit: Number(cardData.daily_limit),
-            monthly_limit: Number(cardData.monthly_limit),
-            current_daily_spent: Number(cardData.current_daily_spent),
-            current_monthly_spent: Number(cardData.current_monthly_spent),
-            daily_remaining: Number(cardData.daily_limit) - Number(cardData.current_daily_spent),
-            monthly_remaining: Number(cardData.monthly_limit) - Number(cardData.current_monthly_spent)
+            id: cardRecord.card_id,
+            card_number: CardNumberUtils.getConsistentCardNumber(cardRecord.card_id),
+            cvv: CardNumberUtils.getConsistentCVV(cardRecord.card_id),
+            expiry_date: cardRecord.expiry_date,
+            status: cardRecord.status,
+            daily_limit: Number(cardRecord.daily_limit),
+            monthly_limit: Number(cardRecord.monthly_limit),
+            current_daily_spent: Number(cardRecord.current_daily_spent),
+            current_monthly_spent: Number(cardRecord.current_monthly_spent),
+            daily_remaining: Number(cardRecord.daily_limit) - Number(cardRecord.current_daily_spent),
+            monthly_remaining: Number(cardRecord.monthly_limit) - Number(cardRecord.current_monthly_spent)
           }
         };
 
@@ -424,20 +396,36 @@ serve(async (req) => {
           );
         }
 
-        const cardIdParam = url.searchParams.get('card_id');
+        const cardNumberParam = url.searchParams.get('card_number');
         const limitParam = url.searchParams.get('limit') || '50';
+        const userIdParam = url.searchParams.get('user_id');
 
-        if (!cardIdParam) {
+        if (!cardNumberParam) {
           return new Response(
-            JSON.stringify({ success: false, error: 'card_id parameter is required' }),
+            JSON.stringify({ success: false, error: 'card_number parameter is required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
+        // First get the card ID from the card number
+        const { data: cardLookup, error: cardLookupError } = await supabaseClient.rpc('get_card_by_number', {
+          p_card_number: cardNumberParam,
+          p_user_id: userIdParam
+        });
+
+        if (cardLookupError || !cardLookup || cardLookup.length === 0) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Card not found or access denied' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const cardId = cardLookup[0].card_id;
+
         const { data: transactions, error: transactionsError } = await supabaseClient
           .from('virtual_card_transactions')
           .select('*')
-          .eq('card_id', cardIdParam)
+          .eq('card_id', cardId)
           .order('created_at', { ascending: false })
           .limit(parseInt(limitParam));
 

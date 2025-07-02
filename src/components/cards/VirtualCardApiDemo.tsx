@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,12 +24,11 @@ export function VirtualCardApiDemo() {
   const [selectedEndpoint, setSelectedEndpoint] = useState('process-transaction');
   const [userCards, setUserCards] = useState<VirtualCard[]>([]);
   
-  // Form states
-  const [cardId, setCardId] = useState('');
+  // Form states - updated to use card numbers
+  const [cardNumber, setCardNumber] = useState('');
   const [transactionType, setTransactionType] = useState('purchase');
   const [amount, setAmount] = useState('100');
   const [description, setDescription] = useState('Test transaction');
-  const [cardNumber, setCardNumber] = useState('');
   const [pin, setPin] = useState('');
   const [userId, setUserId] = useState('');
   const [dailyLimit, setDailyLimit] = useState('5000');
@@ -53,9 +51,11 @@ export function VirtualCardApiDemo() {
       if (error) throw error;
       setUserCards(data || []);
       
-      // Set first card as default if available
+      // Set first card number as default if available
       if (data && data.length > 0) {
-        setCardId(data[0].id);
+        // Generate consistent card number for the first card
+        const firstCardNumber = `4000${data[0].id.replace(/-/g, '').substring(0, 12)}`;
+        setCardNumber(firstCardNumber);
       }
     } catch (error) {
       console.error('Failed to load cards:', error);
@@ -94,25 +94,27 @@ export function VirtualCardApiDemo() {
 
       switch (selectedEndpoint) {
         case 'process-transaction':
-          if (!cardId) {
-            throw new Error('Please select a card ID');
+          if (!cardNumber) {
+            throw new Error('Please enter a card number');
           }
           response = await EnhancedTransactionService.processTransaction({
-            card_id: cardId,
+            card_number: cardNumber,
             transaction_type: transactionType as any,
             amount: parseFloat(amount),
             description,
-            merchant_info: { demo: true }
+            merchant_info: { demo: true },
+            user_id: userId
           });
           break;
 
         case 'validate-limits':
-          if (!cardId) {
-            throw new Error('Please select a card ID');
+          if (!cardNumber) {
+            throw new Error('Please enter a card number');
           }
           response = await EnhancedTransactionService.validateTransactionLimits({
-            card_id: cardId,
-            amount: parseFloat(amount)
+            card_number: cardNumber,
+            amount: parseFloat(amount),
+            user_id: userId
           });
           break;
 
@@ -126,17 +128,17 @@ export function VirtualCardApiDemo() {
           break;
 
         case 'get-card-details':
-          if (!cardId) {
-            throw new Error('Please select a card ID');
+          if (!cardNumber) {
+            throw new Error('Please enter a card number');
           }
-          response = await EnhancedTransactionService.getCardDetails(cardId, pin);
+          response = await EnhancedTransactionService.getCardDetails(cardNumber, pin, userId);
           break;
 
         case 'get-transactions':
-          if (!cardId) {
-            throw new Error('Please select a card ID');
+          if (!cardNumber) {
+            throw new Error('Please enter a card number');
           }
-          response = await EnhancedTransactionService.getTransactions(cardId, 10);
+          response = await EnhancedTransactionService.getTransactions(cardNumber, 10, userId);
           break;
 
         case 'issue-card':
@@ -190,7 +192,7 @@ export function VirtualCardApiDemo() {
     
     switch (selectedEndpoint) {
       case 'process-transaction':
-        return `// Process a card transaction
+        return `// Process a card transaction using card number
 const response = await fetch('${baseUrl}/process-transaction', {
   method: 'POST',
   headers: {
@@ -198,11 +200,12 @@ const response = await fetch('${baseUrl}/process-transaction', {
     'x-api-key': 'your-api-key-here'
   },
   body: JSON.stringify({
-    card_id: '${cardId}',
+    card_number: '${cardNumber}',
     transaction_type: '${transactionType}',
     amount: ${amount},
     description: '${description}',
-    merchant_info: { merchant_id: 'TEST_MERCHANT' }
+    merchant_info: { merchant_id: 'TEST_MERCHANT' },
+    user_id: '${userId}' // Optional for ownership verification
   })
 });
 
@@ -210,7 +213,7 @@ const result = await response.json();
 console.log(result);`;
 
       case 'validate-limits':
-        return `// Validate transaction limits
+        return `// Validate transaction limits using card number
 const response = await fetch('${baseUrl}/validate-limits', {
   method: 'POST',
   headers: {
@@ -218,8 +221,9 @@ const response = await fetch('${baseUrl}/validate-limits', {
     'x-api-key': 'your-api-key-here'
   },
   body: JSON.stringify({
-    card_id: '${cardId}',
-    amount: ${amount}
+    card_number: '${cardNumber}',
+    amount: ${amount},
+    user_id: '${userId}' // Optional for ownership verification
   })
 });
 
@@ -245,7 +249,7 @@ const result = await response.json();
 console.log(result);`;
 
       case 'get-card-details':
-        return `// Get card details
+        return `// Get card details using card number
 const response = await fetch('${baseUrl}/get-card-details', {
   method: 'POST',
   headers: {
@@ -253,8 +257,9 @@ const response = await fetch('${baseUrl}/get-card-details', {
     'x-api-key': 'your-api-key-here'
   },
   body: JSON.stringify({
-    card_id: '${cardId}',
-    user_pin: '${pin}'
+    card_number: '${cardNumber}',
+    user_pin: '${pin}',
+    user_id: '${userId}' // Optional for ownership verification
   })
 });
 
@@ -262,8 +267,8 @@ const result = await response.json();
 console.log(result);`;
 
       case 'get-transactions':
-        return `// Get card transactions
-const response = await fetch('${baseUrl}/get-transactions?card_id=${cardId}&limit=10', {
+        return `// Get card transactions using card number
+const response = await fetch('${baseUrl}/get-transactions?card_number=${cardNumber}&limit=10&user_id=${userId}', {
   method: 'GET',
   headers: {
     'Content-Type': 'application/json',
@@ -312,24 +317,34 @@ console.log(result);`;
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Card Selection */}
-        {userCards.length > 0 && (
-          <div className="space-y-2">
-            <Label>Your Virtual Cards</Label>
-            <select
-              className="w-full p-2 border rounded"
-              value={cardId}
-              onChange={(e) => setCardId(e.target.value)}
-            >
-              <option value="">Select a card...</option>
+        {/* Card Number Input */}
+        <div className="space-y-2">
+          <Label>Card Number (for API testing)</Label>
+          <Input
+            placeholder="Enter card number (16 digits)"
+            value={cardNumber}
+            onChange={(e) => setCardNumber(e.target.value)}
+            maxLength={16}
+          />
+          {userCards.length > 0 && (
+            <div className="text-sm text-muted-foreground">
+              <p>Your active cards:</p>
               {userCards.map((card) => (
-                <option key={card.id} value={card.id}>
+                <button
+                  key={card.id}
+                  className="block text-left hover:text-primary underline"
+                  onClick={() => {
+                    // Generate consistent card number for this card
+                    const fullCardNumber = `4000${card.id.replace(/-/g, '').substring(0, 12)}`;
+                    setCardNumber(fullCardNumber);
+                  }}
+                >
                   {card.masked_card_number} ({card.status})
-                </option>
+                </button>
               ))}
-            </select>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
         <Tabs value={selectedEndpoint} onValueChange={setSelectedEndpoint}>
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
@@ -395,26 +410,15 @@ console.log(result);`;
 
             {/* Validate Card */}
             <TabsContent value="validate-card" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="card-number">Card Number</Label>
-                  <Input
-                    id="card-number"
-                    placeholder="Enter card number"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="card-pin">PIN</Label>
-                  <Input
-                    id="card-pin"
-                    type="password"
-                    placeholder="Enter PIN"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="card-pin">PIN</Label>
+                <Input
+                  id="card-pin"
+                  type="password"
+                  placeholder="Enter PIN"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                />
               </div>
             </TabsContent>
 
@@ -435,7 +439,7 @@ console.log(result);`;
             {/* Get Transactions */}
             <TabsContent value="get-transactions" className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                This will fetch the last 10 transactions for the selected card.
+                This will fetch the last 10 transactions for the specified card number.
               </p>
             </TabsContent>
 
