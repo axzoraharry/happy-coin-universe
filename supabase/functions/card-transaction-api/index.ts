@@ -63,10 +63,13 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const path = url.pathname.split('/').pop();
+    const pathSegments = url.pathname.split('/');
+    const endpoint = pathSegments[pathSegments.length - 1];
+
+    console.log('Processing endpoint:', endpoint, 'Method:', req.method);
 
     // Handle different API endpoints
-    switch (path) {
+    switch (endpoint) {
       case 'process-transaction':
         return await handleProcessTransaction(req, supabaseClient, user.id);
       
@@ -84,7 +87,7 @@ serve(async (req) => {
       
       default:
         return new Response(
-          JSON.stringify({ error: 'Invalid endpoint' }), 
+          JSON.stringify({ error: 'Invalid endpoint: ' + endpoint }), 
           { 
             status: 404, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -95,7 +98,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }), 
+      JSON.stringify({ error: 'Internal server error: ' + error.message }), 
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -115,19 +118,21 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
     );
   }
 
-  const body: TransactionRequest = await req.json();
-  
-  if (!body.card_id || !body.transaction_type) {
-    return new Response(
-      JSON.stringify({ error: 'Missing required fields: card_id, transaction_type' }), 
-      { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
   try {
+    const body: TransactionRequest = await req.json();
+    
+    if (!body.card_id || !body.transaction_type) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: card_id, transaction_type' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('Processing transaction:', body);
+
     const { data, error } = await supabaseClient.rpc('process_card_transaction', {
       p_card_id: body.card_id,
       p_transaction_type: body.transaction_type,
@@ -140,16 +145,16 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
     if (error) {
       console.error('Transaction processing error:', error);
       return new Response(
-        JSON.stringify({ error: 'Transaction processing failed' }), 
+        JSON.stringify({ success: false, error: error.message }), 
         { 
-          status: 500, 
+          status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
 
     return new Response(
-      JSON.stringify(data), 
+      JSON.stringify({ success: true, ...data }), 
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -159,7 +164,7 @@ async function handleProcessTransaction(req: Request, supabaseClient: any, userI
   } catch (error) {
     console.error('Transaction error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to process transaction' }), 
+      JSON.stringify({ success: false, error: 'Failed to process transaction: ' + error.message }), 
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -179,19 +184,19 @@ async function handleProcessPayment(req: Request, supabaseClient: any) {
     );
   }
 
-  const body: ProcessPaymentRequest = await req.json();
-  
-  if (!body.card_number || !body.pin || !body.amount || !body.merchant_id) {
-    return new Response(
-      JSON.stringify({ error: 'Missing required fields: card_number, pin, amount, merchant_id' }), 
-      { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
   try {
+    const body: ProcessPaymentRequest = await req.json();
+    
+    if (!body.card_number || !body.pin || !body.amount || !body.merchant_id) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: card_number, pin, amount, merchant_id' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     // First validate the card
     const { data: validationData, error: validationError } = await supabaseClient.rpc('validate_virtual_card', {
       p_card_number: body.card_number,
@@ -205,38 +210,6 @@ async function handleProcessPayment(req: Request, supabaseClient: any) {
         JSON.stringify({ 
           success: false, 
           error: validationData?.error || 'Card validation failed' 
-        }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    // Check spending limits
-    const dailyRemaining = (validationData.daily_limit || 0) - (validationData.daily_spent || 0);
-    const monthlyRemaining = (validationData.monthly_limit || 0) - (validationData.monthly_spent || 0);
-
-    if (body.amount > dailyRemaining) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Daily spending limit exceeded',
-          daily_remaining: dailyRemaining 
-        }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    if (body.amount > monthlyRemaining) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Monthly spending limit exceeded',
-          monthly_remaining: monthlyRemaining 
         }), 
         { 
           status: 400, 
@@ -290,7 +263,7 @@ async function handleProcessPayment(req: Request, supabaseClient: any) {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: 'Payment processing failed' 
+        error: 'Payment processing failed: ' + error.message 
       }), 
       { 
         status: 500, 
@@ -311,10 +284,10 @@ async function handleGetAnalytics(req: Request, supabaseClient: any, userId: str
     );
   }
 
-  const url = new URL(req.url);
-  const cardId = url.searchParams.get('card_id');
-
   try {
+    const url = new URL(req.url);
+    const cardId = url.searchParams.get('card_id');
+
     let query = supabaseClient
       .from('card_transaction_analytics')
       .select('*')
@@ -329,7 +302,7 @@ async function handleGetAnalytics(req: Request, supabaseClient: any, userId: str
     if (error) {
       console.error('Analytics fetch error:', error);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch analytics' }), 
+        JSON.stringify({ success: false, error: 'Failed to fetch analytics: ' + error.message }), 
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -338,7 +311,7 @@ async function handleGetAnalytics(req: Request, supabaseClient: any, userId: str
     }
 
     return new Response(
-      JSON.stringify({ success: true, analytics: data }), 
+      JSON.stringify({ success: true, analytics: data || [] }), 
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -348,7 +321,7 @@ async function handleGetAnalytics(req: Request, supabaseClient: any, userId: str
   } catch (error) {
     console.error('Analytics error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to get analytics' }), 
+      JSON.stringify({ success: false, error: 'Failed to get analytics: ' + error.message }), 
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -368,12 +341,12 @@ async function handleGetTransactions(req: Request, supabaseClient: any, userId: 
     );
   }
 
-  const url = new URL(req.url);
-  const cardId = url.searchParams.get('card_id');
-  const limit = parseInt(url.searchParams.get('limit') || '50');
-  const offset = parseInt(url.searchParams.get('offset') || '0');
-
   try {
+    const url = new URL(req.url);
+    const cardId = url.searchParams.get('card_id');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+
     let query = supabaseClient
       .from('virtual_card_transactions')
       .select('*')
@@ -390,7 +363,7 @@ async function handleGetTransactions(req: Request, supabaseClient: any, userId: 
     if (error) {
       console.error('Transactions fetch error:', error);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch transactions' }), 
+        JSON.stringify({ success: false, error: 'Failed to fetch transactions: ' + error.message }), 
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -399,7 +372,7 @@ async function handleGetTransactions(req: Request, supabaseClient: any, userId: 
     }
 
     return new Response(
-      JSON.stringify({ success: true, transactions: data }), 
+      JSON.stringify({ success: true, transactions: data || [] }), 
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -409,7 +382,7 @@ async function handleGetTransactions(req: Request, supabaseClient: any, userId: 
   } catch (error) {
     console.error('Transactions error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to get transactions' }), 
+      JSON.stringify({ success: false, error: 'Failed to get transactions: ' + error.message }), 
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -429,20 +402,20 @@ async function handleValidateLimits(req: Request, supabaseClient: any, userId: s
     );
   }
 
-  const body = await req.json();
-  const { card_id, amount } = body;
-
-  if (!card_id || !amount) {
-    return new Response(
-      JSON.stringify({ error: 'Missing required fields: card_id, amount' }), 
-      { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-
   try {
+    const body = await req.json();
+    const { card_id, amount } = body;
+
+    if (!card_id || !amount) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: card_id, amount' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const { data, error } = await supabaseClient
       .from('virtual_cards')
       .select('daily_limit, monthly_limit, current_daily_spent, current_monthly_spent')
@@ -452,7 +425,7 @@ async function handleValidateLimits(req: Request, supabaseClient: any, userId: s
 
     if (error || !data) {
       return new Response(
-        JSON.stringify({ error: 'Card not found' }), 
+        JSON.stringify({ success: false, error: 'Card not found: ' + (error?.message || 'Not found') }), 
         { 
           status: 404, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -486,7 +459,7 @@ async function handleValidateLimits(req: Request, supabaseClient: any, userId: s
   } catch (error) {
     console.error('Limit validation error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to validate limits' }), 
+      JSON.stringify({ success: false, error: 'Failed to validate limits: ' + error.message }), 
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
