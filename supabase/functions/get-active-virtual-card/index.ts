@@ -13,14 +13,16 @@ serve(async (req) => {
   }
 
   try {
+    // Create Supabase client with service role for database access
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', // Use service role key
     );
 
     // Get the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('No authorization header provided');
       return new Response(
         JSON.stringify({ 
           success: false,
@@ -35,19 +37,30 @@ serve(async (req) => {
       );
     }
 
-    // Get user from token
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
+    // Extract and validate the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    console.log('Processing token:', token.substring(0, 20) + '...');
+
+    // Verify the JWT token using the anon key client
+    const anonClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     );
 
+    const { data: { user }, error: authError } = await anonClient.auth.getUser(token);
+
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      console.error('Auth verification failed:', authError);
       return new Response(
         JSON.stringify({ 
           success: false,
           error: 'Invalid or expired token',
           has_cards: false,
-          total_cards: 0
+          total_cards: 0,
+          debug: {
+            auth_error: authError?.message || 'No user found',
+            token_provided: !!token
+          }
         }), 
         { 
           status: 401, 
@@ -56,9 +69,9 @@ serve(async (req) => {
       );
     }
 
-    console.log('Authenticated user:', user.id);
+    console.log('Authenticated user:', user.id, 'Email:', user.email);
 
-    // Get the user's virtual cards
+    // Now use service role client to query the database
     const { data: cards, error: cardsError } = await supabaseClient
       .from('virtual_cards')
       .select(`
@@ -83,13 +96,17 @@ serve(async (req) => {
       .order('created_at', { ascending: false });
 
     if (cardsError) {
-      console.error('Error fetching cards:', cardsError);
+      console.error('Database query error:', cardsError);
       return new Response(
         JSON.stringify({ 
           success: false,
           error: 'Failed to fetch virtual cards: ' + cardsError.message,
           has_cards: false,
-          total_cards: 0
+          total_cards: 0,
+          debug: {
+            user_id: user.id,
+            db_error: cardsError.message
+          }
         }), 
         { 
           status: 500, 
@@ -98,7 +115,13 @@ serve(async (req) => {
       );
     }
 
-    console.log('Found cards:', cards?.length || 0);
+    console.log('Database query successful. Found cards:', cards?.length || 0);
+    
+    if (cards) {
+      cards.forEach(card => {
+        console.log(`Card ${card.id}: status=${card.status}, expiry=${card.expiry_date}, user=${card.user_id}`);
+      });
+    }
 
     // Filter active cards that are not expired
     const activeCards = cards?.filter(card => {
@@ -114,12 +137,13 @@ serve(async (req) => {
       return isActive && notExpired;
     }) || [];
 
-    console.log('Active cards:', activeCards.length);
+    console.log('Active cards found:', activeCards.length);
 
     // Get the primary card (most recently created active card)
     const primaryCard = activeCards.length > 0 ? activeCards[0] : null;
 
     if (!primaryCard) {
+      console.log('No active cards available');
       return new Response(
         JSON.stringify({ 
           success: false,
@@ -129,7 +153,14 @@ serve(async (req) => {
           debug: {
             total_cards_found: cards?.length || 0,
             active_cards_found: activeCards.length,
-            user_id: user.id
+            user_id: user.id,
+            user_email: user.email,
+            all_cards: cards?.map(c => ({
+              id: c.id,
+              status: c.status,
+              expiry_date: c.expiry_date,
+              user_id: c.user_id
+            })) || []
           }
         }), 
         { 
@@ -173,13 +204,17 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error in get-active-virtual-card:', error);
     return new Response(
       JSON.stringify({ 
         success: false,
         error: 'Internal server error: ' + error.message,
         has_cards: false,
-        total_cards: 0
+        total_cards: 0,
+        debug: {
+          error_type: error.constructor.name,
+          error_message: error.message
+        }
       }), 
       { 
         status: 500, 
