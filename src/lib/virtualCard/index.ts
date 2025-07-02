@@ -2,6 +2,7 @@
 import { CardManagementService } from './cardManagement';
 import { CardValidationService } from './cardValidation';
 import { TransactionService } from './transactionService';
+import { EnhancedTransactionService } from './enhancedTransactionService';
 
 // Re-export all types
 export * from './types';
@@ -43,7 +44,7 @@ export class VirtualCardAPI {
     return CardValidationService.getCardStatus(cardId);
   }
 
-  // Transaction methods
+  // Transaction methods (legacy - using card IDs)
   static async getCardTransactions(cardId?: string) {
     return TransactionService.getCardTransactions(cardId);
   }
@@ -75,7 +76,32 @@ export class VirtualCardAPI {
   static async getCardBalance(cardId: string) {
     return TransactionService.getCardBalance(cardId);
   }
+
+  // Enhanced Transaction methods (using card numbers)
+  static async processTransactionByNumber(params: {
+    card_number: string;
+    transaction_type: 'purchase' | 'refund' | 'validation' | 'activation' | 'deactivation';
+    amount?: number;
+    description?: string;
+    merchant_info?: Record<string, any>;
+    reference_id?: string;
+    user_id?: string;
+  }) {
+    return EnhancedTransactionService.processTransaction(params);
+  }
+
+  static async validateTransactionLimitsByNumber(params: {
+    card_number: string;
+    amount: number;
+    user_id?: string;
+  }) {
+    return EnhancedTransactionService.validateTransactionLimits(params);
+  }
+
+  static async getCardByNumber(cardNumber: string, userId?: string) {
+    return EnhancedTransactionService.getCardByNumber(cardNumber, userId);
+  }
 }
 
 // Export individual services for direct use if needed
-export { CardManagementService, CardValidationService, TransactionService };
+export { CardManagementService, CardValidationService, TransactionService, EnhancedTransactionService };

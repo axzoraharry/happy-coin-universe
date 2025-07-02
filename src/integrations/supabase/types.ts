@@ -1409,6 +1409,20 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_card_by_number: {
+        Args: { p_card_number: string; p_user_id?: string }
+        Returns: {
+          card_id: string
+          user_id: string
+          status: string
+          daily_limit: number
+          monthly_limit: number
+          current_daily_spent: number
+          current_monthly_spent: number
+          expiry_date: string
+          masked_card_number: string
+        }[]
+      }
       get_card_secure_details: {
         Args: {
           p_card_id: string
@@ -1588,6 +1602,10 @@ export type Database = {
       validate_redirect_uri: {
         Args: { p_uri: string; p_allowed_domains: string[] }
         Returns: boolean
+      }
+      validate_transaction_limits_by_number: {
+        Args: { p_card_number: string; p_amount: number; p_user_id?: string }
+        Returns: Json
       }
       validate_virtual_card: {
         Args: {

@@ -1,23 +1,32 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-export interface TransactionRequest {
-  card_number: string; // Changed from card_id to card_number
+interface TransactionRequest {
+  card_number: string;
   transaction_type: 'purchase' | 'refund' | 'validation' | 'activation' | 'deactivation';
   amount?: number;
   description?: string;
   merchant_info?: Record<string, any>;
   reference_id?: string;
-  user_id?: string; // Optional user_id for ownership verification
+  user_id?: string;
 }
 
-export interface ValidationRequest {
-  card_number: string; // Changed from card_id to card_number
+interface TransactionResponse {
+  success: boolean;
+  error?: string;
+  transaction_id?: string;
+  card_id?: string;
+  daily_remaining?: number;
+  monthly_remaining?: number;
+}
+
+interface ValidationRequest {
+  card_number: string;
   amount: number;
-  user_id?: string; // Optional user_id for ownership verification
+  user_id?: string;
 }
 
-export interface ValidationResult {
+interface ValidationResponse {
   valid: boolean;
   error?: string;
   daily_remaining?: number;
@@ -25,202 +34,91 @@ export interface ValidationResult {
   daily_limit?: number;
 }
 
-export interface TransactionResult {
-  success: boolean;
-  transaction_id?: string;
-  card_id?: string; // Still returned for reference
-  error?: string;
-  daily_remaining?: number;
-  monthly_remaining?: number;
-}
-
 export class EnhancedTransactionService {
-  private static readonly API_BASE_URL = `https://zygpupmeradizrachnqj.supabase.co/functions/v1`;
-
-  private static async getApiKey(): Promise<string | null> {
+  /**
+   * Process a transaction using card number instead of card ID
+   */
+  static async processTransaction(params: TransactionRequest): Promise<TransactionResponse> {
     try {
-      // In a production environment, you would get this from your API key management system
-      // For now, we'll use a placeholder that would be replaced with actual API key management
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Authentication required');
+      console.log('Processing transaction:', params);
 
-      // This would typically fetch the user's API key from their settings
-      // For demo purposes, we'll use a mock API key
-      return 'demo_api_key_' + user.id.substring(0, 8);
-    } catch (error) {
-      console.error('Failed to get API key:', error);
-      return null;
-    }
-  }
+      const { data, error } = await supabase.rpc('process_card_transaction_by_number', {
+        p_card_number: params.card_number,
+        p_transaction_type: params.transaction_type,
+        p_amount: params.amount || 0,
+        p_description: params.description || '',
+        p_merchant_info: params.merchant_info || {},
+        p_reference_id: params.reference_id || null,
+        p_user_id: params.user_id || null
+      });
 
-  private static async makeApiRequest(endpoint: string, method: string = 'POST', data?: any): Promise<any> {
-    const apiKey = await this.getApiKey();
-    if (!apiKey) {
-      throw new Error('Authentication required - please set up your API key');
-    }
+      if (error) {
+        console.error('Transaction processing error:', error);
+        throw error;
+      }
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-    };
-
-    const requestOptions: RequestInit = {
-      method,
-      headers,
-    };
-
-    if (data && method !== 'GET') {
-      requestOptions.body = JSON.stringify(data);
-    }
-
-    const url = method === 'GET' && data ? 
-      `${this.API_BASE_URL}${endpoint}?${new URLSearchParams(data).toString()}` :
-      `${this.API_BASE_URL}${endpoint}`;
-
-    const response = await fetch(url, requestOptions);
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  }
-
-  static async processTransaction(request: TransactionRequest): Promise<TransactionResult> {
-    try {
-      console.log('Processing transaction via API with card number:', { ...request, card_number: '****' + request.card_number.slice(-4) });
-      
-      const result = await this.makeApiRequest(
-        '/card-transaction-api/process-transaction',
-        'POST',
-        request
-      );
-
-      console.log('Transaction API result:', result);
-      return result;
-    } catch (error) {
-      console.error('Transaction processing failed:', error);
+      console.log('Transaction result:', data);
+      return data as TransactionResponse;
+    } catch (error: any) {
+      console.error('Enhanced transaction service error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error.message || 'Transaction processing failed'
       };
     }
   }
 
-  static async validateTransactionLimits(request: ValidationRequest): Promise<ValidationResult> {
+  /**
+   * Validate transaction limits using card number
+   */
+  static async validateTransactionLimits(params: ValidationRequest): Promise<ValidationResponse> {
     try {
-      console.log('Validating transaction limits via API with card number:', { ...request, card_number: '****' + request.card_number.slice(-4) });
-      
-      const result = await this.makeApiRequest(
-        '/card-transaction-api/validate-limits',
-        'POST',
-        request
-      );
+      console.log('Validating transaction limits:', params);
 
-      console.log('Validation API result:', result);
-      return result;
-    } catch (error) {
-      console.error('Transaction validation failed:', error);
+      const { data, error } = await supabase.rpc('validate_transaction_limits_by_number', {
+        p_card_number: params.card_number,
+        p_amount: params.amount,
+        p_user_id: params.user_id || null
+      });
+
+      if (error) {
+        console.error('Validation error:', error);
+        throw error;
+      }
+
+      console.log('Validation result:', data);
+      return data as ValidationResponse;
+    } catch (error: any) {
+      console.error('Enhanced validation service error:', error);
       return {
         valid: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error.message || 'Validation failed'
       };
     }
   }
 
-  static async validateCard(request: {
-    card_number: string;
-    pin: string;
-    ip_address?: string;
-    user_agent?: string;
-  }): Promise<any> {
+  /**
+   * Get card details by card number (for authenticated users)
+   */
+  static async getCardByNumber(cardNumber: string, userId?: string): Promise<any> {
     try {
-      console.log('Validating card via API');
-      
-      const result = await this.makeApiRequest(
-        '/card-transaction-api/validate-card',
-        'POST',
-        request
-      );
+      console.log('Getting card by number:', { cardNumber: cardNumber.slice(-4), userId });
 
-      console.log('Card validation API result:', result);
-      return result;
-    } catch (error) {
-      console.error('Card validation failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
+      const { data, error } = await supabase.rpc('get_card_by_number', {
+        p_card_number: cardNumber,
+        p_user_id: userId || null
+      });
 
-  static async getCardDetails(cardNumber: string, userPin?: string, userId?: string): Promise<any> {
-    try {
-      console.log('Getting card details via API:', '****' + cardNumber.slice(-4));
-      
-      const result = await this.makeApiRequest(
-        '/card-transaction-api/get-card-details',
-        'POST',
-        { card_number: cardNumber, user_pin: userPin, user_id: userId }
-      );
+      if (error) {
+        console.error('Get card by number error:', error);
+        throw error;
+      }
 
-      console.log('Card details API result:', result);
-      return result;
-    } catch (error) {
-      console.error('Get card details failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
-  static async getTransactions(cardNumber: string, limit: number = 50, userId?: string): Promise<any> {
-    try {
-      console.log('Getting transactions via API:', '****' + cardNumber.slice(-4));
-      
-      const result = await this.makeApiRequest(
-        '/card-transaction-api/get-transactions',
-        'GET',
-        { card_number: cardNumber, limit: limit.toString(), user_id: userId }
-      );
-
-      console.log('Transactions API result:', result);
-      return result;
-    } catch (error) {
-      console.error('Get transactions failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        transactions: []
-      };
-    }
-  }
-
-  static async issueCard(request: {
-    user_id: string;
-    pin: string;
-    daily_limit?: number;
-    monthly_limit?: number;
-  }): Promise<any> {
-    try {
-      console.log('Issuing card via API:', request);
-      
-      const result = await this.makeApiRequest(
-        '/card-transaction-api/issue-card',
-        'POST',
-        request
-      );
-
-      console.log('Card issuance API result:', result);
-      return result;
-    } catch (error) {
-      console.error('Card issuance failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      console.log('Card lookup result:', data);
+      return data;
+    } catch (error: any) {
+      console.error('Enhanced card lookup service error:', error);
+      throw error;
     }
   }
 }
