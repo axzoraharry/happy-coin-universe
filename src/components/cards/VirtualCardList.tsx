@@ -49,12 +49,12 @@ export function VirtualCardList({
     const isVisible = visibleCardNumbers.has(card.id);
     
     if (isVisible) {
-      // When visible, show the full card number formatted
+      // When visible, show the full card number formatted using the consistent utility
       return CardNumberUtils.getFormattedCardNumber(card.id);
     }
     
-    // When hidden, show fully masked version
-    return `**** **** **** ****`;
+    // When hidden, show the masked version using the consistent utility
+    return CardNumberUtils.getMaskedCardNumber(card.id);
   };
 
   const handleCopyCardNumber = async (card: VirtualCard, event: React.MouseEvent) => {
