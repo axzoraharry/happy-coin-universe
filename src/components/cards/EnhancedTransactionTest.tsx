@@ -12,6 +12,7 @@ import { Play, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react'
 import { EnhancedTransactionService } from '@/lib/virtualCard/enhancedTransactionService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface EnhancedTransactionTestProps {
   cards: Array<{ id: string; masked_card_number: string; status: string }>;
@@ -251,7 +252,7 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
                 {cards.map((card) => (
                   <SelectItem key={card.id} value={card.id}>
                     <div className="flex items-center gap-2">
-                      <span>{card.masked_card_number}</span>
+                      <span>{CardNumberUtils.getMaskedCardNumber(card.id)}</span>
                       <Badge variant={card.status === 'active' ? 'default' : 'secondary'}>
                         {card.status}
                       </Badge>
