@@ -58,16 +58,21 @@ export class EnhancedTransactionService {
    * Get authentication headers for API calls
    */
   private static async getAuthHeaders() {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session?.access_token) {
-      throw new Error('Authentication required. Please log in.');
-    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('Authentication required. Please log in.');
+      }
 
-    return {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    };
+      return {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      };
+    } catch (error) {
+      console.error('Failed to get auth headers:', error);
+      throw new Error('Authentication failed');
+    }
   }
 
   /**
@@ -135,7 +140,7 @@ export class EnhancedTransactionService {
         throw new Error(error.message || 'Failed to fetch analytics');
       }
 
-      return data.analytics || [];
+      return data?.analytics || [];
     } catch (error) {
       console.error('Enhanced analytics service error:', error);
       throw error;

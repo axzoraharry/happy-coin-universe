@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +29,9 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
   const { toast } = useToast();
 
   // Check authentication status on component mount
-  useState(() => {
+  useEffect(() => {
     checkAuthStatus();
-  });
+  }, []);
 
   const checkAuthStatus = async () => {
     try {

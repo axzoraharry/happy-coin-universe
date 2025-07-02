@@ -78,7 +78,7 @@ export function TransactionPinReset({ onResetComplete, onCancel }: TransactionPi
       }
 
       // If password verification succeeds, reset the PIN
-      const { data, error } = await supabase.rpc('reset_transaction_pin_with_password' as any, {
+      const { data, error } = await supabase.rpc('reset_transaction_pin_with_password', {
         p_user_id: user.id,
         p_current_password: currentPassword,
         p_new_pin: newPin
