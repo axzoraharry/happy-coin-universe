@@ -2,9 +2,10 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, Calendar, CheckCircle, PowerOff, AlertTriangle, Clock, CreditCard } from 'lucide-react';
+import { Eye, EyeOff, Calendar, CheckCircle, PowerOff, AlertTriangle, Clock, CreditCard, Copy } from 'lucide-react';
 import { VirtualCard } from '@/lib/virtualCard';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 interface VirtualCardListProps {
   cards: VirtualCard[];
@@ -21,6 +22,8 @@ export function VirtualCardList({
   visibleCardNumbers,
   toggleCardNumberVisibility
 }: VirtualCardListProps) {
+  const { toast } = useToast();
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-500/10 text-green-700 border-green-500/20';
@@ -47,7 +50,6 @@ export function VirtualCardList({
     if (isVisible) {
       // When visible, show the masked card number or generate a consistent numeric display
       if (card.masked_card_number) {
-        // Use the existing masked card number but ensure it's properly formatted
         return card.masked_card_number;
       } else {
         // Generate a consistent 16-digit card number based on card ID for display
@@ -64,6 +66,44 @@ export function VirtualCardList({
     
     // When hidden, show fully masked version
     return `**** **** **** ****`;
+  };
+
+  const getFullCardNumber = (card: VirtualCard) => {
+    // Generate the full card number for copying (same logic as display when visible)
+    if (card.masked_card_number && card.masked_card_number.includes('****')) {
+      // If we have a proper masked number, generate the full version
+      const cardIdHash = card.id.replace(/-/g, '').substring(0, 16);
+      const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
+      const numericOnly = paddedHash.split('').map(char => {
+        const code = char.charCodeAt(0);
+        return (code % 10).toString();
+      }).join('');
+      return `4000${numericOnly.substring(4, 16)}`;
+    }
+    
+    // Fallback: use the masked card number if available
+    return card.masked_card_number?.replace(/\s/g, '') || `4000000000000000`;
+  };
+
+  const handleCopyCardNumber = async (card: VirtualCard, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    try {
+      const fullCardNumber = getFullCardNumber(card);
+      await navigator.clipboard.writeText(fullCardNumber);
+      
+      toast({
+        title: "Copied!",
+        description: "Card number copied to clipboard",
+      });
+    } catch (error) {
+      console.error('Failed to copy card number:', error);
+      toast({
+        title: "Copy Failed",
+        description: "Unable to copy card number to clipboard",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -91,25 +131,39 @@ export function VirtualCardList({
                   {format(new Date(card.expiry_date), 'MM/yy')}
                 </span>
               </div>
+              
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="font-mono text-sm">{getDisplayCardNumber(card)}</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleCardNumberVisibility(card.id);
-                    }}
-                    className="h-8 w-8 p-0"
-                  >
-                    {visibleCardNumbers.has(card.id) ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCardNumberVisibility(card.id);
+                      }}
+                      className="h-8 w-8 p-0"
+                      title={visibleCardNumbers.has(card.id) ? "Hide card number" : "Show card number"}
+                    >
+                      {visibleCardNumbers.has(card.id) ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => handleCopyCardNumber(card, e)}
+                      className="h-8 w-8 p-0"
+                      title="Copy card number"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+                
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Daily Spent</span>
                   <span className="font-semibold">{card.current_daily_spent} / {card.daily_limit} HC</span>
