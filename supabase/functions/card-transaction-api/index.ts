@@ -143,7 +143,100 @@ async function handleProcessTransaction(body: TransactionRequest, supabaseClient
       );
     }
 
-    // Validate amount for purchase transactions
+    // Special handling for validation transactions - they don't require amount validation
+    if (body.transaction_type === 'validation') {
+      console.log('Processing validation transaction');
+      
+      // For validation transactions, we just check if the card exists and is active
+      const { data: cardData, error: cardError } = await supabaseClient
+        .from('virtual_cards')
+        .select('id, status, expiry_date, daily_limit, monthly_limit, current_daily_spent, current_monthly_spent')
+        .eq('id', body.card_id)
+        .eq('user_id', userId)
+        .single();
+
+      if (cardError || !cardData) {
+        console.error('Card not found or access denied:', cardError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Card not found or access denied' }), 
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      if (cardData.status !== 'active') {
+        console.error('Card is not active:', cardData.status);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Card is not active' }), 
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Check if card is expired
+      const expiryDate = new Date(cardData.expiry_date);
+      const today = new Date();
+      if (expiryDate < today) {
+        console.error('Card has expired:', cardData.expiry_date);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Card has expired' }), 
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Create validation transaction record
+      const { data: transactionData, error: transactionError } = await supabaseClient
+        .from('virtual_card_transactions')
+        .insert({
+          card_id: body.card_id,
+          user_id: userId,
+          transaction_type: 'validation',
+          amount: 0,
+          description: body.description || 'Card validation',
+          merchant_info: body.merchant_info || {},
+          reference_id: body.reference_id || `VAL_${Date.now()}_${body.card_id.substring(0, 8)}`,
+          status: 'completed'
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        console.error('Failed to create validation transaction:', transactionError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to record validation transaction' }), 
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      console.log('Validation transaction completed successfully:', transactionData);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          transaction_id: transactionData.id,
+          card_status: cardData.status,
+          daily_remaining: cardData.daily_limit - cardData.current_daily_spent,
+          monthly_remaining: cardData.monthly_limit - cardData.current_monthly_spent,
+          message: 'Card validation successful'
+        }), 
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // For purchase transactions, validate amount
     if (body.transaction_type === 'purchase' && (body.amount === undefined || body.amount < 0)) {
       console.error('Invalid amount for purchase:', body.amount);
       return new Response(
