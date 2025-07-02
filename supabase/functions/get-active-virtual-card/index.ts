@@ -7,6 +7,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Centralized card number generation utility
+class CardNumberUtils {
+  private static cardNumberCache = new Map<string, string>();
+  
+  static getConsistentCardNumber(cardId: string): string {
+    if (this.cardNumberCache.has(cardId)) {
+      return this.cardNumberCache.get(cardId)!;
+    }
+
+    const cardIdHash = cardId.replace(/-/g, '').substring(0, 16);
+    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
+    
+    const numericOnly = paddedHash.split('').map(char => {
+      const code = char.charCodeAt(0);
+      return (code % 10).toString();
+    }).join('');
+    
+    const fullCardNumber = `4000${numericOnly.substring(4, 16)}`;
+    this.cardNumberCache.set(cardId, fullCardNumber);
+    
+    return fullCardNumber;
+  }
+
+  static getMaskedCardNumber(cardId: string): string {
+    const fullNumber = this.getConsistentCardNumber(cardId);
+    return `${fullNumber.substring(0, 4)} **** **** ${fullNumber.substring(12, 16)}`;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -172,6 +201,9 @@ serve(async (req) => {
 
     console.log('Returning primary card:', primaryCard.id);
 
+    // Use consistent card number generation
+    const consistentMaskedNumber = CardNumberUtils.getMaskedCardNumber(primaryCard.id);
+
     // Return the active card details
     return new Response(
       JSON.stringify({
@@ -179,7 +211,7 @@ serve(async (req) => {
         card: {
           id: primaryCard.id,
           user_id: primaryCard.user_id,
-          masked_card_number: primaryCard.masked_card_number,
+          masked_card_number: consistentMaskedNumber,
           expiry_date: primaryCard.expiry_date,
           status: primaryCard.status,
           card_type: primaryCard.card_type,

@@ -6,6 +6,7 @@ import { Eye, EyeOff, Calendar, CheckCircle, PowerOff, AlertTriangle, Clock, Cre
 import { VirtualCard } from '@/lib/virtualCard';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface VirtualCardListProps {
   cards: VirtualCard[];
@@ -23,9 +24,6 @@ export function VirtualCardList({
   toggleCardNumberVisibility
 }: VirtualCardListProps) {
   const { toast } = useToast();
-
-  // Store generated card numbers to ensure consistency
-  const cardNumbersCache = new Map();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -47,54 +45,23 @@ export function VirtualCardList({
     }
   };
 
-  // Single function to generate consistent card number for each card
-  const getConsistentCardNumber = (card: VirtualCard) => {
-    // Check cache first
-    if (cardNumbersCache.has(card.id)) {
-      return cardNumbersCache.get(card.id);
-    }
-
-    // Generate a consistent 16-digit card number based on card ID
-    const cardIdHash = card.id.replace(/-/g, '').substring(0, 16);
-    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
-    
-    // Ensure all characters are numeric by converting any non-numeric to numbers
-    const numericOnly = paddedHash.split('').map(char => {
-      const code = char.charCodeAt(0);
-      return (code % 10).toString();
-    }).join('');
-    
-    const fullCardNumber = `4000${numericOnly.substring(4, 16)}`;
-    
-    // Cache the result
-    cardNumbersCache.set(card.id, fullCardNumber);
-    
-    return fullCardNumber;
-  };
-
   const getDisplayCardNumber = (card: VirtualCard) => {
     const isVisible = visibleCardNumbers.has(card.id);
     
     if (isVisible) {
       // When visible, show the full card number formatted
-      const fullNumber = getConsistentCardNumber(card);
-      return `${fullNumber.substring(0, 4)} ${fullNumber.substring(4, 8)} ${fullNumber.substring(8, 12)} ${fullNumber.substring(12, 16)}`;
+      return CardNumberUtils.getFormattedCardNumber(card.id);
     }
     
     // When hidden, show fully masked version
     return `**** **** **** ****`;
   };
 
-  const getFullCardNumber = (card: VirtualCard) => {
-    // Always return the same consistent card number
-    return getConsistentCardNumber(card);
-  };
-
   const handleCopyCardNumber = async (card: VirtualCard, event: React.MouseEvent) => {
     event.stopPropagation();
     
     try {
-      const fullCardNumber = getFullCardNumber(card);
+      const fullCardNumber = CardNumberUtils.getConsistentCardNumber(card.id);
       await navigator.clipboard.writeText(fullCardNumber);
       
       toast({

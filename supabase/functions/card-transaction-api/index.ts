@@ -6,6 +6,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Centralized card number generation utility
+class CardNumberUtils {
+  private static cardNumberCache = new Map<string, string>();
+  
+  static getConsistentCardNumber(cardId: string): string {
+    if (this.cardNumberCache.has(cardId)) {
+      return this.cardNumberCache.get(cardId)!;
+    }
+
+    const cardIdHash = cardId.replace(/-/g, '').substring(0, 16);
+    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
+    
+    const numericOnly = paddedHash.split('').map(char => {
+      const code = char.charCodeAt(0);
+      return (code % 10).toString();
+    }).join('');
+    
+    const fullCardNumber = `4000${numericOnly.substring(4, 16)}`;
+    this.cardNumberCache.set(cardId, fullCardNumber);
+    
+    return fullCardNumber;
+  }
+
+  static getMaskedCardNumber(cardId: string): string {
+    const fullNumber = this.getConsistentCardNumber(cardId);
+    return `${fullNumber.substring(0, 4)} **** **** ${fullNumber.substring(12, 16)}`;
+  }
+}
+
 interface TransactionRequest {
   endpoint: string;
   card_id: string;
