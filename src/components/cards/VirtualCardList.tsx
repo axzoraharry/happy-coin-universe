@@ -6,7 +6,6 @@ import { Eye, EyeOff, Calendar, CheckCircle, PowerOff, AlertTriangle, Clock, Cre
 import { VirtualCard } from '@/lib/virtualCard';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface VirtualCardListProps {
   cards: VirtualCard[];
@@ -48,21 +47,28 @@ export function VirtualCardList({
   const getDisplayCardNumber = (card: VirtualCard) => {
     const isVisible = visibleCardNumbers.has(card.id);
     
-    if (isVisible) {
-      // When visible, show the full card number formatted using the consistent utility
-      return CardNumberUtils.getFormattedCardNumber(card.id);
+    if (isVisible && card.card_number) {
+      // Show the actual full card number from the database when visible
+      const fullNumber = card.card_number.replace(/\s/g, '');
+      return `${fullNumber.substring(0, 4)} ${fullNumber.substring(4, 8)} ${fullNumber.substring(8, 12)} ${fullNumber.substring(12, 16)}`;
     }
     
-    // When hidden, show the masked version using the consistent utility
-    return CardNumberUtils.getMaskedCardNumber(card.id);
+    // Use the masked card number from the database
+    if (card.masked_card_number) {
+      return card.masked_card_number;
+    }
+    
+    // Fallback to a generic masked format
+    return `**** **** **** ${card.id.slice(-4)}`;
   };
 
   const handleCopyCardNumber = async (card: VirtualCard, event: React.MouseEvent) => {
     event.stopPropagation();
     
     try {
-      const fullCardNumber = CardNumberUtils.getConsistentCardNumber(card.id);
-      await navigator.clipboard.writeText(fullCardNumber);
+      // Use the actual card number from the database if available
+      const cardNumberToCopy = card.card_number || card.masked_card_number || `**** **** **** ${card.id.slice(-4)}`;
+      await navigator.clipboard.writeText(cardNumberToCopy.replace(/\s/g, ''));
       
       toast({
         title: "Copied!",

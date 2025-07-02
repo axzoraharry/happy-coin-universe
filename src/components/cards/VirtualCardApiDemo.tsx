@@ -8,10 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface VirtualCardApiDemoProps {
-  cards: Array<{ id: string; masked_card_number: string; status: string }>;
+  cards: Array<{ id: string; masked_card_number: string; card_number?: string; status: string }>;
 }
 
 export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
@@ -46,7 +45,11 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
 
   const getSelectedCardNumber = () => {
     if (!selectedCardId) return '';
-    return CardNumberUtils.getConsistentCardNumber(selectedCardId);
+    const selectedCard = cards.find(card => card.id === selectedCardId);
+    if (!selectedCard) return '';
+    
+    // Use the actual card number from the database if available
+    return selectedCard.card_number || selectedCard.masked_card_number || '';
   };
 
   if (!isAuthenticated) {
@@ -91,7 +94,7 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
           <Label>Card Number (for API testing)</Label>
           <div className="space-y-2">
             <Input
-              value={getSelectedCardNumber()}
+              value={getSelectedCardNumber().replace(/\s/g, '')}
               readOnly
               className="font-mono"
               placeholder="Select a card below"
@@ -99,7 +102,7 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => copyToClipboard(getSelectedCardNumber(), 'Card number')}
+              onClick={() => copyToClipboard(getSelectedCardNumber().replace(/\s/g, ''), 'Card number')}
               disabled={!selectedCardId}
               className="w-full"
             >
@@ -126,7 +129,7 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm">
-                      {CardNumberUtils.getMaskedCardNumber(card.id)}
+                      {card.masked_card_number || `**** **** **** ${card.id.slice(-4)}`}
                     </span>
                     <Badge variant="default">
                       {card.status}
@@ -137,7 +140,7 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Full number: {CardNumberUtils.getConsistentCardNumber(card.id)}
+                  Full number: {card.card_number || card.masked_card_number || 'Not available'}
                 </div>
               </div>
             ))}
@@ -154,7 +157,7 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
   -H "x-api-key: YOUR_X_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "card_number": "${getSelectedCardNumber() || 'SELECT_A_CARD_FIRST'}",
+    "card_number": "${getSelectedCardNumber().replace(/\s/g, '') || 'SELECT_A_CARD_FIRST'}",
     "amount": 100,
     "transaction_type": "purchase",
     "description": "Test transaction"
@@ -170,7 +173,7 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
   -H "x-api-key: YOUR_X_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "card_number": "${getSelectedCardNumber() || 'SELECT_A_CARD_FIRST'}",
+    "card_number": "${getSelectedCardNumber().replace(/\s/g, '') || 'SELECT_A_CARD_FIRST'}",
     "amount": 100,
     "transaction_type": "purchase",
     "description": "Test transaction"
@@ -191,7 +194,7 @@ export function VirtualCardApiDemo({ cards }: VirtualCardApiDemoProps) {
           <ul className="text-sm text-blue-800 space-y-1">
             <li>• Replace YOUR_API_KEY with your actual Authorization Bearer token</li>
             <li>• Replace YOUR_X_API_KEY with your actual x-api-key from the API Management page</li>
-            <li>• All card numbers are consistently generated based on your card IDs</li>
+            <li>• All card numbers are from your actual database records</li>
             <li>• Transaction amounts are in Happy Coins (HC)</li>
             <li>• API endpoint supports purchase, refund, validation, activation, and deactivation</li>
           </ul>

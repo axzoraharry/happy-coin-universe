@@ -1,7 +1,6 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Wallet, Clock } from 'lucide-react';
-import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface VirtualCard {
   id: string;
@@ -47,15 +46,21 @@ export function VirtualCardVisual({
     }
   };
 
-  // Use CardNumberUtils for consistent card number display
+  // Use actual card number from secure details when available, otherwise show masked
   const getDisplayCardNumber = () => {
     if (showDetails && secureDetails.full_number) {
-      // When details are shown and we have secure details, use them
-      return secureDetails.full_number;
+      // Format the full number from secure details
+      const fullNumber = secureDetails.full_number.replace(/\s/g, '');
+      return `${fullNumber.substring(0, 4)} ${fullNumber.substring(4, 8)} ${fullNumber.substring(8, 12)} ${fullNumber.substring(12, 16)}`;
     }
     
-    // Always use CardNumberUtils for consistent display
-    return CardNumberUtils.getMaskedCardNumber(card.id);
+    // Use the masked number from the database if available
+    if (card.masked_number) {
+      return card.masked_number;
+    }
+    
+    // Fallback to a generic masked format
+    return `**** **** **** ${card.id.slice(-4)}`;
   };
 
   return (

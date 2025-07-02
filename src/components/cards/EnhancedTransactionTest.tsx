@@ -12,10 +12,9 @@ import { Play, CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react'
 import { EnhancedTransactionService } from '@/lib/virtualCard/enhancedTransactionService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface EnhancedTransactionTestProps {
-  cards: Array<{ id: string; masked_card_number: string; status: string }>;
+  cards: Array<{ id: string; masked_card_number: string; card_number?: string; status: string }>;
 }
 
 export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps) {
@@ -258,11 +257,11 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
               </SelectTrigger>
               <SelectContent>
                 {cards.map((card) => {
-                  const cardNumber = CardNumberUtils.getConsistentCardNumber(card.id);
+                  const cardNumber = card.card_number || card.masked_card_number || '';
                   return (
-                    <SelectItem key={card.id} value={cardNumber}>
+                    <SelectItem key={card.id} value={cardNumber.replace(/\s/g, '')}>
                       <div className="flex items-center gap-2">
-                        <span>{CardNumberUtils.getMaskedCardNumber(card.id)}</span>
+                        <span>{card.masked_card_number || `**** **** **** ${card.id.slice(-4)}`}</span>
                         <Badge variant={card.status === 'active' ? 'default' : 'secondary'}>
                           {card.status}
                         </Badge>
@@ -275,7 +274,7 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
             {selectedCardNumber && (
               <div className="text-xs text-muted-foreground space-y-1">
                 <div>Using card: {selectedCardNumber}</div>
-                <div className="font-mono text-green-600">✓ Generated from Card ID consistently</div>
+                <div className="font-mono text-green-600">✓ Using actual database card number</div>
               </div>
             )}
           </div>

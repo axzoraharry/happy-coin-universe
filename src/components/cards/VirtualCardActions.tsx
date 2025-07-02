@@ -2,7 +2,6 @@
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff, Copy, Snowflake, Play, Loader2 } from 'lucide-react';
 import { VirtualCard } from '@/lib/virtualCard';
-import { CardNumberUtils } from '@/lib/virtualCard/cardNumberUtils';
 
 interface VirtualCardActionsProps {
   card: VirtualCard;
@@ -28,15 +27,15 @@ export function VirtualCardActions({
 }: VirtualCardActionsProps) {
   
   const handleCopyCardNumber = () => {
-    // Always use CardNumberUtils for consistent card number
-    const consistentCardNumber = CardNumberUtils.getConsistentCardNumber(card.id);
-    onCopyToClipboard(consistentCardNumber, 'Card number');
+    // Use the actual card number from secure details if available, otherwise use from card data
+    const cardNumber = secureDetails.full_number || card.card_number || card.masked_card_number || '';
+    onCopyToClipboard(cardNumber.replace(/\s/g, ''), 'Card number');
   };
 
   const handleCopyCVV = () => {
-    // Always use CardNumberUtils for consistent CVV
-    const consistentCVV = CardNumberUtils.getConsistentCVV(card.id);
-    onCopyToClipboard(consistentCVV, 'CVV');
+    // Use the CVV from secure details
+    const cvv = secureDetails.cvv || '';
+    onCopyToClipboard(cvv, 'CVV');
   };
 
   return (
