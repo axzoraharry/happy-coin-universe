@@ -24,6 +24,9 @@ export function VirtualCardList({
 }: VirtualCardListProps) {
   const { toast } = useToast();
 
+  // Store generated card numbers to ensure consistency
+  const cardNumbersCache = new Map();
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-500/10 text-green-700 border-green-500/20';
@@ -44,24 +47,38 @@ export function VirtualCardList({
     }
   };
 
+  // Single function to generate consistent card number for each card
+  const getConsistentCardNumber = (card: VirtualCard) => {
+    // Check cache first
+    if (cardNumbersCache.has(card.id)) {
+      return cardNumbersCache.get(card.id);
+    }
+
+    // Generate a consistent 16-digit card number based on card ID
+    const cardIdHash = card.id.replace(/-/g, '').substring(0, 16);
+    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
+    
+    // Ensure all characters are numeric by converting any non-numeric to numbers
+    const numericOnly = paddedHash.split('').map(char => {
+      const code = char.charCodeAt(0);
+      return (code % 10).toString();
+    }).join('');
+    
+    const fullCardNumber = `4000${numericOnly.substring(4, 16)}`;
+    
+    // Cache the result
+    cardNumbersCache.set(card.id, fullCardNumber);
+    
+    return fullCardNumber;
+  };
+
   const getDisplayCardNumber = (card: VirtualCard) => {
     const isVisible = visibleCardNumbers.has(card.id);
     
     if (isVisible) {
-      // When visible, show the masked card number or generate a consistent numeric display
-      if (card.masked_card_number) {
-        return card.masked_card_number;
-      } else {
-        // Generate a consistent 16-digit card number based on card ID for display
-        const cardIdHash = card.id.replace(/-/g, '').substring(0, 16);
-        const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
-        // Ensure all characters are numeric by converting any non-numeric to numbers
-        const numericOnly = paddedHash.split('').map(char => {
-          const code = char.charCodeAt(0);
-          return (code % 10).toString();
-        }).join('');
-        return `4000 ${numericOnly.substring(4, 8)} ${numericOnly.substring(8, 12)} ${numericOnly.substring(12, 16)}`;
-      }
+      // When visible, show the full card number formatted
+      const fullNumber = getConsistentCardNumber(card);
+      return `${fullNumber.substring(0, 4)} ${fullNumber.substring(4, 8)} ${fullNumber.substring(8, 12)} ${fullNumber.substring(12, 16)}`;
     }
     
     // When hidden, show fully masked version
@@ -69,20 +86,8 @@ export function VirtualCardList({
   };
 
   const getFullCardNumber = (card: VirtualCard) => {
-    // Generate the full card number for copying (same logic as display when visible)
-    if (card.masked_card_number && card.masked_card_number.includes('****')) {
-      // If we have a proper masked number, generate the full version
-      const cardIdHash = card.id.replace(/-/g, '').substring(0, 16);
-      const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
-      const numericOnly = paddedHash.split('').map(char => {
-        const code = char.charCodeAt(0);
-        return (code % 10).toString();
-      }).join('');
-      return `4000${numericOnly.substring(4, 16)}`;
-    }
-    
-    // Fallback: use the masked card number if available
-    return card.masked_card_number?.replace(/\s/g, '') || `4000000000000000`;
+    // Always return the same consistent card number
+    return getConsistentCardNumber(card);
   };
 
   const handleCopyCardNumber = async (card: VirtualCard, event: React.MouseEvent) => {
