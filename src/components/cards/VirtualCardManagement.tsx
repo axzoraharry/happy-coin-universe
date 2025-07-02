@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -150,7 +151,7 @@ export function VirtualCardManagement() {
         </TabsContent>
 
         <TabsContent value="external" className="space-y-6">
-          <ExternalCardDemo />
+          <ExternalCardDemo cards={cards} />
         </TabsContent>
       </Tabs>
     </div>
