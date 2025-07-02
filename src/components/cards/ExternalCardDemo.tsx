@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CreditCard, Shield, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { CreditCard, Shield, CheckCircle, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ExternalCardService, ExternalCardDetails } from '@/lib/virtualCard/externalCardService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,14 +16,18 @@ export function ExternalCardDemo() {
   const [error, setError] = useState<string | null>(null);
   const [testAmount, setTestAmount] = useState<string>('');
   const [validationResult, setValidationResult] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   const { toast } = useToast();
 
   const fetchActiveCard = async () => {
     setIsLoading(true);
     setError(null);
+    setDebugInfo(null);
     
     try {
+      console.log('Fetching active card...');
       const result = await ExternalCardService.getActiveVirtualCard();
+      console.log('External card service result:', result);
       
       if (result.success && result.card) {
         setCardDetails(result.card);
@@ -34,10 +38,27 @@ export function ExternalCardDemo() {
       } else {
         setError(result.error || 'No active card found');
         setCardDetails(null);
+        
+        // Store debug info if available
+        if ((result as any).debug) {
+          setDebugInfo((result as any).debug);
+        }
+        
+        toast({
+          title: "No Active Card",
+          description: result.error || 'No active virtual card found',
+          variant: "destructive"
+        });
       }
     } catch (err) {
-      setError('Failed to fetch card details');
       console.error('Fetch error:', err);
+      setError('Failed to fetch card details: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setCardDetails(null);
+      toast({
+        title: "Error",
+        description: "Failed to fetch card details",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -53,18 +74,27 @@ export function ExternalCardDemo() {
       return;
     }
 
-    const result = await ExternalCardService.validateTransactionAmount(Number(testAmount));
-    setValidationResult(result);
-    
-    if (result.valid) {
+    try {
+      const result = await ExternalCardService.validateTransactionAmount(Number(testAmount));
+      setValidationResult(result);
+      
+      if (result.valid) {
+        toast({
+          title: "Amount Valid",
+          description: "This transaction amount is within your limits",
+        });
+      } else {
+        toast({
+          title: "Amount Invalid",
+          description: result.error,
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Validation error:', err);
       toast({
-        title: "Amount Valid",
-        description: "This transaction amount is within your limits",
-      });
-    } else {
-      toast({
-        title: "Amount Invalid",
-        description: result.error,
+        title: "Validation Error",
+        description: "Failed to validate amount",
         variant: "destructive"
       });
     }
@@ -87,19 +117,47 @@ export function ExternalCardDemo() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button 
-            onClick={fetchActiveCard} 
-            disabled={isLoading}
-            className="w-full"
-          >
-            {isLoading ? 'Loading...' : 'Fetch Active Card'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={fetchActiveCard} 
+              disabled={isLoading}
+              className="flex-1"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                'Fetch Active Card'
+              )}
+            </Button>
+          </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-red-500" />
                 <span className="text-sm text-red-700">{error}</span>
+              </div>
+              
+              {debugInfo && (
+                <div className="mt-3 p-3 bg-red-100 rounded text-xs text-red-800">
+                  <strong>Debug Info:</strong>
+                  <pre className="mt-1">{JSON.stringify(debugInfo, null, 2)}</pre>
+                </div>
+              )}
+              
+              <div className="mt-3">
+                <p className="text-xs text-red-600 mb-2">
+                  <strong>Troubleshooting:</strong>
+                </p>
+                <ul className="text-xs text-red-600 space-y-1">
+                  <li>• Make sure you have created at least one virtual card</li>
+                  <li>• Check that your card status is 'active'</li>
+                  <li>• Ensure your card hasn't expired</li>
+                  <li>• Try refreshing your authentication</li>
+                </ul>
               </div>
             </div>
           )}
