@@ -17,7 +17,7 @@ export function ExternalCardDemo({ cards = [] }: ExternalCardDemoProps) {
         </TabsList>
 
         <TabsContent value="api-demo" className="space-y-6">
-          <VirtualCardApiDemo />
+          <VirtualCardApiDemo cards={cards} />
         </TabsContent>
 
         <TabsContent value="transaction-test" className="space-y-6">
