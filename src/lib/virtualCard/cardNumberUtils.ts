@@ -15,16 +15,22 @@ export class CardNumberUtils {
     }
 
     // Generate a consistent 16-digit card number based on card ID
-    const cardIdHash = cardId.replace(/-/g, '').substring(0, 16);
-    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
+    // Use a simple hash to convert the UUID to a numeric string
+    let hash = 0;
+    for (let i = 0; i < cardId.length; i++) {
+      const char = cardId.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
     
-    // Ensure all characters are numeric by converting any non-numeric to numbers
-    const numericOnly = paddedHash.split('').map(char => {
-      const code = char.charCodeAt(0);
-      return (code % 10).toString();
-    }).join('');
+    // Make sure hash is positive
+    hash = Math.abs(hash);
     
-    const fullCardNumber = `4000${numericOnly.substring(4, 16)}`;
+    // Convert to 12-digit string and pad with zeros if needed
+    const cardSuffix = hash.toString().padStart(12, '0').slice(0, 12);
+    
+    // Create full 16-digit card number starting with 4000
+    const fullCardNumber = `4000${cardSuffix}`;
     
     // Cache the result
     this.cardNumberCache.set(cardId, fullCardNumber);
@@ -52,13 +58,17 @@ export class CardNumberUtils {
    * Generate a consistent CVV based on card ID
    */
   static getConsistentCVV(cardId: string): string {
-    const cardIdHash = cardId.replace(/-/g, '');
-    const cvvHash = cardIdHash.substring(0, 3);
-    const numericCVV = cvvHash.split('').map(char => {
-      const code = char.charCodeAt(0);
-      return (code % 10).toString();
-    }).join('');
-    return numericCVV.padStart(3, '0');
+    // Generate a simple hash for CVV
+    let hash = 0;
+    for (let i = 0; i < cardId.length; i++) {
+      const char = cardId.charCodeAt(i);
+      hash = ((hash << 3) - hash) + char;
+      hash = hash & hash;
+    }
+    
+    // Convert to 3-digit CVV
+    const cvv = (Math.abs(hash) % 900 + 100).toString();
+    return cvv;
   }
 
   /**

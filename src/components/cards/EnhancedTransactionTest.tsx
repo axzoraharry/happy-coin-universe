@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,12 +48,6 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
       console.error('Auth check failed:', error);
       setAuthStatus('unauthenticated');
     }
-  };
-
-  const generateCardNumber = (cardId: string): string => {
-    // Generate consistent card number based on card ID
-    const cardIdHash = cardId.replace(/-/g, '').substring(0, 12);
-    return `4000${cardIdHash}`;
   };
 
   const handleProcessTransaction = async () => {
@@ -263,7 +258,7 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
               </SelectTrigger>
               <SelectContent>
                 {cards.map((card) => {
-                  const cardNumber = generateCardNumber(card.id);
+                  const cardNumber = CardNumberUtils.getConsistentCardNumber(card.id);
                   return (
                     <SelectItem key={card.id} value={cardNumber}>
                       <div className="flex items-center gap-2">
@@ -279,7 +274,7 @@ export function EnhancedTransactionTest({ cards }: EnhancedTransactionTestProps)
             </Select>
             {selectedCardNumber && (
               <div className="text-xs text-muted-foreground">
-                Using card: ****{selectedCardNumber.slice(-4)}
+                Using card: {selectedCardNumber}
               </div>
             )}
           </div>
