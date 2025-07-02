@@ -88,6 +88,13 @@ export function VirtualCardManagement() {
     }
   };
 
+  // Transform cards to match ExternalCardDemo interface
+  const transformedCards = cards.map(card => ({
+    id: card.id,
+    masked_card_number: card.masked_card_number || 'Not Available',
+    status: card.status
+  }));
+
   return (
     <div className="space-y-6 animate-fade-in">
       <VirtualCardHeader
@@ -151,7 +158,7 @@ export function VirtualCardManagement() {
         </TabsContent>
 
         <TabsContent value="external" className="space-y-6">
-          <ExternalCardDemo cards={cards} />
+          <ExternalCardDemo cards={transformedCards} />
         </TabsContent>
       </Tabs>
     </div>

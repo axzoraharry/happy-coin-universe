@@ -109,7 +109,7 @@ export class EnhancedTransactionService {
       }
 
       console.log('Transaction result:', data);
-      return data as TransactionResponse;
+      return data as unknown as TransactionResponse;
     } catch (error: any) {
       console.error('Enhanced transaction service error:', error);
       return {
@@ -138,7 +138,7 @@ export class EnhancedTransactionService {
       }
 
       console.log('Validation result:', data);
-      return data as ValidationResponse;
+      return data as unknown as ValidationResponse;
     } catch (error: any) {
       console.error('Enhanced validation service error:', error);
       return {
@@ -168,7 +168,7 @@ export class EnhancedTransactionService {
       }
 
       console.log('Card validation result:', data);
-      return data as CardValidationResponse;
+      return data as unknown as CardValidationResponse;
     } catch (error: any) {
       console.error('Enhanced card validation service error:', error);
       return {
@@ -297,7 +297,7 @@ export class EnhancedTransactionService {
       }
 
       console.log('Card issuance result:', data);
-      return data as IssueCardResponse;
+      return data as unknown as IssueCardResponse;
     } catch (error: any) {
       console.error('Enhanced card issuance service error:', error);
       return {

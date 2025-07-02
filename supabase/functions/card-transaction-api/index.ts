@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
-// Centralized card number generation utility
+// Centralized card number generation utility - MUST match frontend implementation
 class CardNumberUtils {
   private static cardNumberCache = new Map<string, string>();
   
@@ -16,28 +16,37 @@ class CardNumberUtils {
       return this.cardNumberCache.get(cardId)!;
     }
 
-    const cardIdHash = cardId.replace(/-/g, '').substring(0, 16);
-    const paddedHash = (cardIdHash + '0000000000000000').substring(0, 16);
+    // Remove hyphens from UUID and use first 16 characters
+    const cleanId = cardId.replace(/-/g, '');
     
-    const numericOnly = paddedHash.split('').map(char => {
-      const code = char.charCodeAt(0);
-      return (code % 10).toString();
-    }).join('');
+    // Convert each character to its char code and sum them
+    let hashSum = 0;
+    for (let i = 0; i < cleanId.length; i++) {
+      hashSum += cleanId.charCodeAt(i);
+    }
     
-    const fullCardNumber = `4000${numericOnly.substring(4, 16)}`;
+    // Generate a seed based on the hash sum
+    const seed = hashSum % 1000000000000; // 12 digits max
+    
+    // Create the card number: 4000 + 12 digit number based on seed
+    const cardSuffix = seed.toString().padStart(12, '0');
+    const fullCardNumber = `4000${cardSuffix}`;
+    
     this.cardNumberCache.set(cardId, fullCardNumber);
     
     return fullCardNumber;
   }
 
   static getConsistentCVV(cardId: string): string {
-    const cardIdHash = cardId.replace(/-/g, '');
-    const cvvHash = cardIdHash.substring(0, 3);
-    const numericCVV = cvvHash.split('').map(char => {
-      const code = char.charCodeAt(0);
-      return (code % 10).toString();
-    }).join('');
-    return numericCVV.padStart(3, '0');
+    let hash = 0;
+    for (let i = 0; i < cardId.length; i++) {
+      const char = cardId.charCodeAt(i);
+      hash = ((hash << 3) - hash) + char;
+      hash = hash & hash;
+    }
+    
+    const cvv = (Math.abs(hash) % 900 + 100).toString();
+    return cvv;
   }
 }
 

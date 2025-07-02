@@ -7,6 +7,7 @@ export class CardNumberUtils {
   /**
    * Generate a consistent 16-digit card number based on card ID
    * This ensures the same card ID always generates the same card number
+   * Uses a deterministic algorithm that matches the backend implementation
    */
   static getConsistentCardNumber(cardId: string): string {
     // Check cache first
@@ -14,22 +15,20 @@ export class CardNumberUtils {
       return this.cardNumberCache.get(cardId)!;
     }
 
-    // Generate a consistent 16-digit card number based on card ID
-    // Use a simple hash to convert the UUID to a numeric string
-    let hash = 0;
-    for (let i = 0; i < cardId.length; i++) {
-      const char = cardId.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+    // Remove hyphens from UUID and use first 16 characters
+    const cleanId = cardId.replace(/-/g, '');
+    
+    // Convert each character to its char code and sum them
+    let hashSum = 0;
+    for (let i = 0; i < cleanId.length; i++) {
+      hashSum += cleanId.charCodeAt(i);
     }
     
-    // Make sure hash is positive
-    hash = Math.abs(hash);
+    // Generate a seed based on the hash sum
+    const seed = hashSum % 1000000000000; // 12 digits max
     
-    // Convert to 12-digit string and pad with zeros if needed
-    const cardSuffix = hash.toString().padStart(12, '0').slice(0, 12);
-    
-    // Create full 16-digit card number starting with 4000
+    // Create the card number: 4000 + 12 digit number based on seed
+    const cardSuffix = seed.toString().padStart(12, '0');
     const fullCardNumber = `4000${cardSuffix}`;
     
     // Cache the result
