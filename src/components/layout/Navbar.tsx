@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import {
   Home,
   ArrowLeftRight,
@@ -147,6 +148,11 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          </div>
+
+          {/* Notification Center */}
+          <div className="hidden md:flex md:items-center md:ml-4">
+            <NotificationCenter />
           </div>
 
           <div className="flex items-center md:hidden">
