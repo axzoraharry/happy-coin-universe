@@ -5,6 +5,7 @@ import { WalletActions } from '@/components/wallet/WalletActions';
 import { TransactionInsights } from '@/components/ai/TransactionInsights';
 import { SmartTransactionSearch } from '@/components/ai/SmartTransactionSearch';
 import { VoiceAssistant } from '@/components/ai/VoiceAssistant';
+import { Interactive3DDashboard } from '@/components/3d/Interactive3DDashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -77,25 +78,29 @@ export default function CardsPage() {
       </div>
 
       <Tabs defaultValue="cards" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="cards" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="cards" className="flex items-center gap-1 text-xs">
+            <CreditCard className="h-3 w-3" />
             Cards
           </TabsTrigger>
-          <TabsTrigger value="insights" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
+          <TabsTrigger value="insights" className="flex items-center gap-1 text-xs">
+            <Brain className="h-3 w-3" />
             AI Insights
           </TabsTrigger>
-          <TabsTrigger value="search" className="flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            Smart Search
+          <TabsTrigger value="search" className="flex items-center gap-1 text-xs">
+            <Search className="h-3 w-3" />
+            Search
           </TabsTrigger>
-          <TabsTrigger value="voice" className="flex items-center gap-2">
-            <Mic className="h-4 w-4" />
+          <TabsTrigger value="voice" className="flex items-center gap-1 text-xs">
+            <Mic className="h-3 w-3" />
             Voice AI
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
+          <TabsTrigger value="3d" className="flex items-center gap-1 text-xs">
+            <Globe className="h-3 w-3" />
+            3D View
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-1 text-xs">
+            <BarChart3 className="h-3 w-3" />
             Analytics
           </TabsTrigger>
         </TabsList>
@@ -190,6 +195,10 @@ export default function CardsPage() {
             transactions={transactions}
             onTransactionSelect={handleTransactionSelect}
           />
+        </TabsContent>
+
+        <TabsContent value="3d" className="space-y-6">
+          <Interactive3DDashboard transactions={transactions} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
