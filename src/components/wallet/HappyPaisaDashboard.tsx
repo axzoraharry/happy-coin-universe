@@ -2,11 +2,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Wallet, TrendingUp, ArrowUpRight, ArrowDownRight, RefreshCw, Server } from 'lucide-react';
-import { useHappyPaisaIntegration } from '@/hooks/useHappyPaisaIntegration';
+import { useHappyPaisaStellar } from '@/hooks/useHappyPaisaStellar';
 import { Badge } from '@/components/ui/badge';
 
 export function HappyPaisaDashboard() {
-  const { balance, transactions, loading, isServiceAvailable, refreshData } = useHappyPaisaIntegration();
+  const { account, transactions, loading, isServiceReady, refreshData } = useHappyPaisaStellar();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -65,15 +65,15 @@ export function HappyPaisaDashboard() {
         <div className="flex items-center space-x-2">
           <Server className="h-5 w-5" />
           <span className="font-medium">Happy Paisa Ledger</span>
-          <Badge variant={isServiceAvailable ? "default" : "destructive"}>
-            {isServiceAvailable ? "Online" : "Offline"}
+          <Badge variant={isServiceReady ? "default" : "destructive"}>
+            {isServiceReady ? "Online" : "Offline"}
           </Badge>
         </div>
         <Button
           variant="outline"
           size="sm"
           onClick={refreshData}
-          disabled={loading || !isServiceAvailable}
+          disabled={loading || !isServiceReady}
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -91,11 +91,11 @@ export function HappyPaisaDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-              {balance?.balance?.toFixed(2) || '0.00'} HC
+              {account?.hp_balance?.toFixed(6) || '0.000000'} HP
             </div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <TrendingUp className="h-3 w-3 mr-1 text-green-600" />
-              Happy Coins
+              Happy Paisa
             </p>
           </CardContent>
         </Card>
@@ -109,7 +109,7 @@ export function HappyPaisaDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {balance?.total_earned?.toFixed(2) || '0.00'} HC
+              ₹{account ? (account.hp_balance * 1000).toFixed(2) : '0.00'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               All time earnings
@@ -126,7 +126,7 @@ export function HappyPaisaDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {balance?.total_spent?.toFixed(2) || '0.00'} HC
+              {account?.is_active ? 'Active' : 'Inactive'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               All time spending
@@ -158,7 +158,7 @@ export function HappyPaisaDashboard() {
                     {getTransactionIcon(transaction.transaction_type)}
                     <div>
                       <p className="font-medium text-sm">
-                        {transaction.description || 'Transaction'}
+                        {transaction.memo || transaction.transaction_type.replace('_', ' ')}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(transaction.created_at)} • {transaction.status}
@@ -167,11 +167,11 @@ export function HappyPaisaDashboard() {
                   </div>
                   <div className="text-right">
                     <p className={`font-medium ${getTransactionColor(transaction.transaction_type)}`}>
-                      {transaction.amount > 0 ? '+' : ''}{transaction.amount.toFixed(2)} HC
+                      {transaction.hp_amount > 0 ? '+' : ''}{transaction.hp_amount.toFixed(6)} HP
                     </p>
-                    {transaction.reference_id && (
+                    {transaction.stellar_transaction_id && (
                       <p className="text-xs text-muted-foreground">
-                        Ref: {transaction.reference_id}
+                        TXN: {transaction.stellar_transaction_id.slice(0, 8)}...
                       </p>
                     )}
                   </div>

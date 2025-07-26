@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_automation_preferences: {
+        Row: {
+          auto_categorization: boolean
+          automation_level: string
+          created_at: string
+          fraud_detection: boolean
+          id: string
+          savings_recommendations: boolean
+          spending_alerts: boolean
+          updated_at: string
+          user_id: string
+          voice_assistant: boolean
+        }
+        Insert: {
+          auto_categorization?: boolean
+          automation_level?: string
+          created_at?: string
+          fraud_detection?: boolean
+          id?: string
+          savings_recommendations?: boolean
+          spending_alerts?: boolean
+          updated_at?: string
+          user_id: string
+          voice_assistant?: boolean
+        }
+        Update: {
+          auto_categorization?: boolean
+          automation_level?: string
+          created_at?: string
+          fraud_detection?: boolean
+          id?: string
+          savings_recommendations?: boolean
+          spending_alerts?: boolean
+          updated_at?: string
+          user_id?: string
+          voice_assistant?: boolean
+        }
+        Relationships: []
+      }
       amadeus_config: {
         Row: {
           api_key: string
@@ -80,6 +119,51 @@ export type Database = {
           secret_key?: string
           updated_at?: string
           webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      automation_workflows: {
+        Row: {
+          actions: Json | null
+          created_at: string
+          execution_count: number
+          id: string
+          is_active: boolean
+          last_executed: string | null
+          n8n_workflow_id: string | null
+          trigger_conditions: Json | null
+          updated_at: string
+          user_id: string
+          workflow_name: string
+          workflow_type: string
+        }
+        Insert: {
+          actions?: Json | null
+          created_at?: string
+          execution_count?: number
+          id?: string
+          is_active?: boolean
+          last_executed?: string | null
+          n8n_workflow_id?: string | null
+          trigger_conditions?: Json | null
+          updated_at?: string
+          user_id: string
+          workflow_name: string
+          workflow_type: string
+        }
+        Update: {
+          actions?: Json | null
+          created_at?: string
+          execution_count?: number
+          id?: string
+          is_active?: boolean
+          last_executed?: string | null
+          n8n_workflow_id?: string | null
+          trigger_conditions?: Json | null
+          updated_at?: string
+          user_id?: string
+          workflow_name?: string
+          workflow_type?: string
         }
         Relationships: []
       }
@@ -360,6 +444,42 @@ export type Database = {
         }
         Relationships: []
       }
+      happy_paisa_accounts: {
+        Row: {
+          created_at: string
+          hp_balance: number
+          id: string
+          inr_equivalent: number | null
+          is_active: boolean
+          stellar_address: string
+          stellar_secret_encrypted: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hp_balance?: number
+          id?: string
+          inr_equivalent?: number | null
+          is_active?: boolean
+          stellar_address: string
+          stellar_secret_encrypted: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hp_balance?: number
+          id?: string
+          inr_equivalent?: number | null
+          is_active?: boolean
+          stellar_address?: string
+          stellar_secret_encrypted?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       happy_paisa_purchases: {
         Row: {
           amount_happy_paisa: number
@@ -512,6 +632,78 @@ export type Database = {
           rooms?: number
           search_results?: Json | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      hp_conversion_rates: {
+        Row: {
+          created_at: string
+          effective_from: string
+          hp_to_inr_rate: number
+          id: string
+          is_active: boolean
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string
+          hp_to_inr_rate?: number
+          id?: string
+          is_active?: boolean
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          hp_to_inr_rate?: number
+          id?: string
+          is_active?: boolean
+        }
+        Relationships: []
+      }
+      hp_transactions: {
+        Row: {
+          created_at: string
+          fee_hp: number | null
+          from_address: string | null
+          hp_amount: number
+          id: string
+          inr_amount: number | null
+          memo: string | null
+          status: string
+          stellar_ledger: number | null
+          stellar_transaction_id: string
+          to_address: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fee_hp?: number | null
+          from_address?: string | null
+          hp_amount: number
+          id?: string
+          inr_amount?: number | null
+          memo?: string | null
+          status?: string
+          stellar_ledger?: number | null
+          stellar_transaction_id: string
+          to_address?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fee_hp?: number | null
+          from_address?: string | null
+          hp_amount?: number
+          id?: string
+          inr_amount?: number | null
+          memo?: string | null
+          status?: string
+          stellar_ledger?: number | null
+          stellar_transaction_id?: string
+          to_address?: string | null
+          transaction_type?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -927,6 +1119,36 @@ export type Database = {
           },
         ]
       }
+      stellar_config: {
+        Row: {
+          asset_code: string
+          asset_issuer: string | null
+          created_at: string
+          horizon_url: string
+          id: string
+          is_active: boolean
+          network_name: string
+        }
+        Insert: {
+          asset_code?: string
+          asset_issuer?: string | null
+          created_at?: string
+          horizon_url?: string
+          id?: string
+          is_active?: boolean
+          network_name?: string
+        }
+        Update: {
+          asset_code?: string
+          asset_issuer?: string | null
+          created_at?: string
+          horizon_url?: string
+          id?: string
+          is_active?: boolean
+          network_name?: string
+        }
+        Relationships: []
+      }
       transaction_pins: {
         Row: {
           created_at: string
@@ -1183,6 +1405,7 @@ export type Database = {
       virtual_cards: {
         Row: {
           activation_date: string | null
+          ai_fraud_protection: boolean
           card_number_encrypted: string
           card_type: string
           created_at: string
@@ -1190,22 +1413,27 @@ export type Database = {
           current_monthly_spent: number | null
           cvv_encrypted: string
           daily_limit: number | null
+          expires_at: string | null
           expiry_date: string
           id: string
+          is_temporary: boolean
           issuer_name: string
           last_transaction_at: string | null
           last_used_at: string | null
           masked_card_number: string
+          merchant_restrictions: Json | null
           metadata: Json | null
           monthly_limit: number | null
           pin_hash: string
           status: string
           total_transactions: number | null
           updated_at: string
+          usage_count: number
           user_id: string
         }
         Insert: {
           activation_date?: string | null
+          ai_fraud_protection?: boolean
           card_number_encrypted: string
           card_type?: string
           created_at?: string
@@ -1213,22 +1441,27 @@ export type Database = {
           current_monthly_spent?: number | null
           cvv_encrypted: string
           daily_limit?: number | null
+          expires_at?: string | null
           expiry_date: string
           id?: string
+          is_temporary?: boolean
           issuer_name?: string
           last_transaction_at?: string | null
           last_used_at?: string | null
           masked_card_number: string
+          merchant_restrictions?: Json | null
           metadata?: Json | null
           monthly_limit?: number | null
           pin_hash: string
           status?: string
           total_transactions?: number | null
           updated_at?: string
+          usage_count?: number
           user_id: string
         }
         Update: {
           activation_date?: string | null
+          ai_fraud_protection?: boolean
           card_number_encrypted?: string
           card_type?: string
           created_at?: string
@@ -1236,18 +1469,22 @@ export type Database = {
           current_monthly_spent?: number | null
           cvv_encrypted?: string
           daily_limit?: number | null
+          expires_at?: string | null
           expiry_date?: string
           id?: string
+          is_temporary?: boolean
           issuer_name?: string
           last_transaction_at?: string | null
           last_used_at?: string | null
           masked_card_number?: string
+          merchant_restrictions?: Json | null
           metadata?: Json | null
           monthly_limit?: number | null
           pin_hash?: string
           status?: string
           total_transactions?: number | null
           updated_at?: string
+          usage_count?: number
           user_id?: string
         }
         Relationships: []
