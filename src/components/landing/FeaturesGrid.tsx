@@ -76,7 +76,7 @@ export function FeaturesGrid() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
-            Built on lovable.dev Principles
+            Built on Axzora Principles
           </h2>
           <p className="text-xl text-purple-200 max-w-3xl mx-auto">
             Every feature is designed with emotional intelligence, user well-being, and delightful experiences at its core

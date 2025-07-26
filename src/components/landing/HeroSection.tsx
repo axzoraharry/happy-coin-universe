@@ -20,17 +20,17 @@ export function HeroSection({ onGetStarted }: HeroSectionProps) {
 
   return (
     <div className="relative overflow-hidden">
-      {/* Lovable ambient background */}
+      {/* Axzora ambient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-pink-900/10 to-blue-900/20"></div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(255,182,193,0.1),transparent_50%),radial-gradient(circle_at_70%_60%,rgba(147,51,234,0.1),transparent_50%)]"></div>
       
       <div className="relative container mx-auto px-4 py-20">
         <div className="text-center space-y-8 max-w-6xl mx-auto">
-          {/* Lovable.dev badge */}
+          {/* Axzora badge */}
           <div className="flex justify-center">
             <Badge className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white border-none px-6 py-3 text-lg font-medium shadow-lg">
               <Heart className="h-5 w-5 mr-2 animate-pulse" />
-              Powered by lovable.dev
+              Powered by Axzora
             </Badge>
           </div>
 
