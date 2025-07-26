@@ -4,6 +4,7 @@ import { VirtualCardManager } from '@/components/cards/VirtualCardManager';
 import { WalletActions } from '@/components/wallet/WalletActions';
 import { TransactionInsights } from '@/components/ai/TransactionInsights';
 import { SmartTransactionSearch } from '@/components/ai/SmartTransactionSearch';
+import { VoiceAssistant } from '@/components/ai/VoiceAssistant';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +20,8 @@ import {
   AlertTriangle,
   Brain,
   Search,
-  BarChart3
+  BarChart3,
+  Mic
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { VirtualCardAPI } from '@/lib/virtualCard';
@@ -75,7 +77,7 @@ export default function CardsPage() {
       </div>
 
       <Tabs defaultValue="cards" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="cards" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             Cards
@@ -87,6 +89,10 @@ export default function CardsPage() {
           <TabsTrigger value="search" className="flex items-center gap-2">
             <Search className="h-4 w-4" />
             Smart Search
+          </TabsTrigger>
+          <TabsTrigger value="voice" className="flex items-center gap-2">
+            <Mic className="h-4 w-4" />
+            Voice AI
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -177,6 +183,13 @@ export default function CardsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="voice" className="space-y-6">
+          <VoiceAssistant 
+            transactions={transactions}
+            onTransactionSelect={handleTransactionSelect}
+          />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
