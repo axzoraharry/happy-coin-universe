@@ -17,6 +17,12 @@ export const navItems = [
     page: <Index />,
   },
   {
+    title: "Cards",
+    to: "/cards",
+    icon: <CreditCard className="h-4 w-4" />,
+    page: <CardsPage />,
+  },
+  {
     title: "Coins",
     to: "/coins",
     icon: <CreditCard className="h-4 w-4" />,
