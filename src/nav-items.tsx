@@ -6,6 +6,7 @@ import { TransfersPage } from "./components/transfers/TransfersPage";
 import { NotificationsList } from "./components/notifications/NotificationsList";
 import { UserProfile } from "./components/profile/UserProfile";
 import APIPage from "./pages/APIPage";
+import CardsPage from "./pages/CardsPage";
 import HappyPaisaPage from "./pages/HappyPaisaPage";
 
 export const navItems = [
