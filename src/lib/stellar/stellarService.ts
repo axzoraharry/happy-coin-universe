@@ -180,7 +180,7 @@ export class StellarService {
       const hpAsset = new Asset(this.config.assetCode, this.config.assetIssuer);
       
       const transaction = new TransactionBuilder(account, {
-        fee: await this.server.fetchBaseFee(),
+        fee: (await this.server.fetchBaseFee()).toString(),
         networkPassphrase: this.config.networkName === 'testnet' ? Networks.TESTNET : Networks.PUBLIC
       })
         .addOperation(Operation.changeTrust({
@@ -207,11 +207,10 @@ export class StellarService {
     try {
       const paths = await this.server
         .strictReceivePaths(
-          params.sourceAsset,
+          [params.sourceAsset],
           params.destinationAsset,
           params.destinationAmount
         )
-        .destinationAccount(params.destinationAccount)
         .call();
       
       return paths.records;
