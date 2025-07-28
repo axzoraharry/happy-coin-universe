@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
+import { MrHappyInterface } from "@/components/layout/MrHappyInterface";
 import Index from "@/pages/Index";
 import CoinsPage from "@/pages/CoinsPage";
 import CardsPage from "@/pages/CardsPage";
@@ -31,6 +32,9 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          
+          {/* Mr Happy Interface - Available on all pages */}
+          <MrHappyInterface />
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
