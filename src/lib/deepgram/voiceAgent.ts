@@ -1,5 +1,3 @@
-import { createClient, LiveTranscriptionEvents, LiveConnectionState } from '@deepgram/sdk';
-
 export interface FinancialAction {
   type: 'transfer' | 'pay_bill' | 'check_balance' | 'create_card' | 'analyze_spending';
   parameters: Record<string, any>;
@@ -14,17 +12,14 @@ export interface ConversationMessage {
 }
 
 export class MrHappyVoiceAgent {
-  private deepgram: any;
-  private connection: any;
+  private mediaRecorder: MediaRecorder | null = null;
+  private stream: MediaStream | null = null;
   private isConnected = false;
   private onMessageCallback?: (message: ConversationMessage) => void;
   private onActionCallback?: (action: FinancialAction) => Promise<string>;
 
   constructor() {
-    // Initialize on client side only
-    if (typeof window !== 'undefined') {
-      this.deepgram = createClient(process.env.DEEPGRAM_API_KEY || '');
-    }
+    // No client-side initialization needed - we'll use server proxies
   }
 
   async initialize(
@@ -36,13 +31,11 @@ export class MrHappyVoiceAgent {
   }
 
   async startConversation() {
-    if (!this.deepgram) {
-      throw new Error('Deepgram not initialized');
-    }
-
     try {
+      console.log('Starting Mr Happy conversation...');
+      
       // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({
+      this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: 16000,
@@ -52,59 +45,92 @@ export class MrHappyVoiceAgent {
         }
       });
 
-      // Create live transcription connection
-      this.connection = this.deepgram.listen.live({
-        model: 'nova-2',
-        language: 'en-US',
-        smart_format: true,
-        filler_words: false,
-        punctuate: true,
-        interim_results: false,
-        endpointing: 300,
-        utterance_end_ms: 1000,
-        vad_events: true
-      });
+      console.log('Microphone access granted');
 
-      // Set up event listeners
-      this.connection.on(LiveTranscriptionEvents.Open, () => {
-        console.log('Mr Happy voice connection opened');
-        this.isConnected = true;
-        this.speak("Hello! I'm Mr Happy, your friendly financial assistant. How can I help you today?");
-      });
-
-      this.connection.on(LiveTranscriptionEvents.Transcript, (data: any) => {
-        const transcript = data.channel?.alternatives?.[0]?.transcript;
-        if (transcript && transcript.trim()) {
-          this.handleUserInput(transcript);
-        }
-      });
-
-      this.connection.on(LiveTranscriptionEvents.Error, (error: any) => {
-        console.error('Mr Happy voice error:', error);
-      });
-
-      this.connection.on(LiveTranscriptionEvents.Close, () => {
-        console.log('Mr Happy voice connection closed');
-        this.isConnected = false;
-      });
-
-      // Send audio data to Deepgram
-      const mediaRecorder = new MediaRecorder(stream, {
+      // Start recording with MediaRecorder
+      this.mediaRecorder = new MediaRecorder(this.stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && this.connection?.readyState === 1) {
-          this.connection.send(event.data);
+      let audioChunks: Blob[] = [];
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
         }
       };
 
-      mediaRecorder.start(100); // Send data every 100ms
+      this.mediaRecorder.onstop = async () => {
+        console.log('Recording stopped, processing audio...');
+        if (audioChunks.length > 0) {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          await this.processAudioChunk(audioBlob);
+          audioChunks = [];
+        }
+      };
 
-      return { stream, mediaRecorder };
+      // Start recording in chunks
+      this.mediaRecorder.start();
+      this.isConnected = true;
+
+      console.log('Mr Happy voice recording started');
+
+      // Send initial greeting
+      await this.speak("Hello! I'm Mr Happy, your friendly financial assistant. How can I help you today?");
+
+      // Set up chunk recording intervals
+      const recordingInterval = setInterval(() => {
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+          this.mediaRecorder.stop();
+          setTimeout(() => {
+            if (this.mediaRecorder && this.isConnected) {
+              this.mediaRecorder.start();
+            }
+          }, 100);
+        }
+      }, 3000); // Process audio every 3 seconds
+
+      return { stream: this.stream, mediaRecorder: this.mediaRecorder, recordingInterval };
     } catch (error) {
       console.error('Error starting Mr Happy conversation:', error);
       throw error;
+    }
+  }
+
+  private async processAudioChunk(audioBlob: Blob) {
+    try {
+      console.log('Processing audio chunk, size:', audioBlob.size);
+      
+      // Convert blob to base64
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const base64Audio = btoa(String.fromCharCode(...uint8Array));
+
+      // Send to our speech-to-text edge function
+      const response = await fetch('/api/deepgram-stt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audio: base64Audio,
+          mimeType: 'audio/webm'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`STT request failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const transcript = result.text?.trim();
+      
+      if (transcript && transcript.length > 3) { // Filter out very short utterances
+        console.log('Transcript received:', transcript);
+        await this.handleUserInput(transcript);
+      }
+    } catch (error) {
+      console.error('Error processing audio chunk:', error);
     }
   }
 
@@ -232,7 +258,9 @@ export class MrHappyVoiceAgent {
 
   private async speak(text: string) {
     try {
-      // Use Deepgram's Aura TTS
+      console.log('Mr Happy speaking:', text);
+      
+      // Use our TTS edge function
       const response = await fetch('/api/deepgram-tts', {
         method: 'POST',
         headers: {
@@ -277,10 +305,18 @@ export class MrHappyVoiceAgent {
   }
 
   async endConversation() {
-    if (this.connection) {
-      this.connection.finish();
-      this.connection = null;
+    console.log('Ending Mr Happy conversation...');
+    
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
     }
+    
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+      this.stream = null;
+    }
+    
+    this.mediaRecorder = null;
     this.isConnected = false;
   }
 
