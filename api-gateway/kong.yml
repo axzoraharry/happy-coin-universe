@@ -43,3 +43,10 @@ services:
       - name: mycroft-api-route
         paths: ["/v1/mycroft"]
         strip_path: false
+
+  - name: core-home-assistant-internal
+    url: http://core-home-assistant-sdk:8006
+    routes:
+      - name: core-assistant-route
+        paths: ["/v1/assistant"]
+        strip_path: false

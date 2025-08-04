@@ -133,6 +133,29 @@ services:
     networks:
       - axzora-network
 
+  # --- Core Home Assistant SDK ---
+  core-home-assistant-sdk:
+    build: ./core-home-assistant-sdk
+    hostname: core-home-assistant-sdk
+    environment:
+      AUTH_SERVICE_URL: "http://auth-service:8000"
+      NLU_SERVICE_URL: "http://nlu-engine-service:8002"
+      LLM_SERVICE_URL: "http://llm-orchestrator-service:8003"
+      HAPPY_PAISA_URL: "http://happy-paisa-ledger:8004"
+      PAYMENT_SERVICE_URL: "http://payment-gateway-service:8005"
+      MYCROFT_URL: "http://mycroft-core:8181"
+    ports:
+      - "8006:8006"
+    depends_on:
+      - auth-service
+      - nlu-engine-service
+      - llm-orchestrator-service
+      - happy-paisa-ledger
+      - payment-gateway-service
+      - mycroft-core
+    networks:
+      - axzora-network
+
 networks:
   axzora-network:
     driver: bridge
