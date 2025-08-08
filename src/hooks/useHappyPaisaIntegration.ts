@@ -21,13 +21,10 @@ export function useHappyPaisaIntegration() {
       await happyPaisaApi.healthCheck();
       setIsServiceAvailable(true);
     } catch (error) {
-      console.error('Happy Paisa Ledger service unavailable:', error);
+      console.warn('Happy Paisa Ledger service unavailable:', error);
       setIsServiceAvailable(false);
-      toast({
-        title: "Service Unavailable",
-        description: "Happy Paisa Ledger service is currently unavailable. Please try again later.",
-        variant: "destructive",
-      });
+      // Quietly degrade without spamming a destructive toast; UI will offer fallback flows
+
     }
   };
 
@@ -166,19 +163,29 @@ export function useHappyPaisaIntegration() {
   };
 
   const addFunds = async (amount: number, source: string) => {
-    if (!isServiceAvailable) {
-      toast({
-        title: "Service Unavailable",
-        description: "Happy Paisa Ledger service is currently unavailable",
-        variant: "destructive",
-      });
-      return false;
-    }
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // Fallback: If ledger service is unavailable, use Stripe Checkout via Supabase
+      if (!isServiceAvailable) {
+        const { data, error } = await supabase.functions.invoke('create-checkout', {
+          body: { amount, paymentMethod: 'card' },
+        });
+        if (error) throw error;
+
+        toast({
+          title: 'Redirecting to Checkout',
+          description: `Buying ${amount} HC via Stripe`,
+        });
+        if (data?.url) {
+          window.open(data.url, '_blank');
+          return true;
+        }
+        throw new Error('Failed to get checkout URL');
+      }
+
+      // Primary path: Use Happy Paisa Ledger when available
       const result = await happyPaisaApi.addFunds({
         user_id: user.id,
         amount,
@@ -188,22 +195,19 @@ export function useHappyPaisaIntegration() {
 
       if (result.success) {
         toast({
-          title: "Funds Added",
+          title: 'Funds Added',
           description: `${amount} HC added to your wallet`,
         });
-
-        // Refresh data
         await fetchUserData();
         return true;
-      } else {
-        throw new Error(result.message);
       }
+      throw new Error(result.message);
     } catch (error: any) {
       console.error('Add funds error:', error);
       toast({
-        title: "Failed to Add Funds",
-        description: error.message || "An error occurred while adding funds",
-        variant: "destructive",
+        title: 'Failed to Add Funds',
+        description: error.message || 'An error occurred while adding funds',
+        variant: 'destructive',
       });
       return false;
     }
