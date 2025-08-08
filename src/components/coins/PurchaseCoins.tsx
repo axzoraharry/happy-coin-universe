@@ -48,7 +48,6 @@ export function PurchaseCoins() {
 
       console.log('Checkout session created, opening:', data.url);
       
-      // Show success message
       toast({
         title: "Payment Session Created",
         description: "Opening Stripe checkout. Complete your payment to receive Happy Coins.",
