@@ -1,41 +1,68 @@
-
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { useSession } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { Navbar } from "@/components/layout/Navbar";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { Dashboard } from "@/components/pages/Dashboard";
+import { Transactions } from "@/components/pages/Transactions";
+import { Budgets } from "@/components/pages/Budgets";
+import { Goals } from "@/components/pages/Goals";
+import { Settings } from "@/components/pages/Settings";
+import { Auth } from "@/components/pages/Auth";
+import { Accounts } from "@/components/pages/Accounts";
+import { Categories } from "@/components/pages/Categories";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
-import { MrHappyInterface } from "@/components/layout/MrHappyInterface";
-import Index from "@/pages/Index";
-import CoinsPage from "@/pages/CoinsPage";
-import CardsPage from "@/pages/CardsPage";
-import HappyPaisaPage from "@/pages/HappyPaisaPage";
-import APIPage from "@/pages/APIPage";
-import AnalyticsPage from "@/pages/AnalyticsPage";
-import UserManagementPage from "@/pages/UserManagementPage";
-import NotFound from "@/pages/NotFound";
-import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import { EnhancedMrHappyInterface } from '@/components/layout/EnhancedMrHappyInterface';
 
 const queryClient = new QueryClient();
 
 function App() {
+  const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <Toaster />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/coins" element={<CoinsPage />} />
-            <Route path="/cards" element={<CardsPage />} />
-            <Route path="/happy-paisa" element={<HappyPaisaPage />} />
-            <Route path="/api" element={<APIPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/user-management" element={<UserManagementPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          
-          {/* Mr Happy Interface - Available on all pages */}
-          <MrHappyInterface />
+          {isAuthenticated ? (
+            <div className="h-screen flex overflow-hidden bg-gray-50">
+              <Sidebar />
+              <div className="flex-1 overflow-auto focus:outline-none">
+                <Navbar />
+                <main className="relative py-6 lg:pt-8 lg:px-8">
+                  <div className="mx-auto max-w-7xl">
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/transactions" element={<Transactions />} />
+                      <Route path="/accounts" element={<Accounts />} />
+                      <Route path="/categories" element={<Categories />} />
+                      <Route path="/budgets" element={<Budgets />} />
+                      <Route path="/goals" element={<Goals />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                  </div>
+                </main>
+              </div>
+            </div>
+          ) : (
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="*" element={<Navigate to="/auth" />} />
+            </Routes>
+          )}
         </BrowserRouter>
+        
+        {/* Add the Enhanced Mr Happy Interface */}
+        <EnhancedMrHappyInterface />
       </TooltipProvider>
     </QueryClientProvider>
   );
