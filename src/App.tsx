@@ -1,10 +1,11 @@
+
+import { useState } from "react";
 import {
   BrowserRouter,
   Routes,
   Route,
   Navigate,
 } from "react-router-dom";
-import { useSession } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { Navbar } from "@/components/layout/Navbar";
@@ -24,8 +25,14 @@ import { EnhancedMrHappyInterface } from '@/components/layout/EnhancedMrHappyInt
 const queryClient = new QueryClient();
 
 function App() {
-  const { status } = useSession();
-  const isAuthenticated = status === "authenticated";
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  // For now, we'll simulate authentication as true
+  // In a real app, you'd use proper authentication logic
+  const isAuthenticated = true;
+
+  const handlePageChange = (page: string) => {
+    setCurrentPage(page);
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -36,7 +43,10 @@ function App() {
             <div className="h-screen flex overflow-hidden bg-gray-50">
               <Sidebar />
               <div className="flex-1 overflow-auto focus:outline-none">
-                <Navbar />
+                <Navbar 
+                  currentPage={currentPage} 
+                  onPageChange={handlePageChange}
+                />
                 <main className="relative py-6 lg:pt-8 lg:px-8">
                   <div className="mx-auto max-w-7xl">
                     <Routes>
